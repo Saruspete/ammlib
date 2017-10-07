@@ -1,0 +1,229 @@
+# vim: ts=4 ft=sh
+
+# AMM Library
+# Main file, bootstrap and load dependencies
+#
+# To avoid uneeded library loading, some core / often used functions are here
+# (they should be in their respective library file)
+
+set -u
+
+#
+# Compatibility check
+#
+
+# Check if we are using bash, else try to load the wrapper
+if [[ -z "$BASH" ]] || [[ "$(cat /proc/$$/comm)" != "bash" ]]; then
+	
+	# TODO Try to find a valid wrapper
+	:
+	
+fi
+
+#
+# FACT: We are now in bash
+#
+
+typeset __AMMLIB_REALPATH="${BASH_SOURCE[0]}"
+typeset __AMMLIB_INTERACTIVE="$(tty -s && echo 1 || echo 0)"
+
+# Check the readlink usability
+if type -t readlink >/dev/null; then
+	[[ "$(readlink -f "$__AMMLIB_REALPATH")" -ef "$__AMMLIB_REALPATH" ]] || {
+		echo "Readlink exists ($(type "readlink")) but does not behave properly."
+		echo "Please check your existing environment before retrying. Stopping here."
+		echo "(press any key to exit)"
+		read -s -n 1 key
+		exit 1
+	}
+fi
+
+#
+# Set and create base folders to be used by library
+#
+
+# Library scripts base path
+typeset __AMMLIB_ROOT="${__AMMLIB_REALPATH%/*}"
+
+# Temporary data
+typeset __AMMLIB_DATATMP="/tmp/.ammlib.${UID:-$(id -u)}/"
+[[ -d "$__AMMLIB_DATATMP" ]] || mkdir -p "$__AMMLIB_DATATMP"
+
+# Persistant data
+typeset __AMMLIB_DATA="$HOME/.ammlib/data/"
+[[ -d "$__AMMLIB_DATA" ]] || mkdir -p "$__AMMLIB_DATA"
+
+
+# -----------------------------------------------------------------------------
+# Module loading
+# -----------------------------------------------------------------------------
+typeset __AMMLIB_SEARCHPATH="${__AMMLIB_ROOT}"
+typeset __AMMLIB_LOADED="lib"
+
+function ammLibLocate {
+	typeset libname="$1"
+	for libpath in $__AMMLIB_SEARCHPATH; do
+			typeset nlib="${libpath}/${libname}.lib"
+			[[ -r "$nlib" ]] && {
+				echo "$nlib"
+				return
+			}
+	done
+}
+
+function ammLibGetSymbols {
+	
+	for file in "$@"; do
+		grep -Po '^[\s]*(function[\s]+[^\s]+|[^\s]+\(\))[\s]*{' $file | awk '
+			/function[ ]+([^ ]+)/ {print $2} 
+			/[^ ]+[ ]*()/ { gsub(/[()]/,"",$1); print $1 }'
+		grep -Po '^[\s]*(typeset|declare|readonly)([\s]+-[a-zA-Z]+)?[\s]+__[^\s]+=' "$file" | awk '
+			{gsub(/=$/,"",$NF); print $NF; }'
+	done
+}
+
+function ammLibLoad {
+	typeset -i r=0
+	for libname in "$@"; do
+		for l in $__AMMLIB_LOADED; do
+			# Already loaded
+			[[ "$libname" == "$l" ]] && return
+		done
+
+		typeset nlib="$(ammLibLocate "$libname")"
+		# If the lib exists, load it
+		if [[ -n "$nlib" ]]; then
+			. $nlib
+			__AMMLIB_LOADED="$__AMMLIB_LOADED $libname"
+			continue
+		else
+			echo >&2 "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
+			r=r+1
+		fi
+	done
+	return $r
+}
+
+function ammLibUnload {
+	typeset -i r=0
+
+	# Find 
+	typeset libname
+	for libname in "$@"; do
+		typeset libfile l
+		# Check if lib was loaded
+		for l in $__AMMLIB_LOADED; do
+			# Not loaded
+			[[ "$libname" == "$l" ]] && {
+				libfile="$(ammLibLocate "$libname")"
+				continue
+			}
+		done
+
+		# Skip non-loaded / non-found libraries
+		[[ -z "$libfile" ]] && continue
+
+		# Remove symbols (functions)
+		typeset sym
+		for sym in $(ammLibGetSymbols "$libfile"); do
+			unset $sym
+		done
+
+	done
+}
+
+
+# Compact all libraries to a single file, to be embedded in scripts
+function ammLibCompact {
+	:
+}
+
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+
+function _ammLogColorJoin {
+	typeset IFS="$1"; shift
+	echo "$*"
+}
+
+typeset -A __AMMLOG_TERMCODES=(
+	# Set
+	[reset]=0 [bold]=1 [dim]=2 [underline]=4 [blink]=5 [reverse]=7 [hidden]=8
+	# Reset
+	[resetbold]=21 [resetdim]=22 [resetunderline]=24 [resetblink]=25 [resetreverse]=27 [resethidden]=28
+	# Foreground Colors
+	[black]=30 [red]=31 [green]=32 [yellow]=33 [blue]=34 [magenta]=35 [cyan]=36 [white]=37 [default]=39
+	# Background Colors
+	[bgblack]=40 [bgred]=41 [bggreen]=42 [bgyellow]=43 [bgblue]=44 [bgmagenta]=45 [bgcyan]=46 [bgwhite]=47 [bgdefault]=49
+	# Foreground Colors Light
+	[lightred]=91 [lightgreen]=92 [lightyellow]=93 [lightblue]=94 [lightmagenta]=95 [lightcyan]=96 [lightwhite]=97
+	# Background Colors Light
+	[bglightblack]=100 [bglightred]=101 [bglightgreen]=102 [bglightyellow]=103 [bglightblue]=104 [bglightmagenta]=105 [bglightcyan]=106 [bglightwhite]=107 [bglightdefault]=109
+)
+
+function ammLogColor {
+	typeset -r esc="\033["
+	typeset -a codes=()
+
+	while [[ -n "${1-}" ]]; do
+		[[ -n "${__AMMLOG_TERMCODES[$1]-}" ]] && codes[${#codes[@]}+1]="${__AMMLOG_TERMCODES[$1]}"
+		shift
+	done
+
+	echo -e "${esc}$(_ammLogColorJoin ";" ${codes[@]})m"
+}
+
+function ammLogTime {
+	date '+%H:%M:%S'
+}
+
+function ammLogDate {
+	date '+%y-%m-%d'
+}
+
+
+typeset __AMMLOG_LOGFILE=""
+typeset __AMMLOG_LOGTERM=""
+function _ammLog {
+	typeset tag="$1"; shift
+	typeset fmt="$1"; shift
+
+	typeset color="$(ammLogColor $fmt)"
+	typeset colorrst="$(ammLogColor reset)"
+	typeset date="$(ammLogTime)"
+
+	# Display
+	echo -e "${color}[$date]$color[$tag][$$] $@${colorrst}"
+}
+
+
+function _ammLogWrite {
+	typeset tar="$1"; shift
+	typeset fmt="$2"; shift
+	typeset color=""
+}
+
+function ammLogErr {
+	_ammLog "ERR" "bold red" "$@"
+}
+
+function ammLogWrn {
+	_ammLog "WRN" "bold yellow" "$@"
+}
+
+function ammLogDbg {
+	_ammLog "DBG" "bold blue" "$@"
+}
+
+function ammLogStdout {
+	typeset type="$1"
+	while read line; do
+		ammLog${type} "$line"
+	done
+}
+
+# -----------------------------------------------------------------------------
+# 
+# -----------------------------------------------------------------------------

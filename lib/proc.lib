@@ -1,0 +1,40 @@
+# vim: ft=sh
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+    # Yeah you can export the __AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+function ammProcPidExists {
+	typeset 
+}
+
+
+function ammProcLastRun {
+	:
+}
+
+# -----------------------------------------------------------------------------
+# Daemon management
+# -----------------------------------------------------------------------------
+typeset __AMMPROC_DAEMONSTATEBASE="$__AMMLIB_DATATMP/proc.daemon/"
+
+function _ammProcDaemonFilestate {
+	typeset process="$1"
+	echo "$__AMMPROC_DAEMONSTATEBASE/$process"
+}
+
+
+function ammProcDaemonCreate {
+	:
+}
+
+function ammProcDaemonIsAlive {
+	:
+}
+
+function ammProcDaemonZap {
+	:
+}

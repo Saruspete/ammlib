@@ -1,0 +1,112 @@
+# vim: ft=sh
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+
+# Translate a time in format MM or HH:MM or HH:MM:SS in minutes
+function ammTime2Min {
+	typeset time="$1"
+	typeset th="${time%%:*}"
+	typeset tm="${time#*:}"
+	tm="${tm%%:*}"
+
+	# Assume default time is in min
+	[[ "$th" == "$time" ]] && th="0"
+	echo $(( ${th#0} * 60 + ${tm#0} ))
+}
+
+function ammTimeInRange {
+	typeset timeCheck="$1"
+	typeset timeStart="$2"
+	typeset timeStop="$3"
+
+	# Normalize time
+	typeset tnorCheck="$(ammTime2Min "$timeCheck")"
+	typeset tnorStart="$(ammTime2Min "$timeStart")"
+	typeset tnorStop="$(ammTime2Min "$timeStop")"
+
+	# Standard time: start < stop
+	if [[ "$tnorStart" -le "$tnorStop" ]]; then
+		[[ "$tnorStart" -le "$tnorCheck" ]] && [[ "$tnorCheck" -le "$tnorStop" ]]
+		return $?
+	# Overnight range: start > stop
+	else
+		[[ "$tnorStop" -le "$tnorCheck" ]] && [[ "$tnorCheck" -le "$tnorStart" ]]
+		return $?
+	fi
+	
+}
+
+function ammTimeBusinessRunning {
+	typeset timeCurr="$(date "+%H:%M")"
+
+	for timerange in "$@"; do
+		typeset bizStart="${timerange%%-*}"
+		typeset bizStop="${timerange##*-}"
+
+		# If we are in range, it's business time!
+		ammTimeInRange "$timeCurr" "$bizStart" "$bizStop" && return 0
+	done
+
+	return 1
+}
+
+function ammTimeIsBusinessTimeFair {
+
+	# Setup the avail minutes array
+	typeset -a avail
+	while [[ ${#avail[@]} -lt 1440 ]]; do
+		avail[${#avail[@]}]=1
+	done
+
+	# Check registered time-ranges
+	for timerange in "$@"; do
+		typeset minStart="$(ammTime2Min "${timerange%%-*}")"
+		typeset minStop="$(ammTime2Min "${timerange##*-}")"
+
+		# Prepare loop minstop => minstart (decrement) to ease overnight
+		typeset -i i=$minStop
+
+		# Overnight ex: 23=>7: add 1 virt day for counter decrement
+		[[ "$minStart" -gt "$minStop" ]] && i=i+1440
+
+		while [[ $i -gt $minStart ]]; do
+			unset avail[$(($i%1440+1))]
+			i=i-1
+		done
+
+	done
+
+	# Get max consecutive min range
+	typeset -i cnt=0 maxcnt=0 firstcnt=0 prevmin=0
+	typeset -a availkeys=(${!avail[@]})
+	typeset    availlast="${availkeys[-1]}"
+
+	for min in ${availkeys[@]}; do
+		# last minute not consecutive OR end of loop
+		if [[ $(( $prevmin+1 )) -ne $min ]] && [[ $min -ne 0 ]] || [[ $min == "$availlast" ]]; then
+			# First save and first minute was avail (used for rollover)
+			[[ $maxcnt -eq 0 ]] && [[ ${avail[0]} -eq 1 ]] && firstcnt=$cnt
+			# last iteration (add for overnight rollover)
+			[[ $min -eq 1439 ]] && cnt=cnt+$firstcnt
+
+			# Save the max and reset
+			[[ $cnt -gt $maxcnt ]] && maxcnt=$cnt
+
+			cnt=1
+		fi
+		cnt=cnt+1
+		prevmin=min
+		
+	done
+
+	# Max consecutive time
+	echo $maxcnt
+	[[ $maxcnt -ge 120 ]]
+
+}

@@ -1,0 +1,46 @@
+#!/bin/bash
+
+typeset MYSELF="$(readlink -f $0)"
+typeset MYPATH="${MYSELF%/*}"
+
+# Do not expand failed globs
+shopt -s nullglob
+
+export LC_ALL=C
+
+typeset -a SHELLS=(/bin/bash /bin/ksh /bin/zsh /bin/dash/ /bin/sh)
+typeset    TESTS=$MYPATH/test.*.sh
+
+# Output file
+typeset MYOUT="$MYPATH/results"
+[[ -d "$MYOUT" ]] || mkdir -p "$MYOUT" || { echo "Unable to create '$MYOUT'. Exiting..."; exit 1; }
+
+
+#
+# Do the tests
+#
+for testscript in $TESTS; do
+
+	echo "Testing '$testscript'"
+
+	# Run against all shells
+	for sid in ${!SHELLS[@]}; do
+		typeset shell="${SHELLS[sid]}";
+		shell="$(readlink -f $shell)"
+		[[ -x $shell ]] || continue
+		
+		typeset base="$MYOUT/${testscript##*/}.${shell##*/}"
+		typeset outfile="$base.out"
+		typeset errfile="$base.err"
+		typeset resfile="$base.res"
+
+		echo -n "- $shell : "
+		#/bin/time -f "$timefmt" -o $resfile -- $shell $testscript
+		/bin/time -v -o "$resfile" -- $shell "$testscript" >$outfile 2>$errfile 
+		awk 'NR ~/^[346]$/ { printf "%s ", $NF;}' "$resfile"
+		echo
+
+	done
+
+done
+

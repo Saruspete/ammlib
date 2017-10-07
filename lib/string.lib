@@ -1,0 +1,23 @@
+# vim: ft=sh
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+function ammString2List {
+	typeset    listFull=""
+	typeset -i err=0
+
+	typeset elem group
+
+	for elems in "$@"; do
+		# Split the g1,g2,g3 parts
+		for group in ${elems// /,}; do
+			# Split the groups (if any)
+			:
+		done
+	done
+}

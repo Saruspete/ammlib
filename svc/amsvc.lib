@@ -1,0 +1,305 @@
+# vim: ft=sh
+
+# Adrien Mahieux - SVC Generic lib v0.1
+
+if [[ -z "$MYPATH" ]] || [[ -z "$MYSELF" ]] || [[ -z "$MYCALL" ]]; then
+	echo "Your environemnt is not safe to use this lib..."
+	exit 1
+fi
+
+# Ensure a safe environment
+set -o nounset
+set -o noclobber
+
+export LC_ALL="C"
+export PATH="/bin:/sbin:/usr/bin:/usr/sbin:$PATH"
+unset LD_LIBRARY_PATH
+
+
+# Set my path according to these
+typeset -r APP_NAME="${MYCALL##*/}"
+typeset -r APP_BASE="$(readlink -f $MYPATH/../apps/${APP_NAME})"
+typeset -r SRC_BASE="$(readlink -f $MYPATH/../srcs/${APP_NAME})"
+typeset -r DB_BASE="$(readlink -f $MYPATH/../data/${APP_NAME})"
+typeset -r TMP_BASE="$(readlink -f $MYPATH/../tmp)"
+typeset -r TMP_PIDS="${TMP_BASE}/_pids"
+
+# 
+typeset RUN_VERS="current"
+typeset RUN_BASE="$APP_BASE/${APP_NAME}-${RUN_VERS}"
+typeset LOG_BASE="$APP_BASE/${APP_NAME}"
+typeset DB_STORE="$DB_BASE/${APP_NAME}"
+
+# To be overriden by script
+typeset RUN_BIN="${RUN_BIN:-}"
+typeset RUN_OPT="${RUN_OPT:-}"
+typeset RUN_USER="${RUN_USER:-}"
+typeset RUN_PIDOPT="${RUN_PIDOPT:-}"
+
+# Verbosity
+typeset -i LOG_VERB="1"
+typeset -i _LOG_DEPTH=0
+
+typeset CESC="\033["
+typeset CRST="${CESC}0m"
+typeset CRED="${CESC}91m"
+typeset CGRN="${CESC}92m"
+typeset CYEL="${CESC}93m"
+typeset CBLU="${CESC}94m"
+typeset CPUR="${CESC}95m"
+typeset CCYA="${CESC}96m"
+typeset CWHI="${CESC}96m"
+
+function char_repeat {
+	typeset -i time="${1:-1}";
+	typeset char="${2:- }";
+	seq -s "$char" $(($time+1)) | tr -d '[:digit:]'
+}
+
+function log {
+	typeset lvl="$1"; shift
+	typeset lvlcol="$lvl"
+	case $lvl in
+		ERR) lvlcol="${CRED}$lvl${CRST}" ;;
+		WRN) lvlcol="${CYEL}$lvl${CRST}" ;;
+		INF) lvlcol="${CGRN}$lvl${CRST}" ;;
+		DBG) lvlcol="${CBLU}$lvl${CRST}" ;;
+	esac
+
+	# Padding for logs, depending on the step we are in.
+	# But don't 
+	typeset pad="$(char_repeat $(($_LOG_DEPTH*2)))"
+	[[ "$lvl" == "DBG" ]] && pad=""
+
+	# Read stdin
+	if [[ "$1" = "-"  ]]; then
+
+		while read line; do 
+			# Skip the ending "set +x" of dbg
+			[[ $line =~ .+\ set\ \+x$ ]] && continue
+			if [[ -t 1 ]]; then
+				echo -e "[$(date '+%H:%M:%S')][$lvlcol]$pad $line"
+			else
+				echo "[$(date '+%Y-%m-%d_%H:%M:%S')][$lvl]$pad $line"
+			fi
+		done
+
+	# Standard line
+	else
+		# Use color & short date if stdout (1) is pure tty (not piped)
+		if [[ -t 1 ]]; then
+			echo -e "[$(date '+%H:%M:%S')][$lvlcol]$pad $@"
+		else
+			echo "[$(date '+%Y-%m-%d_%H:%M:%S')][$lvl]$pad $@"
+		fi
+	fi
+}
+function log_err { log "ERR" "$@"; }
+function log_wrn { log "WRN" "$@"; }
+function log_inf { log "INF" "$@"; }
+function log_dbg {
+	[[ "$LOG_VERB" -lt 1 ]] && return
+	log "DBG" "$@"
+}
+
+
+function log_stepnew {
+	log_inf "STEP NEW ($_LOG_DEPTH): $@"
+	_LOG_DEPTH+=1
+}
+function log_stepend {
+	_LOG_DEPTH+=-1
+	log_inf "STEP END ($_LOG_DEPTH): $@"
+}
+
+#function log_stack { }
+
+
+
+# Debugging logs (beware, will be async from other standard log_ calls !)
+typeset LOG_DBGFILE="$LOG_BASE/svc.${APP_NAME}.$$.dbg"
+exec 99> >(log_dbg -; wait)
+export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]}::$LINENO)  '
+BASH_XTRACEFD=99
+
+
+function is_set {   type "$1" >/dev/null; }
+function is_func {  [[ "$(type -t "$1")" == "function" ]]; }
+function is_alias { [[ "$(type -t "$1")" == "alias" ]]; }
+
+# Try to run as user
+function user_run {
+	typeset runas="$1"; shift
+	typeset curruser="$(user_current)"
+	typeset ret=0
+
+set -x
+	# Exec from stdin
+	if [[ "$@" = "-" ]]; then
+		
+		# If no user specified, or we already are correct one...
+		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
+			eval "$(cat)"
+			ret=$?
+			
+		# root... yay !
+		elif [[ "$curruser" = "root" ]]; then
+			cat | su  "$runas"
+			ret=$?
+		else
+			log_err "Cannot change from user $curruser to user $runas"
+			ret=4
+		fi
+		
+	# Standard binary to run
+	else
+		# Default to run as owner of the file
+		if [[ -z "$runas" ]] && [[ -x "$1" ]]; then
+			runas="$(stat -c '%U' "$1")"
+		else
+			runas="$curruser"
+		fi
+
+		# Correct user, nice
+		if [[ "$runas" = "$curruser" ]]; then
+			"$@"
+			ret=$?
+
+		# root... yay !
+		elif [[ "$curruser" = "root" ]]; then
+			# I need to flatten
+			su -c "$*" - "$runas"
+			ret=$?
+
+		# Maybe handle sudo ?
+		elif sret="$(sudo -nl 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$sret" ]]; then
+			# maybe should parse $sret output more...
+			sudo -n -u "$runas" "$@"
+			ret=$?
+
+		# Fails...
+		else
+			log_err "Cannot exec '$@' as user $runas from user $curruser"
+			ret=4
+		fi
+	fi
+set +x
+	return $ret
+}
+
+function user_current {
+	id -un
+}
+
+
+# Standard start
+function amsvc_start {
+
+	# Use global opts if available
+	typeset opts="${RUN_OPT:-}"
+
+	# If argument provided, use these to override
+	[[ -n "${1:-}" ]] && {
+		opts="$@"
+	}
+
+	# Add the PIDFILE afterwards
+	[[ -n "$RUN_PIDOPT" ]] && {
+		opts+="$RUN_PIDOPT $(amsvc_getpidfile)"
+	}
+
+	# User defined startup func, don't mess with it
+	if is_func "run_start"; then
+		log_inf "Starting with custom run_start function"
+		run_start "$@"
+		log_inf "Result: $?"
+		return $?
+	
+	# Variables
+	elif [[ -n "$RUN_BIN" ]]; then
+		log_inf "Starting with \$RUN_BIN var ($RUN_BIN)"
+		user_run "$RUN_USER" "$RUN_BIN" "$opts"
+		log_inf "Result: $?"
+		return $?
+
+	# Nothing...
+	else
+		log_err "Cannot use generic start: No function 'run_start' and no var 'RUN_BIN' defined"
+		return 1
+	fi
+
+}
+
+# Standard stop
+function amsvc_stop {
+	:
+}
+
+function amsvc_getpidfile {
+	# Create base folder if needed
+	[[ -d "$TMP_PIDS" ]] || mkdir -p "$TMP_PIDS"
+
+	# Return standard pid path
+	echo "${TMP_PIDS}/${APP_NAME}.pid"
+}
+
+function amsvc_isrunning {
+
+	# Check if we have a valid PID File
+	typeset pidfile="$(amsvc_getpidfile)"
+	[[ -s "$pidfile" ]] && {
+		typeset pid="$(cat "$pidfile" 2>/dev/null)"
+		# PIDs < 100 are so unlikely (used by kthreads) we shouldn't even try
+		[[ -n "$pid" ]] && [[ "$pid" -gt 100 ]] && {
+			[[ -e "/proc/$pid" ]]
+			return $?
+		}
+	}
+
+	# No pid file, try if we have a RUN_BIN var
+	[[ -n "$RUN_BIN" ]] && {
+		:
+	}
+
+	return 1
+}
+
+# Parse global options
+function amsvc_parseopt {
+	:
+}
+
+
+# Main processing option
+function amsvc_main {
+
+	act="${1:-}"; shift
+
+	#
+	case "$act" in
+		start)
+			amsvc_isrunning && log_wrn "already started"
+			amsvc_start "$@"
+			;;
+		stop)
+			amsvc_isrunning || log_wrn "already stopped"
+			amsvc_stop "$@"
+			;;
+		restart)
+			amsvc_isrunning && amsvc_stop "$@"
+			amsvc_isrunning || amsvc_start "$@"
+			;;
+		status)
+			echo "Status of ${APP_NAME}:"
+			amsvc_isrunning
+			;;
+		*)
+			log_err "Usage: $0 <start|stop|restart|status|zap>"
+			exit 1
+			;;
+	esac
+}
+
+function file_set_key {
+	:
+}

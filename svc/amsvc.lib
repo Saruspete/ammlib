@@ -20,15 +20,26 @@ unset LD_LIBRARY_PATH
 typeset -r APP_NAME="${MYCALL##*/}"
 typeset -r APP_BASE="$(readlink -f $MYPATH/../apps/${APP_NAME})"
 typeset -r SRC_BASE="$(readlink -f $MYPATH/../srcs/${APP_NAME})"
-typeset -r DB_BASE="$(readlink -f $MYPATH/../data/${APP_NAME})"
-typeset -r TMP_BASE="$(readlink -f $MYPATH/../tmp)"
+typeset -r DAT_BASE="$(readlink -f $MYPATH/../data/${APP_NAME})"
+typeset -r TMP_BASE="$(readlink -f $MYPATH/../temp/${APP_NAME})"
 typeset -r TMP_PIDS="${TMP_BASE}/_pids"
+typeset -r LOG_BASE="${DAT_BASE}/_logs"
 
-# 
+# Sanity checks
+[[ -z "$APP_BASE" ]] && { echo >&2 "Unable to find APP_BASE value"; exit 1; }
+[[ -z "$LOG_BASE" ]] && { echo >&2 "Unable to find LOG_BASE value"; exit 1; }
+[[ -z "$DAT_BASE" ]] && { echo >&2 "Unable to find DAT_BASE value"; exit 1; }
+[[ -z "$TMP_BASE" ]] && { echo >&2 "Unable to find TMP_BASE value"; exit 1; }
+[[ -e "$APP_BASE" ]] && { echo >&2 "Missing required folder '$APP_BASE'"; exit 1; }
+[[ -d "$TMP_BASE" ]] || mkdir -p "$TMP_BASE"
+[[ -d "$LOG_BASE" ]] || mkdir -p "$LOG_BASE"
+
+
+
+#
 typeset RUN_VERS="current"
 typeset RUN_BASE="$APP_BASE/${APP_NAME}-${RUN_VERS}"
-typeset LOG_BASE="$APP_BASE/${APP_NAME}"
-typeset DB_STORE="$DB_BASE/${APP_NAME}"
+typeset DB_STORE="$DAT_BASE/${APP_NAME}"
 
 export RUN_VERS RUN_BASE LOG_BASE DB_STORE
 
@@ -37,6 +48,7 @@ typeset RUN_BIN="${RUN_BIN:-}"
 typeset RUN_OPT="${RUN_OPT:-}"
 typeset RUN_USER="${RUN_USER:-}"
 typeset RUN_PIDOPT="${RUN_PIDOPT:-}"
+typeset RUN_DAEMON=""
 
 # Verbosity
 typeset -i LOG_VERB="1"
@@ -69,14 +81,14 @@ function log {
 	esac
 
 	# Padding for logs, depending on the step we are in.
-	# But don't 
+	# But don't add it for debug, already done from PS4 1rst char
 	typeset pad="$(char_repeat $(($_LOG_DEPTH*2)))"
 	[[ "$lvl" == "DBG" ]] && pad=""
 
 	# Read stdin
 	if [[ "$1" = "-"  ]]; then
 
-		while read line; do 
+		while read line; do
 			# Skip the ending "set +x" of dbg
 			[[ $line =~ .+\ set\ \+x$ ]] && continue
 			if [[ -t 1 ]]; then
@@ -100,25 +112,57 @@ function log_err { log "ERR" "$@"; }
 function log_wrn { log "WRN" "$@"; }
 function log_inf { log "INF" "$@"; }
 function log_dbg {
-	[[ "$LOG_VERB" -lt 1 ]] && return
-	log "DBG" "$@"
+	#LOG_DBGSTACK[$_LOG_DEPTH]+="$@"
+
+	# Only send to log on verbose level
+	if [[ "$LOG_VERB" -ge 2 ]]; then
+		log "DBG" "$@"
+	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
+	else
+		if [[ "$1" == "-" ]]; then
+			while read line; do
+				echo "$line" >> "${LOG_DBGFILE}.${_LOG_DEPTH}"
+			done
+		else
+			echo "$@" >> "${LOG_DBGFILE}.${_LOG_DEPTH}"
+		fi
+	fi
 }
 
 
 function log_stepnew {
 	log_inf "STEP NEW ($_LOG_DEPTH): $@"
 	_LOG_DEPTH+=1
+	# Clean old stack
+	>| "${LOG_DBGFILE}.${_LOG_DEPTH}"
+	#LOG_DBGSTACK[$_LOG_DEPTH]=""
 }
 function log_stepend {
 	_LOG_DEPTH+=-1
 	log_inf "STEP END ($_LOG_DEPTH): $@"
 }
 
-#function log_stack { }
+function log_stackdump {
+	typeset -i deep="${1:-1}"
 
+	# Cannot go before deep 0
+	[[ $deep -gt $_LOG_DEPTH ]] && deep=$_LOG_DEPTH
 
+	while [[ $deep -ge 0 ]]; do
+		typeset -i d=$(( $_LOG_DEPTH - $deep ))
+		#echo "${LOG_DBGSTACK[$d]}"
+		cat "${LOG_DBGFILE}.${d}"
+		deep+=-1
+	done
+}
+
+function log_cleanup {
+	# remove temporary stack files
+	rm -f $LOG_DBGFILE.[0-9]*
+}
 
 # Debugging logs (beware, will be async from other standard log_ calls !)
+#typeset -a LOG_DBGSTACK
 typeset LOG_DBGFILE="$LOG_BASE/svc.${APP_NAME}.$$.dbg"
 exec 99> >(log_dbg -; wait)
 export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]}::$LINENO)  '
@@ -134,21 +178,19 @@ function user_run {
 	typeset runas="$1"; shift
 	typeset curruser="$(user_current)"
 	typeset ret=0
-	typeset out=""
 
-set -o pipefail
 set -x
 	# Exec from stdin
 	if [[ "$@" = "-" ]]; then
 		
 		# If no user specified, or we already are correct one...
 		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
-			out="$(eval "$(cat)" 2>&1)"
+			eval "$(cat)"
 			ret=$?
 			
 		# root... yay !
 		elif [[ "$curruser" = "root" ]]; then
-			out="$(cat | su  "$runas" 2>&1)"
+			cat | su  "$runas"
 			ret=$?
 		else
 			log_err "Cannot change from user $curruser to user $runas"
@@ -166,19 +208,19 @@ set -x
 
 		# Correct user, nice
 		if [[ "$runas" = "$curruser" ]]; then
-			out="$("$@" 2>&1)"
+			"$@"
 			ret=$?
 
 		# root... yay !
 		elif [[ "$curruser" = "root" ]]; then
 			# I need to flatten
-			out="$(su -c "$*" - "$runas" 2>&1)"
+			su -c "$*" - "$runas"
 			ret=$?
 
 		# Maybe handle sudo ?
 		elif sret="$(sudo -nl 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$sret" ]]; then
 			# maybe should parse $sret output more...
-			out="$(sudo -n -u "$runas" "$@" 2>&1)"
+			sudo -n -u "$runas" "$@"
 			ret=$?
 
 		# Fails...
@@ -189,9 +231,6 @@ set -x
 	fi
 set +x
 
-	if [[ $ret -ne 0 ]]; then
-		log_err "Execution error. Return code: $ret. Output:\n$out"
-	fi
 	return $ret
 }
 
@@ -235,10 +274,26 @@ function amsvc_start {
 			}
 		}
 
+		# Should we handle daemonizing
+		[[ -n "$RUN_DAEMON" ]] && {
+			opts+=" >/dev/null 2>&1 0>&1 & "
+		}
+
 		log_inf "Starting with \$RUN_BIN var ($RUN_BIN)"
-		user_run "$RUN_USER" "$RUN_BIN" "$opts"
-		log_inf "Result: $?"
-		return $?
+		typeset out=""
+		typeset ret=""
+
+		out="$(user_run "$RUN_USER" "$RUN_BIN" "$opts" 2>&1)"
+		ret=$?
+
+		# Check return value
+		if [[ $ret -ne 0 ]]; then
+			log_err "Service start return: $ret. Output:\n$out"
+			log_dbg "$(log_stackdump)"
+		else
+			log_inf "Result: $ret"
+		fi
+		return $ret
 
 	# Nothing...
 	else

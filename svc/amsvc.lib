@@ -23,14 +23,14 @@ typeset -r SRC_BASE="$(readlink -f $MYPATH/../srcs/${APP_NAME})"
 typeset -r DAT_BASE="$(readlink -f $MYPATH/../data/${APP_NAME})"
 typeset -r TMP_BASE="$(readlink -f $MYPATH/../temp/${APP_NAME})"
 typeset -r TMP_PIDS="${TMP_BASE}/_pids"
-typeset -r LOG_BASE="${DAT_BASE}/_logs"
+typeset -r LOG_BASE="${DAT_BASE}/logs"
 
 # Sanity checks
 [[ -z "$APP_BASE" ]] && { echo >&2 "Unable to find APP_BASE value"; exit 1; }
 [[ -z "$LOG_BASE" ]] && { echo >&2 "Unable to find LOG_BASE value"; exit 1; }
 [[ -z "$DAT_BASE" ]] && { echo >&2 "Unable to find DAT_BASE value"; exit 1; }
 [[ -z "$TMP_BASE" ]] && { echo >&2 "Unable to find TMP_BASE value"; exit 1; }
-[[ -e "$APP_BASE" ]] && { echo >&2 "Missing required folder '$APP_BASE'"; exit 1; }
+[[ -e "$APP_BASE" ]] || { echo >&2 "Missing required folder '$APP_BASE'"; exit 1; }
 [[ -d "$TMP_BASE" ]] || mkdir -p "$TMP_BASE"
 [[ -d "$LOG_BASE" ]] || mkdir -p "$LOG_BASE"
 
@@ -199,15 +199,9 @@ set -x
 		
 	# Standard binary to run
 	else
-		# Default to run as owner of the file
-		if [[ -z "$runas" ]] && [[ -x "$1" ]]; then
-			runas="$(stat -c '%U' "$1")"
-		else
-			runas="$curruser"
-		fi
 
-		# Correct user, nice
-		if [[ "$runas" = "$curruser" ]]; then
+		# No user specified, or already correct user
+		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
 			"$@"
 			ret=$?
 
@@ -251,32 +245,46 @@ function amsvc_start {
 		opts="$@"
 	}
 
-	# Add the PIDFILE afterwards
-	[[ -n "$RUN_PIDOPT" ]] && {
-		pidf="$(amsvc_getpidfile)"
-		opts+="$RUN_PIDOPT $pidf"
-	}
 
-	# User defined startup func, don't mess with it
+	#
+	# User defined startup func, just use it
+	#
 	if is_func "run_start"; then
 		log_inf "Starting with custom run_start function"
-		run_start "$@"
+		run_start "$opts"
 		log_inf "Result: $?"
 		return $?
-	
-	# Variables
+
+	#
+	# Variables defined for standard management
+	#
 	elif [[ -n "$RUN_BIN" ]]; then
 
+		# Runas specified user. If not defined, use owner of the binary
+		typeset runas="${RUN_USER:-$(stat -c '%U' "$RUN_BIN")}"
+
+		# Add the PIDFILE afterwards
+		[[ -n "$RUN_PIDOPT" ]] && {
+			pidf="$(amsvc_getpidfile)"
+			opts+="$RUN_PIDOPT $pidf"
+		}
+
 		# If pidfile, check it has access to the file
-		[[ -n "$pidf" ]] && {
-			chown $RUN_USER: "$pidf" || {
-				log_err "Unable to chown '$RUN_USER' '$pidf'. The app may fail or be unmanageable"
+		[[ -n "$pidf" ]] && [[ -e "$pidf" ]] && {
+
+			# Does the file already belong to target user
+			[[ "$(stat -c '%U' $pidf)" != "$runas" ]] && {
+				chown $runas: "$pidf" || {
+					log_err "Unable to chown '$runas' '$pidf'. The app may fail or be unmanageable"
+				}
 			}
 		}
 
 		# Should we handle daemonizing
 		[[ -n "$RUN_DAEMON" ]] && {
-			opts+=" >/dev/null 2>&1 0>&1 & "
+			typeset logfile="$(amsvc_getlogfile)"
+			log_inf "Pushing daemon logs to $logfile"
+			opts+=" >>$logfile 2>&1 0>/dev/null & "
 		}
 
 		log_inf "Starting with \$RUN_BIN var ($RUN_BIN)"
@@ -285,6 +293,7 @@ function amsvc_start {
 
 		out="$(user_run "$RUN_USER" "$RUN_BIN" "$opts" 2>&1)"
 		ret=$?
+
 
 		# Check return value
 		if [[ $ret -ne 0 ]]; then
@@ -314,6 +323,12 @@ function amsvc_getpidfile {
 
 	# Return standard pid path
 	echo "${TMP_PIDS}/${APP_NAME}.pid"
+}
+
+function amsvc_getlogfile {
+	[[ -d "$LOG_BASE" ]] || mkdir -p "$LOG_BASE"
+
+	echo "$LOG_BASE/daemon.log"
 }
 
 function amsvc_isrunning {

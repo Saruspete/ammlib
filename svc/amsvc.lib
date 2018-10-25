@@ -263,10 +263,12 @@ function amsvc_start {
 		# Runas specified user. If not defined, use owner of the binary
 		typeset runas="${RUN_USER:-$(stat -c '%U' "$RUN_BIN")}"
 
-		# Add the PIDFILE afterwards
+		#
+		# PIDFILE management
+		#
 		[[ -n "$RUN_PIDOPT" ]] && {
 			pidf="$(amsvc_getpidfile)"
-			opts+="$RUN_PIDOPT $pidf"
+			opts+=" $RUN_PIDOPT $pidf"
 		}
 
 		# If pidfile, check it has access to the file
@@ -280,18 +282,20 @@ function amsvc_start {
 			}
 		}
 
-		# Should we handle daemonizing
+		#
+		# Logfile and daemon management
+		#
 		[[ -n "$RUN_DAEMON" ]] && {
 			typeset logfile="$(amsvc_getlogfile)"
-			log_inf "Pushing daemon logs to $logfile"
-			opts+=" >>$logfile 2>&1 0>/dev/null & "
+			log_inf "Daemonizing and sending logs to $logfile"
+			opts+=" >>$logfile 2>&1 0>/dev/null &"
 		}
 
 		log_inf "Starting with \$RUN_BIN var ($RUN_BIN)"
 		typeset out=""
 		typeset ret=""
 
-		out="$(user_run "$RUN_USER" "$RUN_BIN" "$opts" 2>&1)"
+		out="$(user_run "$RUN_USER" "$RUN_BIN" $opts 2>&1)"
 		ret=$?
 
 

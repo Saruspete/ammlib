@@ -18,9 +18,10 @@ unset LD_LIBRARY_PATH
 
 # Set my path according to these
 typeset -r APP_NAME="${MYCALL##*/}"
-typeset -r APP_BASE="$(readlink -f $MYPATH/../apps/${APP_NAME})"
+typeset -r APP_PACK="${APP_NAME%%-*}"
+typeset -r APP_BASE="$(readlink -f $MYPATH/../apps/${APP_PACK})"
+typeset -r DAT_BASE="$(readlink -f $MYPATH/../data/${APP_PACK})"
 typeset -r SRC_BASE="$(readlink -f $MYPATH/../srcs/${APP_NAME})"
-typeset -r DAT_BASE="$(readlink -f $MYPATH/../data/${APP_NAME})"
 typeset -r TMP_BASE="$(readlink -f $MYPATH/../temp/${APP_NAME})"
 typeset -r TMP_PIDS="${TMP_BASE}/_pids"
 typeset -r LOG_BASE="${DAT_BASE}/logs"
@@ -202,7 +203,7 @@ set -x
 
 		# No user specified, or already correct user
 		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
-			"$@"
+			eval "$@"
 			ret=$?
 
 		# root... yay !

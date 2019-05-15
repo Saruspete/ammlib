@@ -21,3 +21,31 @@ function ammString2List {
 		done
 	done
 }
+
+function ammStringIsYes {
+	typeset str="$1"
+	[[ $str =~ ^[yY][eE]?[sS]?$ ]]
+}
+
+function ammStringIsNo {
+	typeset str="$1"
+	[[ $str =~ ^[nN][oO]?$ ]]
+}
+
+function ammStringContains {
+	typeset want="$1"
+	typeset check="$2"
+	[[ "${check//$want/}" != "$check" ]]
+}
+
+function ammStringStartsWith {
+	typeset want="$1"
+	typeset check="$2"
+	[[ "${check#$want}" != "$check" ]]
+}
+
+function ammStringEndsWith {
+	typeset want="$1"
+	typeset check="$2"
+	[[ "${check%$want}" != "$check" ]]
+}

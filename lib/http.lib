@@ -1,0 +1,73 @@
+# vim: ft=sh
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+# Requires lib: Exec
+
+function ammHttpFetch {
+	typeset src="$1"
+	typeset dst="$2"
+	typeset opts="${3:-follow silent}"
+
+	#
+	# Curl
+	#
+	if ammExecExists "curl"; then
+		# TODO: Manage the proxy creds
+		ammLogInf "Fetching '$src' with curl"
+
+		# Process special parameters
+		typeset curlopts=""
+		for o in ${opts:-}; do
+			case $o in
+				follow) curlopts+=" -L" ;;
+				nofollow) curlopts="${curlopts// -L/ /}" ;;
+				silent) curlopts+=" " ;;
+				*) ammLogErr "Unknown option: $o" ;;
+			esac
+			shift
+		done
+
+		# Do the query
+		\curl $curlopts -sS -f --connect-timeout 10 -o "$dst" "$src"
+		ret=$?
+		return $ret
+
+	#
+	# wget
+	#
+	elif ammExecExists "wget"; then
+		ammLogInf "Fetching '$src' with wget"
+
+		# Process special parameters
+		typeset wgetopts=""
+		for o in ${opts:-}; do
+			case $o in
+				follow) ;;
+				nofollow) wgetopts+=" --max-redirect=0" ;;
+				silent) wgetopts+=" -sS" ;;
+				*) log_err "Unknown fetch_http option: $o" ;;
+			esac
+			shift
+		done
+
+		# Do the fetch
+		set -x
+		\wget 2>&1 $wgetopts -O "$dst" "$src"
+		ret=$?
+		set +x
+		return $ret
+
+	else
+		ammLogErr "Unable to find curl not wget for fetch_http"
+		return 99
+	fi
+}
+
+
+

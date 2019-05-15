@@ -1,6 +1,6 @@
 # vim: ts=4 ft=sh
 
-# AMM Library
+# AM Modular Library
 # Main file, bootstrap and load dependencies
 #
 # To avoid uneeded library loading, some core / often used functions are here
@@ -57,8 +57,8 @@ typeset __AMMLIB_DATA="$HOME/.ammlib/data/"
 # -----------------------------------------------------------------------------
 # Module loading
 # -----------------------------------------------------------------------------
-typeset __AMMLIB_SEARCHPATH="${__AMMLIB_ROOT}"
-typeset __AMMLIB_LOADED="lib"
+typeset __AMMLIB_SEARCHPATH="${__AMMLIB_ROOT}/lib"
+typeset __AMMLIB_LOADED="amlib"
 
 function ammLibLocate {
 	typeset libname="$1"
@@ -93,6 +93,18 @@ function ammLibLoad {
 		typeset nlib="$(ammLibLocate "$libname")"
 		# If the lib exists, load it
 		if [[ -n "$nlib" ]]; then
+
+			# try to load it in a subshell to check init
+			typeset initfunc="amm${libname^}MetaInit"
+			typeset inittext=""
+			inittext="$( . $nlib ; if \type $initfunc 2>/dev/null; then $initfunc; else exit 0; fi; )"
+			if [[ $? -ne 0 ]]; then
+				echo >&2 "Unable to load lib '$libname' (file '$nlib'). Init check failed: "
+				r=r+1
+				continue
+			fi
+
+			# Init was ok, source and use lib
 			. $nlib
 			__AMMLIB_LOADED="$__AMMLIB_LOADED $libname"
 			continue
@@ -163,6 +175,14 @@ typeset -A __AMMLOG_TERMCODES=(
 	[bglightblack]=100 [bglightred]=101 [bglightgreen]=102 [bglightyellow]=103 [bglightblue]=104 [bglightmagenta]=105 [bglightcyan]=106 [bglightwhite]=107 [bglightdefault]=109
 )
 
+typeset -i __AMMLOG_VERBOSITY=1
+typeset -i __AMMLOG_DEPTH=0
+
+# If no debug override has been done yet
+[[ -n "$PS4" ]] && [[ "$PS4" != "+" ]] && {
+	PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
+}
+
 function ammLogColor {
 	typeset -r esc="\033["
 	typeset -a codes=()
@@ -184,8 +204,14 @@ function ammLogDate {
 }
 
 
+# Log will be out to stdout
+typeset __AMMLOG_FDSTD=97
+typeset __AMMLOG_FDERR=98
+exec 97>&1 98>&2 # Must be plain int, not the variable
+typeset __AMMLOG_FDDBG=99
 typeset __AMMLOG_LOGFILE=""
 typeset __AMMLOG_LOGTERM=""
+
 function _ammLog {
 	typeset tag="$1"; shift
 	typeset fmt="$1"; shift
@@ -194,8 +220,17 @@ function _ammLog {
 	typeset colorrst="$(ammLogColor reset)"
 	typeset date="$(ammLogTime)"
 
-	# Display
-	echo -e "${color}[$date]$color[$tag][$$] $@${colorrst}"
+	# Read stdin
+	if [[ "$@" = "-" ]]; then
+		while read line; do
+			echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $line${colorrst}"
+		done
+
+	# Standard args
+	else
+		# Display
+		echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $@${colorrst}"
+	fi
 }
 
 
@@ -206,6 +241,7 @@ function _ammLogWrite {
 }
 
 function ammLogErr {
+	# TODO: add calling path
 	_ammLog "ERR" "bold red" "$@"
 }
 
@@ -213,8 +249,26 @@ function ammLogWrn {
 	_ammLog "WRN" "bold yellow" "$@"
 }
 
+function ammLogInf {
+	_ammLog "INF" "bold green" "$@"
+}
+
 function ammLogDbg {
-	_ammLog "DBG" "bold blue" "$@"
+
+	# Only send to log on verbose level
+	if [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
+		_ammLog "DBG" "bold blue" "$@"
+
+	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
+	else
+		if [[ "$1" == "-" ]]; then
+			while read line; do
+				: # echo "$line" >> "${__AMMLOG_DBGFILE}.${_AMMLOG_DEPTH}"
+			done
+		else
+			: # echo "$@" >> "${__AMMLOG_DBGFILE}.${_AMMLOG_DEPTH}"
+		fi
+	fi
 }
 
 function ammLogStdout {
@@ -224,6 +278,47 @@ function ammLogStdout {
 	done
 }
 
+# Log xtrace (run in another process, and shares FD)
+function ammLogDebugStore {
+	set +x
+	ammLogDbg -
+}
+
+function ammLogDebugEnable {
+	exec $__AMMLOG_FDDBG> >(ammLogDebugStore)
+	BASH_XTRACEFD=$__AMMLOG_FDDBG
+}
+
+
 # -----------------------------------------------------------------------------
 # 
 # -----------------------------------------------------------------------------
+
+function ammExecExists {
+
+	for bin in "$@"; do
+		binfound=""
+		for p in ${PATH//:/ }; do
+			[[ -x "$p/$bin" ]] && {
+				binfound="$p/$bin"
+				break
+			}
+		done
+
+		# If binary was not found in $PATH, stop here
+		if [[ -z "$binfound" ]]; then
+			return 1
+		fi
+	done
+	return 0
+}
+
+function ammExecRequires {
+	for bin in "$@"; do
+		ammLogDbg "Trying to find required bin '$bin'"
+		ammExecExists "$bin" || {
+			ammLogErr "Unable to find required binary $bin in $PATH"
+			exit 1
+		}
+	done
+}

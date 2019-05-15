@@ -1,0 +1,154 @@
+# vim: ft=sh
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+# Some tools are required for this module to work
+function ammPkgyumInit {
+	ammExecRequires cksum gzip awk
+}
+
+function ammPkgyumDownload {
+	typeset    dst="$1"; shift
+	typeset -i ret=0
+
+	cd "$dst"
+	for file in "$@"; do
+		(
+			cd "$dst"
+			rpm2cpio "$file" | cpio -idmv
+		)
+		ret+=$?
+	done
+	return $ret
+}
+
+# What versions are available for a package
+function ammPkgyumInfoVersions {
+	typeset pkg="$1"
+	yum info $pkg
+}
+
+
+
+#
+# Yum emulation
+#
+function _ammPkgyumRepodataCache {
+	typeset cks="$(echo "$1"|cksum)"; cks="${cks// /_}"
+	typeset t="$__AMMLIB_DATATMP/pkgyum.repodata.$cks"
+
+	mkdir -p "$t"
+	echo "$t"
+}
+
+# Basic yum emulation
+function ammPkgyumRepodataGet {
+	typeset url="$1"
+
+	# We need http tools for this
+	ammLibLoad http || {
+		ammLogErr "Unable to load http library."
+		return 99
+	}
+
+	# Download the file listing
+	typeset cache="$(_ammPkgyumRepodataCache "$url")"
+	typeset repomd="$cache/repomd.xml"
+	ammHttpFetch "$url/repodata/repomd.xml" "$repomd"
+
+	# Download each xml file
+	typeset xmls="$(grep 'location href=' "$repomd"|grep -o '".*\.xml.gz"' | tr -d '"')"
+	for xml in $xmls; do
+		typeset dstfile="$cache/${xml##*/}"
+
+		# Skip if cache already here
+		[[ -s "$dstfile" ]] && continue
+
+		ammHttpFetch "$url/$xml" "$dstfile"
+
+		# Check and unzip
+		[[ -e "$dstfile" ]] && gzip -kdf "$dstfile"
+	done
+
+	# echo output
+	echo "$cache"
+}
+
+function _ammPkgyumRepodataParseFilelist {
+	typeset repodata="$1"; shift
+
+	# Parse all search
+	for dep in "$@"; do
+
+		# This is utterly ugly, and a really bad idea (parsing xml in awk...)
+		# but it's the easiest available for quick an portable solution
+
+		awk -v search="$dep" '
+		# Check what are we looking for (file, package...)
+		BEGIN {
+			searchFile = searchName = 0
+			# File search always contains /
+			if (index(search, "/"))
+				searchFile = 1
+			else
+				searchName = 1
+		}
+
+		$1 =="<package" || $1 == "<version" {
+			# Check for format in multiline xml...
+			if (! $NF ~ />$/) {
+				# WARNING !
+			}
+			# remove last > (or />)
+			gsub(/\/?>$/,"",$NF)
+
+			# Package opening is for a new package. Reset old vals
+			if ($1 == "<package")
+				pkgname = pkgvers = pkgrel = pkgarch = ""
+
+			for (i=2; i<=NF; i++) {
+				split($i,a,"=")
+				lkey = a[1]
+				lval = a[2]
+
+				# remove extra "
+				gsub(/"/,"",lval)
+
+				# Name marks a new package
+				if (lkey == "name") pkgname = lval
+				if (lkey == "arch") pkgarch = lval
+				if (lkey == "ver")  pkgvers = lval
+				if (lkey == "rel")  pkgrel  = lval
+			}
+
+			# Search against pkg name. Now we have version and can print
+			if (searchName && $1 == "<version" && pkgname == search) {
+				print pkgname"-"pkgvers"-"pkgrel"."pkgarch".rpm"
+			}
+		}
+		# Search against file provided.
+		searchFile && match($1, /<file>(.+)<\/file>/, b) {
+			# maybe try to change the glob to regex in "search" input
+			if (b[1] ~ search) {
+				print pkgname"-"pkgvers"-"pkgrel"."pkgarch".rpm"
+			}
+		}
+		' $repodata/*-filelists.xml
+	done
+}
+
+# Emulate the "yum provides" feature
+function ammPkgyumRepodataWhatProvides {
+	
+	typeset url="$1"; shift
+	typeset pkgs=""
+
+	typeset repodata="$(ammPkgyumRepodataGet "$url")"
+	
+	_ammPkgyumRepodataParseFilelist "$repodata" "$@" | sort | uniq
+}

@@ -1,0 +1,136 @@
+# vim: ft=sh
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+# Holder for inputs
+typeset -A __AMMLIB_INPUT_REPLIES
+
+ammLibLoad string
+
+
+function ammInputAsk {
+	typeset id="$1"
+	typeset prompt="$2"
+	typeset default="${3:-}"
+	typeset readopts="${4:-}"
+
+	typeset reply=""
+
+	# Prettify the prompt
+	prompt="$(ammLogColor bold underline)${prompt}$(ammLogColor "reset"): "
+
+	[[ -n "$default" ]] && {
+		readopts+=" -i $default"
+	}
+
+	# Check if the input was already provided in options
+	if [[ -n "$id" ]] && ( set +u; [[ -n "${__AMMLIB_INPUT_REPLIES[$id]:-}" ]] ); then
+		# Set the reply and consume it
+		reply="${__AMMLIB_INPUT_REPLIES[$id]}"
+		unset _AMMLIB_INPUT_REPLIES[$id]
+
+	# Read from user input
+	else
+
+		read -e $readopts -p "$prompt" reply
+	fi
+
+	echo "$reply"
+	return 0
+}
+
+
+function ammInputYN {
+	typeset id="$1"
+	typeset prompt="$2"
+	typeset default="${3:-no}"
+	typeset readopts="${4:-}"
+
+	# If a default value has been proposed, check it
+	if [[ -n "$default" ]]; then
+		if ammStringIsYes "$default" || ammStringIsNo "$default"; then
+			:
+		else
+			ammLogWrn "Invalid yes/no default input: '$default'"
+		fi
+	fi
+
+	while :; do
+		typeset reply="$(ammInputAsk "$id" "$prompt [yes/no]" "$default" "$readopts")"
+
+		# check input
+		if ammStringIsYes "$reply"; then
+			return 0
+		elif ammStringIsNo "$reply"; then
+			return 1
+		else
+			echo >&2 "Invalid input '$reply'. Must be 'yes' or 'no'"
+			sleep .1
+		fi
+	done
+
+}
+
+function ammInputPassword {
+	typeset id="$1"
+	typeset prompt="${2:-Password (not displayed): }"
+	typeset default="${3:-}"
+	typeset checks="${4:-}"
+
+	[[ -n "$default" ]] && {
+		prompt+="(empty for default)"
+	}
+
+	typeset password="$(ammInputAsk "$id" "$prompt" "" "-s")"
+	typeset -i ret=0
+
+	# As the text will be silent, we need to manage default by ourself
+	[[ -z "$password" ]] && [[ -n "$default" ]] && {
+		password="$default"
+	}
+
+	# Recreate a line jump
+	typeset _junk
+	echo|read -t0 _junk >/dev/null 2>&1
+
+	# Additionnal checks to be done
+	for check in $checks; do
+		typeset chkkey="${check%%:*}"
+		typeset chkval="${check#*:}"
+
+		case $chkkey in
+			minsize)
+				[[ ${#password} -ge $chkval ]] || {
+					ammLogErr "Password validation: Must be at least $chkval chars long (got ${#password})"
+					ret+=1
+				}
+				;;
+			maxsize)
+				[[ ${#password} -le $chkval ]] || {
+					ammLogErr "Password validation: Must be at most $chkval chars long (got ${#password})"
+					ret+=1
+				}
+				;;
+			cracklib)
+				if ammExecExists cracklib-check; then
+					echo "$password" | cracklib-check >/dev/null
+					ret+=$?
+				else
+					ammLogWrn "Cracklib check required, but no cracklib-check exec available. Skipping"
+				fi
+				;;
+			*)
+				ammLogWrn "Unknown check: $chkkey ($chkval)"
+				;;
+		esac
+	done
+
+
+	echo "$password"
+	return $ret
+}

@@ -1,0 +1,40 @@
+==== Input
+AskHostname: question
+
+==== Hardware
+ListByVendor
+ListByNumaNode
+GetNumaNode
+UpdatePci
+
+==== Network
+ping
+telnet
+ssh
+waituntilping
+
+
+==== Exec
+DelayExec (timeout, perl, etc...)
+runas
+
+==== String
+trim / ltrim / rtrim
+ucfirst
+
+==== PkgRpm
+
+==== PkgYum
+
+==== PkgDpkg
+
+==== PkgApt
+
+==== Chroot
+
+==== Services
+
+==== LXC
+
+==== Fs
+zfs, xfs, ext4

@@ -14,10 +14,8 @@ set -u
 
 # Check if we are using bash, else try to load the wrapper
 if [[ -z "$BASH" ]] || [[ "$(cat /proc/$$/comm)" != "bash" ]]; then
-	
 	# TODO Try to find a valid wrapper
 	:
-	
 fi
 
 #
@@ -72,7 +70,6 @@ function ammLibLocate {
 }
 
 function ammLibGetSymbols {
-	
 	for file in "$@"; do
 		grep -Po '^[\s]*(function[\s]+[^\s]+|[^\s]+\(\))[\s]*{' $file | awk '
 			/function[ ]+([^ ]+)/ {print $2} 
@@ -82,38 +79,83 @@ function ammLibGetSymbols {
 	done
 }
 
-function ammLibLoad {
+function ammLibLoadable {
+
 	typeset -i r=0
+
 	for libname in "$@"; do
-		for l in $__AMMLIB_LOADED; do
-			# Already loaded
-			[[ "$libname" == "$l" ]] && return
-		done
+		typeset libfile="$libname"
 
-		typeset nlib="$(ammLibLocate "$libname")"
+		# If the given path was a file, find its libname from path
+		if [[ -e "$libfile" ]]; then
+			libname="${libfile##*/}"
+			libname="${libname%.lib}"
+		# Else, find our file
+		else
+			libfile="$(ammLibLocate "$libname")"
+		fi
+
 		# If the lib exists, load it
-		if [[ -n "$nlib" ]]; then
-
+		if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
 			# try to load it in a subshell to check init
 			typeset initfunc="amm${libname^}MetaInit"
 			typeset inittext=""
-			inittext="$( . $nlib ; if \type $initfunc 2>/dev/null; then $initfunc; else exit 0; fi; )"
+			inittext="$( . $libfile || exit 1; if \type $initfunc >/dev/null 2>&1; then $initfunc; exit $?; else exit 0; fi;)"
+
+			# Dont stop loading, just log error and increase return
 			if [[ $? -ne 0 ]]; then
-				echo >&2 "Unable to load lib '$libname' (file '$nlib'). Init check failed: "
+				ammLogDbg "Unable to load lib '$libname' (file '$libfile'). Init check failed: '$inittext'"
 				r=r+1
-				continue
 			fi
 
+			# Display the lib file
+			echo "$libfile"
+
+		# Unable to load the lib
+		else
+			ammLogDbg "Unable to locate library '$libname'"
+			r+=1
+		fi
+	done
+
+	return $r
+}
+
+function ammLibLoad {
+	typeset -i r=0
+
+	typeset libfile=""
+	for libname in "$@"; do
+		for l in $__AMMLIB_LOADED; do
+			# Already loaded
+			[[ "$libname" == "$l" ]] && continue 2
+		done
+
+		# Check if we can load requested lib
+		libfile="$(ammLibLoadable "$libname")"
+		typeset libavailable=$?
+
+		if [[ $libavailable -eq 0 ]]; then
+
 			# Init was ok, source and use lib
-			. $nlib
+			. $libfile
 			__AMMLIB_LOADED="$__AMMLIB_LOADED $libname"
 			continue
+
 		else
-			echo >&2 "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
+			if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
+				ammLogErr "Unable to load lib '$libname' due to failed init"
+			else
+				ammLogErr "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
+			fi
+
 			r=r+1
 		fi
 	done
-	return $r
+
+	# A failed lib loading is fatal
+	[[ $r -ne 0 ]] && exit $r
+	return 0
 }
 
 function ammLibUnload {
@@ -144,6 +186,21 @@ function ammLibUnload {
 	done
 }
 
+function ammLibRequires {
+	for libname in "$@"; do
+
+		# Spawn it in a subshell to accomodate all potential exec / checks
+		ammLogDbg "Trying to load required lib '$libname'"
+		( ammLibLoadable "$libname" )
+
+		[[ $? -ne 0 ]] && {
+			ammLogErr "Unable to load required library '$libname'. Exiting"
+			exit 1
+		}
+	done
+
+	return 0
+}
 
 # Compact all libraries to a single file, to be embedded in scripts
 function ammLibCompact {
@@ -291,8 +348,13 @@ function ammLogDebugEnable {
 
 
 # -----------------------------------------------------------------------------
-# 
+# Execution helpers
 # -----------------------------------------------------------------------------
+
+function ammExecLogged {
+	# TODO: Log the exec, return code and output of the command
+	"$@"
+}
 
 function ammExecExists {
 

@@ -1,4 +1,4 @@
-# vim: ft=sh
+# vim: ft=sh ts=4
 
 if [[ -z "$__AMMLIB_ROOT" ]]; then
 	echo >&2 "You must not source this library: Use function ammLibLoad"
@@ -7,30 +7,13 @@ if [[ -z "$__AMMLIB_ROOT" ]]; then
 	exit 1
 fi
 
-function ammString2List {
-	typeset    listFull=""
-	typeset -i err=0
-
-	typeset elem group
-
-	for elems in "$@"; do
-		# Split the g1,g2,g3 parts
-		for group in ${elems// /,}; do
-			# Split the groups (if any)
-			:
-		done
-	done
+function ammStringMetaInit {
+	ammExecRequires sed
 }
 
-function ammStringIsYes {
-	typeset str="$1"
-	[[ $str =~ ^[yY][eE]?[sS]?$ ]]
-}
-
-function ammStringIsNo {
-	typeset str="$1"
-	[[ $str =~ ^[nN][oO]?$ ]]
-}
+# -----------------------------------------------------------------------------
+# Tests of string content, types and values
+# -----------------------------------------------------------------------------
 
 function ammStringContains {
 	typeset want="$1"
@@ -49,3 +32,118 @@ function ammStringEndsWith {
 	typeset check="$2"
 	[[ "${check%$want}" != "$check" ]]
 }
+
+function ammStringIsInteger {
+	typeset str="$1"
+
+	# Remove leading minus
+	str="${str#-}"
+	# Remove all numbers. Nothing should be left
+	[[ -z "${str//[0-9]/}" ]]
+}
+
+
+function ammStringIsYes {
+	typeset str="$1"
+	[[ $str =~ ^[yY][eE]?[sS]?$ ]]
+}
+
+function ammStringIsNo {
+	typeset str="$1"
+	[[ $str =~ ^[nN][oO]?$ ]]
+}
+
+
+# -----------------------------------------------------------------------------
+# String modifiers
+# -----------------------------------------------------------------------------
+
+function _ammStringTrim {
+	typeset str="$1"
+	# Protect the / as used by the regex
+	typeset chars="${2////\\/}"
+	
+	echo "$str" | sed -E \
+		-e "s/^${chars}+//g" \
+		-e "s/${chars}+$//g"
+}
+
+function ammStringTrim {
+	typeset str="$1"
+	typeset trimchars="${2:-[ \t\n]}"
+
+	
+	if [[ "$1" == "-" ]]; then
+		while read line; do
+			_ammStringTrim "$line" "$trimchars"
+		done
+	else
+		_ammStringTrim "$str" "$trimchars"
+	fi
+}
+
+# -----------------------------------------------------------------------------
+# Advanced format parsers
+# -----------------------------------------------------------------------------
+
+function ammStringListExpand {
+	typeset    listFull=""
+	typeset -i err=0
+
+	# Using a simple indexed array allows final ordering
+	typeset -a values
+
+	typeset elem group
+	for elem in "$@"; do
+		# Split the g1,g2,g3 parts
+		for group in ${elem//,/ }; do
+			# Split the groups (if any)
+			typeset bgn="${group%-*}"
+			typeset end="${group#*-}"
+
+			# Some checks
+			[[ -z "$bgn" ]] && {
+				ammLogWrn "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
+				continue
+			}
+			[[ -z "$end" ]] && {
+				ammLogWrn "List end element '$end' (in group '$group') cannot be empty. Skipping"
+				continue
+			}
+
+			! ammStringIsInteger "$bgn" && {
+				ammLogWrn "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
+				continue
+			}
+			! ammStringIsInteger "$end" && {
+				ammLogWrn "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
+				continue
+			}
+
+			# Different int values means a group like "start-end"
+			if [[ "$bgn" != "$end" ]]; then
+				typeset -i i=$bgn
+
+				# We may want begin/end to be in ascending order.. or just swap them
+				[[ $bgn -gt $end ]] && {
+					i=$end
+					end=$bgn
+				}
+
+				while [[ $i -lt $end ]]; do
+					values[$i]=$i
+					i+=1
+				done
+
+			# Same, so no group, just the same value
+			else
+				values[$bgn]=$bgn
+			fi
+			:
+		done
+	done
+
+	# Show the final unique listing in a single echo
+	echo ${!values[@]}
+}
+

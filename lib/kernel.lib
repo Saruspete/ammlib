@@ -1,0 +1,80 @@
+# vim: ft=sh ts=4
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+	# Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammKernelMetaInit {
+	#ammLibLoad string
+	ammExecRequires wc
+}
+
+# -----------------------------------------------------------------------------
+# Kernel modules management
+# -----------------------------------------------------------------------------
+
+function ammKernelRmmod {
+
+	typeset -i r=0
+	typeset -A moddep
+	typeset -A matches
+	typeset    mod
+
+	# Build our dependency list
+	while read name size refcnt deps state address _junk; do
+		deps="${deps%,}"
+		deps="${deps//,/ }"
+		[[ "$deps" == "-" ]] && deps=""
+
+		# Set mod dependencies
+		moddep[$name]="${deps:-}"
+		typeset modcnt="$(echo ${deps-}|wc -w)"
+
+		# If this module matches
+		for mod in "$@"; do
+			if [[ $name =~ ^$mod$ ]]; then
+				ammLogInf "Module '$name' matched search '$mod' (refcnt:$refcnt modcnt:$modcnt deps:$deps)"
+				matches[$name]="$(( $refcnt - $modcnt ))"
+			fi
+		done
+	done < /proc/modules
+
+	# Check is we can unload all found modules
+	typeset -i refcnt=0
+	for mod in ${!matches[@]}; do
+		# If we have remaining refcnt, we can't unload the mod. Display insights
+		if [[ ${matches[$mod]} -gt 0 ]]; then
+			ammLogErr "Cannot unload module '$mod': refcount is higher than mod dependencies (remains ${matches[$mod]} refs)"
+			ammLogErr "Provide here some help for module ...."
+			refcnt+=1
+		fi
+	done
+
+	# Stop here if we can't unload them
+	[[ $refcnt -gt 0 ]] && return $refcnt
+
+	# Try to unload dependencies recursively
+	for mod in ${!matches[@]}; do
+		if ! ammKernelRmmod ${moddep[$mod]}; then
+			ammLogErr "Cannot unload dependencies for module '$mod'. Stopping"
+			return 1
+		fi
+	done
+
+	# try to unload the modules
+	for mod in ${!matches[@]}; do
+		ammLogInf "rmmod of $mod"
+		/sbin/rmmod $mod || {
+			ammLogErr "Cannot remove module '$mod'. Are you root ?"
+			return 1
+		}
+	done
+
+}

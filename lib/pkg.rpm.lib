@@ -1,0 +1,121 @@
+# vim: ft=sh
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+# Some tools are required for this module to work
+function ammPkgrpmMetaInit {
+	ammExecRequires rpm rpm2cpio
+}
+
+# -----------------------------------------------------------------------------
+# Extract data
+# -----------------------------------------------------------------------------
+
+function ammPkgrpmExtract {
+	typeset    dst="$1"; shift
+	typeset -i ret=0
+
+	cd "$dst"
+	for file in "$@"; do
+		# Exec in subshell to avoid changing script cwd
+		(
+			cd "$dst"
+			rpm2cpio "$file" | cpio -idmv
+		)
+		ret+=$?
+	done
+	return $ret
+}
+
+# -----------------------------------------------------------------------------
+# Queries
+# -----------------------------------------------------------------------------
+
+# What does a package requires
+function ammPkgrpmInfoRequires {
+	
+	for file in "$@"; do
+		rpm -q --requires "$file"
+	done
+}
+
+# What does a package provides
+function ammPkgrpmInfoProvides {
+	:
+}
+
+# What package provides a given 
+function ammPkgrpmInfoWhatProvides {
+	:
+}
+
+# 
+function ammPkgrpmInfoRequiresToPkg {
+	:
+}
+
+# -----------------------------------------------------------------------------
+# RPM DB Helper
+# -----------------------------------------------------------------------------
+function ammPkgrpmDbInit {
+	typeset prefix="${1:-}"
+
+	mkdir -p "$root"
+	rpm --root="$root" --initdb
+}
+
+function ammPkgrpmDbKeyImport {
+	typeset prefix="${1:-}"; shift;
+
+	typeset rpmopts=""
+	for key in "$@"; do
+		[[ -n "$prefix" ]] && rpmopts+=" --root=$prefix"
+		rpm $rpmopts "$key"
+	done
+}
+
+function ammPkgrpmDbExport {
+	typeset prefix="${1:-}"
+	typeset exportdir="$2"
+
+	for dbfile in $prefix/var/lib/rpm/*; do
+		# Skip non BDB files
+		[[ "$(file "$dbfile"|awk '{print $2,$3}')" == "BerkeleyDB" ]] || continue
+
+		# Dump the file to target
+		ammLogInf "Dumping '$dbfile' to '$exportdir'"
+		/usr/lib/rpm/rpmdb_dump "$dbfile" > "$exportdir/${dbfile##*/}.dmp"
+	done
+}
+
+function ammPkgrpmDbImport {
+	typeset rpmdb="$1"
+	typeset import="$2"
+
+	fo
+}
+
+function ammPkgrpmDbRecover {
+	typeset prefix="${1:-}"
+
+	# First, try a simple recover
+	/usr/lib/rpm/rpmdb_recover
+	#rm $prefix/log.0000000001
+
+}
+
+function ammPkgrpmDbMigrate {
+	typeset prefix="${1:-}"
+
+	# 
+}
+
+# -----------------------------------------------------------------------------
+# Static values, helpers...
+# -----------------------------------------------------------------------------
+

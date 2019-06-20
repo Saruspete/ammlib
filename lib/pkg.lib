@@ -1,0 +1,23 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE)
+	: Use function ammLibLoad"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammPkgMetaInit {
+	ammExecRequires awk
+	for i in ${!BASH_SOURCE[@]}; do
+		echo >&2 "$i = ${BASH_SOURCE[$i]}::${FUNCNAME[$i]}::${BASH_LINENO[$i]}"
+	done
+	exit 1
+}
+
+# -----------------------------------------------------------------------------
+# Some description for your lib
+# -----------------------------------------------------------------------------

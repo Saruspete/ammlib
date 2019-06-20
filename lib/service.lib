@@ -1,0 +1,73 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+#function amm##NAME##MetaInit {
+#	ammExecRequires awk
+#}
+
+# -----------------------------------------------------------------------------
+# Handle system services
+# -----------------------------------------------------------------------------
+
+
+function ammServiceType {
+	typeset inittype="unknown"
+	typeset pid1comm="$(</proc/1/comm)"
+	[[ "$pid1comm" == "systemd" ]] && inittype="systemd"
+	[[ "$pid1comm" == "init" ]] && inittype="initrc"
+
+	echo "$inittype"
+}
+ __AMMSERVICE_TYPE="$(ammServiceType)"
+
+
+function _ammServicePathList {
+	if [[ "$__AMMSERVICE_TYPE" == "systemd" ]]; then
+
+		# Listing from https://www.freedesktop.org/software/systemd/man/systemd.unit.html
+		cat <<<-EOT
+			/etc/systemd/system/
+			/run/systemd/system/
+			/usr/lib/systemd/system/
+			~/.config/systemd/user/
+			/etc/systemd/user/
+			/run/systemd/user/
+			~/.local/share/systemd/user/
+			/usr/lib/systemd/user/
+		EOT
+
+	elif [[ "$__AMMSERVICE_TYPE" == "initrc" ]]; then
+		cat <<<-EOT
+			/etc/init.d/
+		EOT
+	fi
+}
+
+function ammServiceExists {
+	typeset svcname="$1"
+	typeset prefix=""
+	typeset suffix=""
+
+	[[ "$__AMMSERVICE_TYPE" == "systemd" ]] && {
+		suffix=".service"
+	}
+
+	for dir in $(_ammServicePathList); do
+		[[ -e "$dir/${prefix}${svcname}${suffix}" ]] && return 0
+	done
+	return 1
+}
+
+function ammServiceStateGet {
+	typeset svc="$1"
+
+}
+

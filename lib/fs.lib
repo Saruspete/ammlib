@@ -1,0 +1,48 @@
+# vim: ft=sh ts=4
+
+if [[ -z "$__AMMLIB_ROOT" ]]; then
+	echo >&2 "You must not source this library: Use function ammLibLoad"
+	# Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
+	# to do that, you're smart enough to understand why it's a bad idea ;-)
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+#function ammFsMetaInit {
+#	ammExecRequires awk
+#}
+
+# -----------------------------------------------------------------------------
+# 
+# -----------------------------------------------------------------------------
+
+function ammFsMount {
+	typeset mntsrc="$2"
+	typeset mntdst="$3"
+	typeset mntopts="${4:-}"
+
+	typeset mnttype=""
+
+	# If source is a folder, use bindmount
+	[[ -d "$mntsrc" ]] && {
+		mnttype+="-t none"
+		mntopts+="-o bind"
+	}
+
+	# Mount the target
+	[[ -d "$mntdst" ]] || {
+		ammLogInf "Target mount '$mntdst' does not exists. Creating"
+		mkdir -p "$mntdst"
+	}
+
+	ammChrootMounted "$mntdst" && {
+		ammLogInf "Mountpoint '$mntdst' already mounted"
+		return 0
+	}
+
+	# Do the mount
+	mount $mnttype $mntopts "$mntsrc" "$mntdst"
+}

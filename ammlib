@@ -60,12 +60,25 @@ typeset __AMMLIB_LOADED="amlib"
 
 function ammLibLocate {
 	typeset libname="$1"
+
+	typeset libpath
 	for libpath in $__AMMLIB_SEARCHPATH; do
 			typeset nlib="${libpath}/${libname}.lib"
 			[[ -r "$nlib" ]] && {
 				echo "$nlib"
 				return
 			}
+	done
+}
+
+function ammLibLocatePattern {
+	typeset libpattern="$1"
+
+	typeset libpath lib
+	for libpath in $__AMMLIB_SEARCHPATH; do
+		for lib in $libpath/$libpattern*.lib; do
+			echo "$lib"
+		done
 	done
 }
 
@@ -77,6 +90,11 @@ function ammLibGetSymbols {
 		grep -Po '^[\s]*(typeset|declare|readonly)([\s]+-[a-zA-Z]+)?[\s]+__[^\s]+=' "$file" | awk '
 			{gsub(/=$/,"",$NF); print $NF; }'
 	done
+}
+
+function ammLibIsSublib {
+	typeset libname="$1"
+	[[ "${libname//./}" != "$libname" ]]
 }
 
 function ammLibLoadable {
@@ -97,8 +115,17 @@ function ammLibLoadable {
 
 		# If the lib exists, load it
 		if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
+
+			typeset funcpref="${libname^}"
+			ammLibIsSublib "$libname" && {
+				funcpref=""
+				for f in ${libname//. }; do
+					funcpref+=${f^}
+				done
+			}
+
 			# try to load it in a subshell to check init
-			typeset initfunc="amm${libname^}MetaInit"
+			typeset initfunc="amm${funcpref}MetaInit"
 			typeset inittext=""
 			inittext="$( . $libfile || exit 1; if \type $initfunc >/dev/null 2>&1; then $initfunc; exit $?; else exit 0; fi;)"
 
@@ -126,6 +153,28 @@ function ammLibLoad {
 
 	typeset libfile=""
 	for libname in "$@"; do
+
+		# For submodule, you need to load parent module first
+		if ammLibIsSublib "$libname"; then
+			# If the name is indeed a submodule, stop here
+			typeset parentlib="${libname%.*}"
+			typeset parentlibpath="$(ammLibLocate "$parentlib")"
+			if [[ -n "$parentlibpath" ]]; then
+
+				typeset parentloaded=
+				for l in $__AMMLIB_LOADED; do
+					[[ "$l" == "$parentlib" ]] && parentloaded="$l"
+				done
+
+				if [[ -z "$parentloaded" ]]; then
+					ammLogErr "Cannot load '$libname' with ammLibLoad: look like a sub-lib of '$parentlib'."
+					r=r+1
+					continue
+				fi
+			fi
+		fi
+
+		# Skip already loaded libraries
 		for l in $__AMMLIB_LOADED; do
 			# Already loaded
 			[[ "$libname" == "$l" ]] && continue 2
@@ -139,7 +188,7 @@ function ammLibLoad {
 
 			# Init was ok, source and use lib
 			. $libfile
-			__AMMLIB_LOADED="$__AMMLIB_LOADED $libname"
+			__AMMLIB_LOADED+=" $libname"
 			continue
 
 		else
@@ -157,6 +206,7 @@ function ammLibLoad {
 	[[ $r -ne 0 ]] && exit $r
 	return 0
 }
+
 
 function ammLibUnload {
 	typeset -i r=0

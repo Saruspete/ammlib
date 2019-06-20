@@ -1,14 +1,12 @@
 # vim: ft=sh ts=4
 
-if [[ -z "$__AMMLIB_ROOT" ]]; then
-	echo >&2 "You must not source this library: Use function ammLibLoad"
-    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
-	# to do that, you're smart enough to understand why it's a bad idea ;-)
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
 	exit 1
 fi
 
 function ammStringMetaInit {
-	ammExecRequires sed
+	ammExecRequires sed seq tr
 }
 
 # -----------------------------------------------------------------------------
@@ -19,6 +17,18 @@ function ammStringContains {
 	typeset want="$1"
 	typeset check="$2"
 	[[ "${check//$want/}" != "$check" ]]
+}
+
+function ammStringContainsWord {
+	typeset want="$1"
+	typeset phase="$2"
+
+	# Lazy: just check 
+	for w in $phrase; do
+		[[ "$w" == "$want" ]] && return 0
+	done
+
+	return 1
 }
 
 function ammStringStartsWith {
@@ -69,7 +79,7 @@ function _ammStringTrim {
 }
 
 function ammStringTrim {
-	typeset str="$1"
+	typeset str="${1:-}"
 	typeset trimchars="${2:-[ \t\n]}"
 
 	
@@ -80,6 +90,30 @@ function ammStringTrim {
 	else
 		_ammStringTrim "$str" "$trimchars"
 	fi
+}
+
+function ammStringCapitalize {
+	typeset str="${1:-}"
+
+	if [[ "$str" == "-" ]]; then
+		while read str; do
+			str="${str,,}"
+			echo "${str^}"
+		done
+	else
+		str="${str,,}"
+		echo "${str^}"
+	fi
+}
+
+function ammStringToLower {
+	typeset -l str="${1:-}"
+	echo "$str"
+}
+
+function ammStringToUpper {
+	typeset -u str="${1:-}"
+	echo "$str"
 }
 
 # -----------------------------------------------------------------------------
@@ -146,4 +180,14 @@ function ammStringListExpand {
 	# Show the final unique listing in a single echo
 	echo ${!values[@]}
 }
+
+# -----------------------------------------------------------------------------
+# Pretty print and display helpers
+# -----------------------------------------------------------------------------
+function ammStringRepeat {
+	typeset -i time="${1:-1}"
+	typeset    char="${2:- }"
+	seq -s "$char" $(($time+1)) | tr -d '[:digit:]'
+}
+
 

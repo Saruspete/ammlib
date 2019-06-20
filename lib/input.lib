@@ -1,19 +1,29 @@
-# vim: ft=sh
+# vim: ft=sh ts=4
 
-if [[ -z "$__AMMLIB_ROOT" ]]; then
-	echo >&2 "You must not source this library: Use function ammLibLoad"
-    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
-	# to do that, you're smart enough to understand why it's a bad idea ;-)
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
 	exit 1
 fi
 
 # Holder for inputs
-typeset -A __AMMLIB_INPUT_REPLIES
+__AMMLIB_INPUT_REPLIES=()
+__AMMLIB_INPUT_CALLBACKS=()
+__AMMLIB_INPUT_IDS=()
 
-ammLibLoad string
+function ammInputMetaInit {
+	ammLibLoad string
+}
+
+function ammInputRegister {
+	typeset id="$1"
+	typeset typ="${2:-string}"
+	typeset helptext="${3:-}"
+	typeset validcb="${4:-}"
 
 
-function ammInputAsk {
+}
+
+function ammInputGet {
 	typeset id="$1"
 	typeset prompt="$2"
 	typeset default="${3:-}"
@@ -24,9 +34,7 @@ function ammInputAsk {
 	# Prettify the prompt
 	prompt="$(ammLogColor bold underline)${prompt}$(ammLogColor "reset"): "
 
-	[[ -n "$default" ]] && {
-		readopts+=" -i $default"
-	}
+	[[ -n "$default" ]] && readopts+=" -i $default"
 
 	# Check if the input was already provided in options
 	if [[ -n "$id" ]] && ( set +u; [[ -n "${__AMMLIB_INPUT_REPLIES[$id]:-}" ]] ); then
@@ -36,7 +44,6 @@ function ammInputAsk {
 
 	# Read from user input
 	else
-
 		read -e $readopts -p "$prompt" reply
 	fi
 
@@ -45,7 +52,7 @@ function ammInputAsk {
 }
 
 
-function ammInputYN {
+function ammInputGetYN {
 	typeset id="$1"
 	typeset prompt="$2"
 	typeset default="${3:-no}"
@@ -61,7 +68,7 @@ function ammInputYN {
 	fi
 
 	while :; do
-		typeset reply="$(ammInputAsk "$id" "$prompt [yes/no]" "$default" "$readopts")"
+		typeset reply="$(ammInputGet "$id" "$prompt [yes/no]" "$default" "$readopts")"
 
 		# check input
 		if ammStringIsYes "$reply"; then
@@ -76,7 +83,7 @@ function ammInputYN {
 
 }
 
-function ammInputPassword {
+function ammInputGetPassword {
 	typeset id="$1"
 	typeset prompt="${2:-Password (not displayed): }"
 	typeset default="${3:-}"
@@ -86,7 +93,7 @@ function ammInputPassword {
 		prompt+="(empty for default)"
 	}
 
-	typeset password="$(ammInputAsk "$id" "$prompt" "" "-s")"
+	typeset password="$(ammInputGet "$id" "$prompt" "" "-s")"
 	typeset -i ret=0
 
 	# As the text will be silent, we need to manage default by ourself

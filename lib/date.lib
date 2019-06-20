@@ -1,0 +1,185 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+	exit 1
+fi
+
+function ammDateMetaInit {
+	ammExecRequires date
+}
+
+function ammDateParseInt {
+	typeset int="${1:-}"
+
+	# Remove leading 0 (octal)
+	while [[ "${int#0}" != $int ]]; do
+		int="${int#0}"
+	done
+
+	# Check for Hex and convert to Dec
+	[[ "${int:0:1}" == "x" ]] && int="$(( 16#${int:1} ))"
+
+	echo "$int"
+}
+
+# Simple dates. Just beware of leading 0 (octal notation)
+__ammDateCurrYear="$(date +%Y)"
+__ammDateNextYear="$(( $__ammDateCurrYear + 1 ))"
+__ammDateCurrMonth="$(ammDateParseInt $(date +%m) )"
+__ammDateNextMonth="$(( ($__ammDateCurrMonth % 12) + 1 ))"
+__ammDateCurrDayOfMonth="$(ammDateParseInt $( date +%d) )"
+__ammDateCurrDayOfWeek="$(date +%u)"
+
+# -----------------------------------------------------------------------------
+# Date calculation
+# -----------------------------------------------------------------------------
+
+function ammDateToEpoch {
+	typeset time="$1"
+	date +%s -d "$time"
+}
+
+function ammDateToday {
+	echo "${__ammDateCurrYear}-${__ammDateCurrMonth}-${__ammDateCurrDayOfMonth}"
+}
+
+
+function ammDateCalculate {
+	typeset year="${1:-$__ammDateCurrYear}"
+	typeset month="${2:-$__ammDateCurrMonth}"
+	typeset day="${3:-$__ammDateCurrDayOfMonth}"
+
+	# Special formats
+	typeset ypref="${year:0:1}"
+	typeset mpref="${month:0:1}"
+	typeset dpref="${day:0:1}"
+
+	# Year
+	if [[ "$ypref" == "+" ]] || [[ "$ypref" == "-" ]]; then
+		year="$(( $__ammDateCurrYear + $year ))"
+	fi
+
+	# Month
+	if [[ "$mpref" == "+" ]] || [[ "$mpref" == "-" ]]; then
+		month="$(( $__ammDateCurrMonth + $month ))"
+	fi
+
+	# Days
+	if [[ "$dpref" == "+" ]] || [[ "$dpref" == "-" ]]; then
+		day="$(( $__ammDateCurrDayOfMonth + $day ))"
+	fi
+
+	# TODO: Manage the days
+	if [[ $day -gt 31 ]]; then
+		:
+	elif [[ $day -lt 1 ]]; then
+		:
+	fi
+
+	if [[ $month -gt 12 ]]; then
+		typeset moffs="$(( ($month-1) % 12 +1 ))"
+		typeset yoffs="$(( $month  / 12 ))"
+
+		month="$moffs"
+		year="$(( $year + $yoffs ))"
+
+	elif [[ $month -lt 1 ]]; then
+		# 12 + (negative time diff)
+		typeset moffs="$(( 12 + ( ($month-1) % 12 +1) ))"
+		typeset yoffs="$(( $month / 12 ))"
+
+		month="$moffs"
+		year="$(( $year -1 + $yoffs))"
+	fi
+
+	echo "$year-$month-$day"
+}
+
+function ammDateFirstDayOfMonth {
+	typeset month="${1:-$__ammDateCurrMonth}"
+	typeset year="${2:-$__ammDateCurrYear}"
+	typeset format="${3:-%u}"
+
+	typeset date="$(ammDateCalculate "$year" "$month" "01")"
+
+	date +"$format" -d "$date 12:00:00"
+}
+
+# -----------------------------------------------------------------------------
+# Waiting
+# -----------------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------
+# Date related to business
+# -----------------------------------------------------------------------------
+function ammDateIsBusinessRunning {
+	typeset timeCurr="$(date "+%H:%M")"
+
+	for timerange in "$@"; do
+		typeset bizStart="${timerange%%-*}"
+		typeset bizStop="${timerange##*-}"
+
+		# If we are in range, it's business time!
+		ammDateIsInRange "$timeCurr" "$bizStart" "$bizStop" && return 0
+	done
+
+	return 1
+}
+
+function ammDateIsBusinessTimeFair {
+
+	# Setup the avail minutes array
+	typeset -a avail
+	while [[ ${#avail[@]} -lt 1440 ]]; do
+		avail[${#avail[@]}]=1
+	done
+
+	# Check registered time-ranges
+	typeset timerange
+	for timerange in "$@"; do
+		typeset minStart="$(ammDateToMin "${timerange%%-*}")"
+		typeset minStop="$(ammDateToMin "${timerange##*-}")"
+
+		# Prepare loop minstop => minstart (decrement) to ease overnight
+		typeset -i i=$minStop
+
+		# Overnight ex: 23=>7: add 1 virt day for counter decrement
+		[[ "$minStart" -gt "$minStop" ]] && i=i+1440
+
+		while [[ $i -gt $minStart ]]; do
+			unset avail[$(($i%1440+1))]
+			i=i-1
+		done
+
+	done
+
+	# Get max consecutive min range
+	typeset -i cnt=0 maxcnt=0 firstcnt=0 prevmin=0
+	typeset -a availkeys=(${!avail[@]})
+	typeset    availlast="${availkeys[-1]}"
+
+	for min in ${availkeys[@]}; do
+		# last minute not consecutive OR end of loop
+		if [[ $(( $prevmin+1 )) -ne $min ]] && [[ $min -ne 0 ]] || [[ $min == "$availlast" ]]; then
+			# First save and first minute was avail (used for rollover)
+			[[ $maxcnt -eq 0 ]] && [[ ${avail[0]} -eq 1 ]] && firstcnt=$cnt
+			# last iteration (add for overnight rollover)
+			[[ $min -eq 1439 ]] && cnt=cnt+$firstcnt
+
+			# Save the max and reset
+			[[ $cnt -gt $maxcnt ]] && maxcnt=$cnt
+
+			cnt=1
+		fi
+		cnt=cnt+1
+		prevmin=min
+		
+	done
+
+	# Max consecutive time
+	echo $maxcnt
+	[[ $maxcnt -ge 120 ]]
+
+}

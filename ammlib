@@ -434,3 +434,20 @@ function ammExecRequires {
 		}
 	done
 }
+
+function ammExecRequiresOne {
+	typeset r=1
+	for bin in "$@"; do
+		ammLogDbg "Trying to find required bin '$bin'"
+		ammExecExists "$bin" && return 0
+	done
+
+	ammLogErr "Unable to find any of required binaries "$@" in $PATH"
+	exit 1
+}
+
+function ammExecIsFunc {
+	[[ "$(type -t "$1")" == "function" ]]
+}
+
+

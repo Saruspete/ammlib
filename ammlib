@@ -25,6 +25,7 @@ fi
 typeset    __AMMLIB_REALPATH="${BASH_SOURCE[0]}"
 typeset    __AMMLIB_INTERACTIVE="$(tty -s && echo true || echo false)"
 typeset -a __AMMLIB_CALLOPTS=("$@")
+typeset    __AMMLIB_CALLNAME="$0"
 
 
 # Check the readlink usability

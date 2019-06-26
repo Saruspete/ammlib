@@ -22,8 +22,10 @@ fi
 # FACT: We are now in bash
 #
 
-typeset __AMMLIB_REALPATH="${BASH_SOURCE[0]}"
-typeset __AMMLIB_INTERACTIVE="$(tty -s && echo 1 || echo 0)"
+typeset    __AMMLIB_REALPATH="${BASH_SOURCE[0]}"
+typeset    __AMMLIB_INTERACTIVE="$(tty -s && echo true || echo false)"
+typeset -a __AMMLIB_CALLOPTS=("$@")
+
 
 # Check the readlink usability
 if type -t readlink >/dev/null; then
@@ -347,6 +349,11 @@ function _ammLogWrite {
 	typeset color=""
 }
 
+function ammLogDie {
+	_ammLog "ERR" "bold red" "$@"
+	exit 255
+}
+
 function ammLogErr {
 	# TODO: add calling path
 	_ammLog "ERR" "bold red" "$@"
@@ -446,8 +453,24 @@ function ammExecRequiresOne {
 	exit 1
 }
 
-function ammExecIsFunc {
+
+# -----------------------------------------------------------------------------
+# Internal script state (bash) helpers
+# -----------------------------------------------------------------------------
+
+function ammIsFunc {
 	[[ "$(type -t "$1")" == "function" ]]
 }
 
 
+function ammIsVar {
+	typeset varname="$1"
+
+	(
+		set -o posix
+		set | while read var; do
+			[[ "$varname" == "${var%%=*}" ]] && exit 0
+		done
+		exit 1
+	)
+}

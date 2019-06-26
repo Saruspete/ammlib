@@ -38,10 +38,11 @@ function ammInputRegister {
 	typeset default="${3:-}"
 	typeset validcb="${4:-}"
 
-	typeset caller="${BASH_SOURCE[1]}:${FUNCNAME[1]}"
+	#typeset caller="${BASH_SOURCE[1]}:${FUNCNAME[1]}"
 
 	# Fill registration values
-	__ammInputIds[$id]="$caller"
+	#__ammInputIds[$id]="$caller"
+	__ammInputIds[$id]=""
 	__ammInputDefaults[$id]="$default"
 	__ammInputHelp[$id]="$helptext"
 
@@ -235,7 +236,7 @@ function ammInputSetPrefix {
 # Populate the reply values from file, environment, options
 function ammInputPopulate {
 	typeset srcs="${1:-environment,options}"
-	typeset prefix="${2:-$__ammInputPrefix}"
+	typeset prefix="${2-$__ammInputPrefix}"
 
 	# Loop on all registered IDs
 	for src in ${srcs//,/ }; do
@@ -253,7 +254,11 @@ function ammInputPopulate {
 					if [[ "$var" = $pfx* ]]; then
 						typeset id="${var#$pfx}"
 						id="${id%%=*}"
+
+						# Save parsed var
 						__ammInputReplies[$id]="$val"
+						# Map input with ID for replay, option style
+						__ammInputIds[$id]="--$var"
 					fi
 				done < <(printenv)
 				;;
@@ -270,39 +275,49 @@ function ammInputPopulate {
 
 					# remove leading dash
 					var="${var##--}"
-					var="${var##-}"
 					# if our option parsing can be done
 					if [[ "$var" = $pfx* ]]; then
 						# remove prefix and add reply
 						typeset id="${var#$pfx}"
 						id="${id%%=*}"
 						typeset val="${var#*=}"
+						# Save reply without prefix
 						__ammInputReplies[$id]="$val"
+						# Map input with ID for replay
+						__ammInputIds[$id]="$orig"
 					else
-						# Push basck elemenets as they are read
+						# Push back elemenets as they are read
 						args[${#args[@]}]="$var"
 					fi
 				done
 
 				# Recreate the arguments, without our options
-				set - "${args[@]}"
+				#set - "${args[@]}"
+				__AMMLIB_CALLOPTS=("${args[@]}")
 				;;
 
 			# From /proc/cmdline
 			cmdline)
+			set -x
 				# parse all options
 				for arg in $(</proc/cmdline); do
-					typeset var="${arg##=*}"
-					typeset val="${arg%*=}"
+					typeset var="${arg%%=*}"
+					typeset val="${arg#*=}"
 
-					if [[ "$var" = $prefix* ]]; then
-						typeset id="${var#$prefix}"
-						id="${id%%=*}"
-						typeset val="${var#*=}"
-						__ammInputReplies[$id]="$val"
-						continue
+					# Prefix is required for filtering
+					if [[ -n $prefix ]]; then
+						if [[ "$var" = $prefix* ]]; then
+							var="${var#$prefix}"
+						else
+							# No match with prefix, skip
+							continue
+						fi
 					fi
+
+					__ammInputReplies[$var]="$val"
+					__ammInputIds[$var]="cmdline:$arg"
 				done
+			set +x
 				;;
 
 			*)
@@ -314,7 +329,14 @@ function ammInputPopulate {
 }
 
 function ammInputBlueprint {
-	:
+	echo "You can replay this script with your filled values with:"
+	echo -n "$__AMMLIB_CALLNAME ${__AMMLIB_CALLOPTS[@]} "
+	for id in ${!__ammInputIds[@]}; do
+		# Check if the input was used
+		ammStringContainsWord "$id" "${!__ammInputReplies[@]:-}" || continue
+
+		echo -n "${__ammInputIds[$id]}"
+	done
 }
 
 # -----------------------------------------------------------------------------
@@ -324,6 +346,12 @@ function ammInputBlueprint {
 function ammInputValidateNotEmpty {
 	typeset str="${1:-}"
 	[[ -n "$str" ]]
+}
+
+function ammInputValidateInteger {
+	typeset str="${1:-}"
+	[[ -z "$str" ]] && return 1
+	[[ -z "${str//[0-9]/}" ]]
 }
 
 function ammInputValidateYN {

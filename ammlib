@@ -22,10 +22,17 @@ fi
 # FACT: We are now in bash
 #
 
-typeset    __AMMLIB_REALPATH="${BASH_SOURCE[0]}"
-typeset    __AMMLIB_INTERACTIVE="$(tty -s && echo true || echo false)"
-typeset -a __AMMLIB_CALLOPTS=("$@")
 typeset    __AMMLIB_CALLNAME="$0"
+typeset -a __AMMLIB_CALLOPTS=("$@")
+typeset    __AMMLIB_REALPATH="${BASH_SOURCE[0]}"
+
+# Check if we are started by a valid stdin
+typeset    __AMMLIB_TTY="$(tty)"
+typeset    __AMMLIB_INTERACTIVE=true
+if [[ -z "$__AMMLIB_TTY" ]] || ! [[ -e $__AMMLIB_TTY ]]; then
+	__AMMLIB_TTY=""
+	__AMMLIB_INTERACTIVE=false
+fi
 
 
 # Check the readlink usability
@@ -47,13 +54,25 @@ fi
 typeset __AMMLIB_ROOT="${__AMMLIB_REALPATH%/*}"
 
 # Temporary data
-typeset __AMMLIB_DATATMP="/tmp/.ammlib.${UID:-$(id -u)}/"
+typeset __AMMLIB_DATATMP="/tmp/.ammlib.${UID:-$(id -u)}/${__AMMLIB_CALLNAME##*/}.$$"
 [[ -d "$__AMMLIB_DATATMP" ]] || mkdir -p "$__AMMLIB_DATATMP"
 
 # Persistant data
 typeset __AMMLIB_DATA="$HOME/.ammlib/data/"
 [[ -d "$__AMMLIB_DATA" ]] || mkdir -p "$__AMMLIB_DATA"
 
+trap _ammClean EXIT INT TERM QUIT ILL ABRT
+
+function _ammClean {
+	# wait for any process in background
+	wait
+
+	# TODO: Clean all libraries
+	:
+
+	# clean global temp vars
+	[[ -d "$__AMMLIB_DATATMP" ]] && rm -fr "$__AMMLIB_DATATMP"
+}
 
 # -----------------------------------------------------------------------------
 # Module loading
@@ -88,7 +107,7 @@ function ammLibLocatePattern {
 function ammLibGetSymbols {
 	for file in "$@"; do
 		grep -Po '^[\s]*(function[\s]+[^\s]+|[^\s]+\(\))[\s]*{' $file | awk '
-			/function[ ]+([^ ]+)/ {print $2} 
+			/function[ ]+([^ ]+)/ {print $2}
 			/[^ ]+[ ]*()/ { gsub(/[()]/,"",$1); print $1 }'
 		grep -Po '^[\s]*(typeset|declare|readonly)([\s]+-[a-zA-Z]+)?[\s]+__[^\s]+=' "$file" | awk '
 			{gsub(/=$/,"",$NF); print $NF; }'
@@ -98,6 +117,20 @@ function ammLibGetSymbols {
 function ammLibIsSublib {
 	typeset libname="$1"
 	[[ "${libname//./}" != "$libname" ]]
+}
+
+function ammLibMetaInitGetName {
+	typeset libname="$1"
+	
+	typeset funcpref="${libname^}"
+	ammLibIsSublib "$libname" && {
+		funcpref=""
+		for f in ${libname//. }; do
+			funcpref+=${f^}
+		done
+	}
+
+	echo "amm${funcpref}MetaInit"
 }
 
 function ammLibLoadable {
@@ -119,16 +152,8 @@ function ammLibLoadable {
 		# If the lib exists, load it
 		if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
 
-			typeset funcpref="${libname^}"
-			ammLibIsSublib "$libname" && {
-				funcpref=""
-				for f in ${libname//. }; do
-					funcpref+=${f^}
-				done
-			}
-
 			# try to load it in a subshell to check init
-			typeset initfunc="amm${funcpref}MetaInit"
+			typeset initfunc="$(ammLibMetaInitGetName "$libname")"
 			typeset inittext=""
 			inittext="$( . $libfile || exit 1; if \type $initfunc >/dev/null 2>&1; then $initfunc; exit $?; else exit 0; fi;)"
 
@@ -191,6 +216,11 @@ function ammLibLoad {
 
 			# Init was ok, source and use lib
 			. $libfile
+
+			# Call init
+			typeset metainit="$(ammLibMetaInitGetName $libname)"
+			ammIsFunc $metainit && $metainit
+
 			__AMMLIB_LOADED+=" $libname"
 			continue
 
@@ -404,6 +434,13 @@ function ammLogDebugEnable {
 	BASH_XTRACEFD=$__AMMLOG_FDDBG
 }
 
+function ammLogWriteTerm {
+	typeset msg="$1"
+
+	$__AMMLIB_INTERACTIVE || return 0
+
+	echo > $__AMMLIB_TTY "$msg"
+}
 
 # -----------------------------------------------------------------------------
 # Execution helpers
@@ -416,8 +453,9 @@ function ammExecLogged {
 
 function ammExecExists {
 
+	typeset bin
 	for bin in "$@"; do
-		binfound=""
+		typeset binfound=""
 		for p in ${PATH//:/ }; do
 			[[ -x "$p/$bin" ]] && {
 				binfound="$p/$bin"
@@ -434,6 +472,7 @@ function ammExecExists {
 }
 
 function ammExecRequires {
+	typeset bin
 	for bin in "$@"; do
 		ammLogDbg "Trying to find required bin '$bin'"
 		ammExecExists "$bin" || {
@@ -445,6 +484,7 @@ function ammExecRequires {
 
 function ammExecRequiresOne {
 	typeset r=1
+	typeset bin
 	for bin in "$@"; do
 		ammLogDbg "Trying to find required bin '$bin'"
 		ammExecExists "$bin" && return 0
@@ -467,11 +507,9 @@ function ammIsFunc {
 function ammIsVar {
 	typeset varname="$1"
 
-	(
-		set -o posix
-		set | while read var; do
-			[[ "$varname" == "${var%%=*}" ]] && exit 0
-		done
-		exit 1
-	)
+	typeset var
+	while read var; do
+		[[ "$varname" == "${var%%=*}" ]] && return 0
+	done < <(set -o posix; set)
+	return 1
 }

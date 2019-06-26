@@ -5,52 +5,350 @@ if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
 	exit 1
 fi
 
-# Holder for inputs
-__AMMLIB_INPUT_REPLIES=()
-__AMMLIB_INPUT_CALLBACKS=()
-__AMMLIB_INPUT_IDS=()
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
 
 function ammInputMetaInit {
 	ammLibLoad string
 }
 
+# Prefix to look for
+typeset -g  __ammInputPrefix="input."
+# List of registered questions from InputRegister
+typeset -gA __ammInputIds=()
+typeset -gA __ammInputDefaults=()
+typeset -gA __ammInputValidationCB=()
+typeset -gA __ammInputHelp=()
+
+# State for blueprint
+typeset -gA __ammInputReplies=()
+typeset -gA __ammInputRepliesUnknownId=()
+
+typeset -g __ammInputBatchAutoTry=false
+typeset -g __ammInputBatchDieOnErr=false
+typeset -g __ammInputBatchSilentOk=false
+
+# -----------------------------------------------------------------------------
+# Registration
+# -----------------------------------------------------------------------------
 function ammInputRegister {
 	typeset id="$1"
-	typeset typ="${2:-string}"
-	typeset helptext="${3:-}"
+	typeset helptext="${2:-}"
+	typeset default="${3:-}"
 	typeset validcb="${4:-}"
 
+	typeset caller="${BASH_SOURCE[1]}:${FUNCNAME[1]}"
 
+	# Fill registration values
+	__ammInputIds[$id]="$caller"
+	__ammInputDefaults[$id]="$default"
+	__ammInputHelp[$id]="$helptext"
+
+	# Only call if internal function
+	if [[ -n "$validcb" ]] && ammIsFunc "$validcb"; then
+		__ammInputValidationCB[$id]="$validcb"
+	fi
 }
+
+function ammInputBatch {
+
+	typeset arg
+	typeset resetDone=false
+
+	for arg in "$@"; do
+		typeset fchar="${arg:0:1}"
+		typeset var="$arg"
+		typeset val=true
+
+		# - feature: set feature to false
+		if [[ "$fchar" == "-" ]]; then
+			val=false
+			var="${var:1}"
+		# + feature: set feature to true
+		elif [[ "$fchar" == "+" ]]; then
+			var="${var:1}"
+		# No prefix: reset all values and set only provided features
+		else
+			if ! $resetDone; then
+				__ammInputBatchAutoTry=false
+				__ammInputBatchDieOnErr=false
+				__ammInputBatchSilentOk=false
+				resetDone=true
+			fi
+		fi
+
+		# Check if the feature exists
+		ammIsVar "__ammInputBatch${var}" && {
+			eval "__ammInputBatch${var}=$val"
+		}
+	done
+
+	# If we can't have user interaction, dont mind to ask for it
+	if ! $__AMMLIB_INTERACTIVE; then
+		__ammInputBatchAutoTry=true
+		__ammInputBatchDieOnErr=true
+	fi
+
+	# 
+}
+
 
 function ammInputGet {
 	typeset id="$1"
-	typeset prompt="$2"
+	typeset prompt="${2:-}"
 	typeset default="${3:-}"
 	typeset readopts="${4:-}"
+	typeset validcb="${5:-}"
 
 	typeset reply=""
+	typeset caller="${BASH_SOURCE[1]}:${FUNCNAME[1]}"
+
+	# No prompt, check if one was registered beforehand
+	if [[ -z "$prompt" ]]; then
+		if [[ -n "$id" ]] && (set +u; [[ -n "${__ammInputHelp[$id]}" ]] ); then
+			prompt="${__ammInputHelp[$id]}"
+		else
+			prompt="Value for '$id'"
+		fi
+	fi
 
 	# Prettify the prompt
 	prompt="$(ammLogColor bold underline)${prompt}$(ammLogColor "reset"): "
 
-	[[ -n "$default" ]] && readopts+=" -i $default"
 
-	# Check if the input was already provided in options
-	if [[ -n "$id" ]] && ( set +u; [[ -n "${__AMMLIB_INPUT_REPLIES[$id]:-}" ]] ); then
-		# Set the reply and consume it
-		reply="${__AMMLIB_INPUT_REPLIES[$id]}"
-		unset _AMMLIB_INPUT_REPLIES[$id]
+	if [[ -z "$default" ]] && [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputDefaults[$id]}" ]] ); then
+		default="${__ammInputDefaults[$id]}"
+	fi
 
-	# Read from user input
+
+	# Loop until input is valid for caller
+	while :; do
+
+		# set/reset the reply value
+		typeset reply=""
+
+		#
+		# Set the default value
+		#
+
+		# Check if the input was already provided in options
+		if [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputReplies[$id]:-}" ]] ); then
+			# Set the reply and consume it
+			default="${__ammInputReplies[$id]}"
+			unset __ammInputReplies[$id]
+
+			ammLogDbg "Getting reply from filled list __ammInputReplies[$id] => '$reply'"
+		fi
+
+
+		#
+		# Get the reply value
+		#
+
+		# Batch mode
+		if $__ammInputBatchAutoTry; then
+			reply="$default"
+
+		# Read from user input
+		else
+			if [[ -n "$default" ]]; then
+				read -e $readopts -p "$prompt" -i "$default" reply
+			else
+				read -e $readopts -p "$prompt" reply
+			fi
+			ammLogDbg "Got input from user question. Id:$id Caller:$caller"
+		fi
+
+		#
+		# Validation of value
+		#
+
+		# Validation (locally supplied)
+		if [[ -n "$validcb" ]]; then
+			# I expect it to be a simple function, not a binary
+			if ammIsFunc "$validcb"; then
+				if ! $validcb "$reply"; then
+					ammLogWrn "Reply '$reply' is invalid (callback '$validcb')"
+
+					if $__ammInputBatchDieOnErr; then
+						ammLogDie "Dying due to DieOnErr requested"
+					fi
+				else
+					ammLogDbg "Input validated by arg provided callback '$validcb'"
+					break
+				fi
+			else
+				ammLogErr "Validation callback '$validcb' is not a function. Please retry"
+				unset validcb
+			fi
+
+		# Validation (registration)
+		elif [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputValidationCB[$id]}" ]] ); then
+			typeset func="${__ammInputValidationCB[$id]}"
+			if ammIsFunc "$func"; then
+				if ! $func "$reply"; then
+					ammLogWrn "Reply '$reply' is invalid (callback '$func')"
+				else
+					ammLogDbg "Input validated by registered '$validcb'"
+					break
+				fi
+			else
+				ammLogErr "Validation callback '$func' is not a function. Please retry"
+				unset __ammInputValidationCB[$id]
+			fi
+
+		# No validation requested
+		else
+			ammLogDbg "No validation requested."
+			break
+		fi
+
+		# If failure, let the user correct its input painlessly
+		default="$reply"
+
+		sleep .1
+	done
+
+	# Register the input
+	if [[ -n "$id" ]]; then
+		__ammInputReplies[$id]="$reply"
 	else
-		read -e $readopts -p "$prompt" reply
+		__ammInputRepliesUnknownId[$caller]="$reply"
 	fi
 
 	echo "$reply"
 	return 0
 }
 
+function ammInputSetPrefix {
+	typeset pref="${1:-}"
+
+	if [[ -z "$pref" ]]; then
+		ammLogErr "Prefix for input parsing cannot be empty"
+		return 1
+	fi
+
+	__ammInputPrefix="$pref."
+}
+
+# Populate the reply values from file, environment, options
+function ammInputPopulate {
+	typeset srcs="${1:-environment,options}"
+	typeset prefix="${2:-$__ammInputPrefix}"
+
+	# Loop on all registered IDs
+	for src in ${srcs//,/ }; do
+		case $src in
+			# Environment vars parsing
+			environment)
+				# parse and protect the prefix
+				typeset pfx="${prefix^^}"
+				pfx="${pfx//[.-]/_}"
+
+				# I only want env var, not shell vars, as with ( set -o posix ; set )
+				typeset var val
+				while IFS='=' read var val; do
+					# if current environment is matching our prefix
+					if [[ "$var" = $pfx* ]]; then
+						typeset id="${var#$pfx}"
+						id="${id%%=*}"
+						__ammInputReplies[$id]="$val"
+					fi
+				done < <(printenv)
+				;;
+
+			# Option parsing
+			options)
+				typeset -a args=()
+				typeset pfx="$prefix"
+
+				# Parse all options
+				for optid in ${!__AMMLIB_CALLOPTS[@]}; do
+					typeset var="${__AMMLIB_CALLOPTS[$optid]}"
+					typeset orig="$var"
+
+					# remove leading dash
+					var="${var##--}"
+					var="${var##-}"
+					# if our option parsing can be done
+					if [[ "$var" = $pfx* ]]; then
+						# remove prefix and add reply
+						typeset id="${var#$pfx}"
+						id="${id%%=*}"
+						typeset val="${var#*=}"
+						__ammInputReplies[$id]="$val"
+					else
+						# Push basck elemenets as they are read
+						args[${#args[@]}]="$var"
+					fi
+				done
+
+				# Recreate the arguments, without our options
+				set - "${args[@]}"
+				;;
+
+			# From /proc/cmdline
+			cmdline)
+				# parse all options
+				for arg in $(</proc/cmdline); do
+					typeset var="${arg##=*}"
+					typeset val="${arg%*=}"
+
+					if [[ "$var" = $prefix* ]]; then
+						typeset id="${var#$prefix}"
+						id="${id%%=*}"
+						typeset val="${var#*=}"
+						__ammInputReplies[$id]="$val"
+						continue
+					fi
+				done
+				;;
+
+			*)
+				ammLogErr "Unknown source type: '$src'"
+				;;
+		esac
+	done
+
+}
+
+function ammInputBlueprint {
+	:
+}
+
+# -----------------------------------------------------------------------------
+# Validation callbacks
+# -----------------------------------------------------------------------------
+
+function ammInputValidateNotEmpty {
+	typeset str="${1:-}"
+	[[ -n "$str" ]]
+}
+
+function ammInputValidateYN {
+	typeset str="${1:-}"
+	ammStringIsYes "$str" || ammStringIsNo "$str"
+}
+
+function ammInputValidateHost {
+	typeset str="${1:-}"
+
+	[[ -z "$str" ]] && return 1
+	[[ ${#str} -gt 255 ]] && return 1
+	[[ "${str:-1:1}" == "." ]] && return 1
+
+	# Validation from RFC1123
+	typeset IPv4Regex="^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
+	typeset HostRegex="^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$"
+
+	[[ $str =~ $IPv4Regex ]] || [[ $str =~ $HostRegex ]]
+}
+
+
+# -----------------------------------------------------------------------------
+# Getters with complex types
+# -----------------------------------------------------------------------------
 
 function ammInputGetYN {
 	typeset id="$1"
@@ -60,27 +358,18 @@ function ammInputGetYN {
 
 	# If a default value has been proposed, check it
 	if [[ -n "$default" ]]; then
-		if ammStringIsYes "$default" || ammStringIsNo "$default"; then
-			:
+		if ammInputValidateYN "$default"; then
+			ammLogDbg "Default input '$default' validated"
 		else
 			ammLogWrn "Invalid yes/no default input: '$default'"
+			default=""
 		fi
 	fi
 
-	while :; do
-		typeset reply="$(ammInputGet "$id" "$prompt [yes/no]" "$default" "$readopts")"
-
-		# check input
-		if ammStringIsYes "$reply"; then
-			return 0
-		elif ammStringIsNo "$reply"; then
-			return 1
-		else
-			echo >&2 "Invalid input '$reply'. Must be 'yes' or 'no'"
-			sleep .1
-		fi
-	done
-
+	typeset reply="$(ammInputGet "$id" "$prompt [yes/no]" "$default" "$readopts" "ammInputValidateYN")"
+	# check input
+	ammStringIsYes "$reply"
+	return $?
 }
 
 function ammInputGetPassword {

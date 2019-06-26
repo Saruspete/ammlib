@@ -21,9 +21,9 @@ function ammStringContains {
 
 function ammStringContainsWord {
 	typeset want="$1"
-	typeset phase="$2"
+	typeset phrase="$2"
 
-	# Lazy: just check 
+	# Lazy: just check
 	for w in $phrase; do
 		[[ "$w" == "$want" ]] && return 0
 	done

@@ -23,6 +23,7 @@ typeset -gA __ammInputHelp=()
 
 # State for blueprint
 typeset -gA __ammInputReplies=()
+typeset -gA __ammInputRepliesUsed=()
 typeset -gA __ammInputRepliesUnknownId=()
 
 typeset -g __ammInputBatchAutoTry=false
@@ -90,8 +91,6 @@ function ammInputBatch {
 		__ammInputBatchAutoTry=true
 		__ammInputBatchDieOnErr=true
 	fi
-
-	# 
 }
 
 
@@ -117,11 +116,11 @@ function ammInputGet {
 	# Prettify the prompt
 	prompt="$(ammLogColor bold underline)${prompt}$(ammLogColor "reset"): "
 
-
 	if [[ -z "$default" ]] && [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputDefaults[$id]}" ]] ); then
 		default="${__ammInputDefaults[$id]}"
 	fi
 
+	typeset -i ntries=0
 
 	# Loop until input is valid for caller
 	while :; do
@@ -148,9 +147,13 @@ function ammInputGet {
 		#
 
 		# Batch mode
-		if $__ammInputBatchAutoTry; then
+		if $__ammInputBatchAutoTry && [[ $ntries -eq 0 ]]; then
 			reply="$default"
 
+			# If we are not in silent mode, display the prompt nonetheless
+			if ! $__ammInputBatchSilentOk; then
+				ammLogWriteTerm "${prompt}${reply}"
+			fi
 		# Read from user input
 		else
 			if [[ -n "$default" ]]; then
@@ -172,6 +175,9 @@ function ammInputGet {
 				if ! $validcb "$reply"; then
 					ammLogWrn "Reply '$reply' is invalid (callback '$validcb')"
 
+					# If we are in silent ok, and had error, display it now
+					$__ammInputBatchSilentOk && ammLogWriteTerm "${prompt}${reply}"
+
 					if $__ammInputBatchDieOnErr; then
 						ammLogDie "Dying due to DieOnErr requested"
 					fi
@@ -189,6 +195,10 @@ function ammInputGet {
 			typeset func="${__ammInputValidationCB[$id]}"
 			if ammIsFunc "$func"; then
 				if ! $func "$reply"; then
+
+					# If we are in silent ok, and had error, display it now
+					$__ammInputBatchSilentOk && ammLogWriteTerm "${prompt}${reply}"
+
 					ammLogWrn "Reply '$reply' is invalid (callback '$func')"
 				else
 					ammLogDbg "Input validated by registered '$validcb'"
@@ -207,15 +217,15 @@ function ammInputGet {
 
 		# If failure, let the user correct its input painlessly
 		default="$reply"
+		ntries+=1
 
 		sleep .1
 	done
 
 	# Register the input
+	typeset file="$__AMMLIB_DATATMP/input.blueprint"
 	if [[ -n "$id" ]]; then
-		__ammInputReplies[$id]="$reply"
-	else
-		__ammInputRepliesUnknownId[$caller]="$reply"
+		echo -n >>$file " --${__ammInputPrefix}${id}='${reply}'"
 	fi
 
 	echo "$reply"
@@ -230,7 +240,7 @@ function ammInputSetPrefix {
 		return 1
 	fi
 
-	__ammInputPrefix="$pref."
+	__ammInputPrefix="$pref"
 }
 
 # Populate the reply values from file, environment, options
@@ -239,6 +249,7 @@ function ammInputPopulate {
 	typeset prefix="${2-$__ammInputPrefix}"
 
 	# Loop on all registered IDs
+	typeset src
 	for src in ${srcs//,/ }; do
 		case $src in
 			# Environment vars parsing
@@ -298,7 +309,6 @@ function ammInputPopulate {
 
 			# From /proc/cmdline
 			cmdline)
-			set -x
 				# parse all options
 				for arg in $(</proc/cmdline); do
 					typeset var="${arg%%=*}"
@@ -315,9 +325,8 @@ function ammInputPopulate {
 					fi
 
 					__ammInputReplies[$var]="$val"
-					__ammInputIds[$var]="cmdline:$arg"
+					__ammInputIds[$var]="--kernel.$arg"
 				done
-			set +x
 				;;
 
 			*)
@@ -329,14 +338,13 @@ function ammInputPopulate {
 }
 
 function ammInputBlueprint {
-	echo "You can replay this script with your filled values with:"
-	echo -n "$__AMMLIB_CALLNAME ${__AMMLIB_CALLOPTS[@]} "
-	for id in ${!__ammInputIds[@]}; do
-		# Check if the input was used
-		ammStringContainsWord "$id" "${!__ammInputReplies[@]:-}" || continue
 
-		echo -n "${__ammInputIds[$id]}"
-	done
+	typeset file="$__AMMLIB_DATATMP/input.blueprint"
+	[[ -s "$file" ]] || return 0
+
+	echo
+	echo "Script Blueprint: You can replay this script with your filled values with:"
+	echo "$__AMMLIB_CALLNAME ${__AMMLIB_CALLOPTS[@]} $(<$file)"
 }
 
 # -----------------------------------------------------------------------------

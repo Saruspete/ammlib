@@ -24,12 +24,12 @@ function ammDateParseInt {
 }
 
 # Simple dates. Just beware of leading 0 (octal notation)
-__ammDateCurrYear="$(date +%Y)"
-__ammDateNextYear="$(( $__ammDateCurrYear + 1 ))"
-__ammDateCurrMonth="$(ammDateParseInt $(date +%m) )"
-__ammDateNextMonth="$(( ($__ammDateCurrMonth % 12) + 1 ))"
-__ammDateCurrDayOfMonth="$(ammDateParseInt $( date +%d) )"
-__ammDateCurrDayOfWeek="$(date +%u)"
+typeset -gi __ammDateCurrYear="$(date +%Y)"
+typeset -gi __ammDateNextYear="$(( $__ammDateCurrYear + 1 ))"
+typeset -gi __ammDateCurrMonth="$(ammDateParseInt $(date +%m) )"
+typeset -gi __ammDateNextMonth="$(( ($__ammDateCurrMonth % 12) + 1 ))"
+typeset -gi __ammDateCurrDayOfMonth="$(ammDateParseInt $( date +%d) )"
+typeset -gi __ammDateCurrDayOfWeek="$(date +%u)"
 
 # -----------------------------------------------------------------------------
 # Date calculation

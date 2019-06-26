@@ -1,13 +1,23 @@
-# vim: ft=sh
+# vim: ft=sh ts=4
 
-if [[ -z "$__AMMLIB_ROOT" ]]; then
-	echo >&2 "You must not source this library: Use function ammLibLoad"
-    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
-	# to do that, you're smart enough to understand why it's a bad idea ;-)
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
 	exit 1
 fi
 
-# Requires lib: Exec
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function amm##NAME##MetaInit {
+	ammExecRequiresOne curl wget
+	ammLibLoad "exec"
+
+}
+
+# -----------------------------------------------------------------------------
+# Generic HTTP features
+# -----------------------------------------------------------------------------
 
 function ammHttpFetch {
 	typeset src="$1"
@@ -71,3 +81,6 @@ function ammHttpFetch {
 
 
 
+# -----------------------------------------------------------------------------
+# Site specific impementations
+# -----------------------------------------------------------------------------

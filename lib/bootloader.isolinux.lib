@@ -1,0 +1,323 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammBootloaderisolinuxMetaInit {
+	ammLibLoad string
+
+}
+
+
+typeset -ga __ammBootloaderisolinuxEntries=()
+typeset -g  __ammBootloaderisolinuxEntriesAppend=""
+
+typeset -gA __ammBootloaderisolinuxConfig=()
+typeset -gA __ammBootloaderisolinuxConfigAvail=(
+	[timeout]="Time in 1/10th of sec to wait for user input"
+	[menu_clear]="Clear the screen when exiting the menu"
+	[menu_title]="Title to display on the menu"
+	[menu_background]="Background image"
+	[menu_vshift]="?"
+	[menu_rows]="?"
+	[menu_margin]="?"
+	[menu_helpmsgrow]="?"
+	[menu_tabmsgrow]="?"
+	[menu_tabmsg]="?"
+	# Color related
+	[menu_color_border]="Border Area"
+	[menu_color_sel]="Selected item"
+	[menu_color_unsel]="Unselected menu item"
+	[menu_color_title]="Title bar"
+	[menu_color_tabmsg]="Press [Tab] message"
+	[menu_color_hotsel]="Selected hotkey"
+	[menu_color_hotkey]="Unselected hotkey"
+	[menu_color_help]="Help text"
+	[menu_color_scrollbar]="A scrollbar of some type? Not sure."
+	[menu_color_timeout]="?"
+	[menu_color_timeout_msg]="?"
+	[menu_color_cmdmark]="?"
+	[menu_color_cmdline]="?"
+)
+
+typeset -gA __ammBootloaderisolinuxMessage=()
+
+# -----------------------------------------------------------------------------
+# Initialize
+# -----------------------------------------------------------------------------
+function ammBootloaderisolinuxInit {
+	typeset basedir="$1"
+	
+	typeset dstdir="$basedir/isolinux"
+
+	# Require syslinux toolset
+	mkdir -p "$dstdir"
+
+	# Create the file listing, according to isolinux version
+	typeset files="isolinux.bin vesamenu.c32 kbdmap.c32 reboot.c32 disk.c32"
+	[[ ${__ammBootloaderisolinuxVersion:0:1} -ge 5 ]] && files+=" libutil.c32 libcom32.c32 ldlinux.c32 linux.c32"
+
+	typeset file
+	for file in $files; do
+		typeset fpath="$(ammBootloaderisolinuxFind "$file")"
+		if ! [[ -s "$fpath" ]]; then
+			ammLogErr "Unable to find required '$file'"
+			return 1
+		fi
+
+		cp "$fpath" "$dstdir"
+	done
+
+	# reset state variables
+	__ammBootloaderisolinuxConfig=()
+	__ammBootloaderisolinuxEntries=()
+	__ammBootloaderisolinuxEntriesAppend=""
+}
+
+function _ammBootloaderisolinuxVarnameClean {
+	typeset name="$1"
+	echo ${name} | tr -cd '[a-zA-Z0-9_]'
+}
+
+function ammBootloaderisolinuxFind {
+	typeset file="$1"
+	typeset searchpath="/usr/share/isolinux /usr/share/syslinux"
+
+	# For each requested file
+	typeset path
+	for path in $searchpath; do
+		if [[ -e "$path/$file" ]]; then
+			echo "$path/$file"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+typeset -g  __ammBootloaderisolinuxLocation="$(ammBootloaderisolinuxFind isolinux.bin)"
+#typeset -g  __ammBootloaderisolinuxVersion="$(awk '/ISOLINUX/{for(i=1;i<=NF; i++){ if($i=="ISOLINUX"){ print $(i+1);} } }' "$__ammBootloaderisolinuxLocation")"
+typeset -g  __ammBootloaderisolinuxVersion="$(strings "$__ammBootloaderisolinuxLocation"| ammStringFilter "ISOLINUX" "ISOLINUX" "+1" )"
+
+# -----------------------------------------------------------------------------
+# Set configuration values
+# -----------------------------------------------------------------------------
+function ammBootloaderisolinuxConfig {
+	typeset var="$1"
+	typeset val="$2"
+
+	if ! ammStringContainsWord "$var" "${!__ammBootloaderisolinuxConfigAvail[@]}"; then
+		echo "${!__ammBootloaderisolinuxConfigAvail[@]}"
+		ammLogWrn "Unavailable configuration '$var'"
+		return 1
+	fi
+
+	__ammBootloaderisolinuxConfig[$var]="$val"
+}
+
+function ammBootloaderisolinuxMessageSet {
+	typeset msg="${1:-}"
+	typeset key="${2:-display}"
+	__ammBootloaderisolinuxMessage[$key]="$msg"
+}
+
+# -----------------------------------------------------------------------------
+# Add label and menu content
+# -----------------------------------------------------------------------------
+
+#
+# Main menu
+#
+function ammBootloaderisolinuxEntryAddLabel {
+	typeset label="${1:-boot${#__ammBootloaderisolinuxEntries[@]}}"
+	shift
+
+	typeset id="${#__ammBootloaderisolinuxEntries[@]}"
+	__ammBootloaderisolinuxEntries[$id]="label $label"
+
+	typeset opt
+	for opt in "$@"; do
+		__ammBootloaderisolinuxEntriesData[$id]+="  $opt\n"
+	done
+}
+
+function ammBootloaderisolinuxEntryAddSeparator {
+	typeset label="${1:-boot${#__ammBootloaderisolinuxEntries[@]}}"
+
+	typeset id="${#__ammBootloaderisolinuxEntries[@]}"
+	__ammBootloaderisolinuxEntries[$id]="menu separator"
+}
+
+
+#
+# Submenu processing (this uses eval to fake multi-dimentional arrays... sorry)
+#
+function ammBootloaderisolinuxEntryAddSubmenu {
+	typeset name="$1"
+	typeset code="$(_ammBootloaderisolinuxVarnameClean "${name}")"
+
+	typeset id="${#__ammBootloaderisolinuxEntries[@]}"
+	__ammBootloaderisolinuxEntries[$id]="menu begin ^$name"
+	__ammBootloaderisolinuxEntriesData[$id]+="  menu title $name\n"
+
+	# Dynamic submenus
+	eval "typeset -ga __ammBootloaderisolinuxEntriesSub${code}=()"
+	eval "typeset -ga __ammBootloaderisolinuxEntriesSub${code}Data=()"
+}
+
+function ammBootloaderisolinuxEntryAddSubmenuLabel {
+	typeset name="$1"
+	typeset code="$(echo ${name} | tr -cd '[a-zA-Z0-9]')"
+
+	eval "typeset id=\"\${#__ammBootloaderisolinuxEntriesSub${code}[@]}\""
+	typeset label="${2:-boot${code}${id}}"
+
+	eval "__ammBootloaderisolinuxEntriesSub${code}[$id]=\"label $label\""
+
+	typeset opt
+	for opt in "$@"; do
+		eval "__ammBootloaderisolinuxEntriesSub${code}Data[$id]+=\"  $opt\n\""
+	done
+}
+
+
+
+# -----------------------------------------------------------------------------
+# Initialize
+# -----------------------------------------------------------------------------
+function ammBootloaderisolinuxGenerate {
+	typeset isolinuxcfg="$1"
+	#typeset rootdir="$1"
+	#typeset isolinuxcfg="$rootdir/isolinux/isolinux.cfg"
+	typeset msgprefix="${isolinuxcfg%/*}msg."
+
+	#
+	# Generate isolinux.cfg
+	#
+
+	# Default header for isolinux
+	cat >| "$isolinuxcfg" <<-EOT
+	ui vesamenu.c32
+	#default vesamenu.c32
+	
+	EOT
+
+	#
+	# Welcome and F1-F12 messages
+	#
+	cat >> "$isolinuxcfg" <<-EOT
+	
+	#
+	# Help messages
+	#
+	EOT
+	typeset msgtype
+	for msgtype in ${!__ammBootloaderisolinuxMessage[@]}; do
+		typeset msgtext="${__ammBootloaderisolinuxMessage[$msgtype]}"
+		typeset msgfile="$msgprefix.$msgtype"
+
+		echo "$msgtype ${msgfile##*/}" >> "$isolinuxcfg"
+		echo "$msgtext" >| "$msgfile"
+	done
+
+	#
+	# Global configuration
+	#
+	cat >> "$isolinuxcfg" <<-EOT
+	
+	#
+	# Configuration and design
+	#
+	EOT
+	typeset cfgkey
+	for cfgkey in $(ammStringSortWords ${!__ammBootloaderisolinuxConfig[@]}); do
+		typeset cfgval="${__ammBootloaderisolinuxConfig[$cfgkey]}"
+		echo >> "$isolinuxcfg" "${cfgkey//_/ } $cfgval"
+	done
+
+	#
+	# Genreate the menu content
+	#
+	cat >> "$isolinuxcfg" <<-EOT
+	
+	#
+	# Menu content
+	#
+	EOT
+	typeset menuentryId
+	for menuentryId in ${!__ammBootloaderisolinuxEntries[@]}; do
+
+		typeset menuentry="${__ammBootloaderisolinuxEntries[$menuentryId]}"
+		typeset menudata="$(set +u; echo "${__ammBootloaderisolinuxEntriesData[$menuentryId]}")"
+
+		# Set the label for booting
+		echo    >> "$isolinuxcfg" "$menuentry"
+		echo -e >> "$isolinuxcfg" "$menudata"
+
+		# Special cases with further processing
+		case "$menuentry" in
+			menu\ begin*)
+				typeset submenuname="${menuentry#menu begin}"
+
+				echo >> "$isolinuxcfg" "# Submenu $submenuname"
+
+				# Generate the sub menu
+				_ammBootloaderisolinuxGenerateEntries "$submenuname" >> "$isolinuxcfg"
+
+				# Add usual footer menus
+				cat >> "$isolinuxcfg" <<-EOT
+				label returntomain
+				  menu label Return to ^main menu
+				  menu exit
+
+				menu end
+				# End Submenu $submenuname
+
+				EOT
+				;;
+		esac
+	done
+
+	#
+	# Generate UEFI Grub
+	#
+
+}
+
+function _ammBootloaderisolinuxGenerateEntries {
+	typeset subname="$1"
+	
+	subname="$(_ammBootloaderisolinuxVarnameClean "${subname}")"
+
+	# Would rather have used 'typeset -n' but not available on old bash4
+	# Instead, use eval to create aliases
+	eval "typeset -a menuentries=(\"\${__ammBootloaderisolinuxEntriesSub${subname}[@]}\")"
+	eval "typeset -a menudatas=(\"\${__ammBootloaderisolinuxEntriesSub${subname}Data[@]}\")"
+
+	typeset menuId
+	for menuId in ${!menuentries[@]}; do
+		typeset menuentry="${menuentries[$menuId]}"
+		typeset menudata="$(set +u; echo "${menudatas[$menuId]}")"
+		echo    "${menuentry}"
+		echo -e "${menudata}"
+	done
+
+}
+
+# -----------------------------------------------------------------------------
+# Img extraction
+# -----------------------------------------------------------------------------
+
+function ammBootloaderisolinuxExtract {
+	typeset srcfile="$1"
+	typeset dstdir="$2"
+
+	
+
+}

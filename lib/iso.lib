@@ -1,0 +1,115 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammIsoMetaInit {
+	ammLibLoad string
+}
+
+typeset -gA __ammIsoBootloaderConfig=()
+typeset -ga __ammIsoBootloaderEntries=()
+typeset -g  __ammIsoBootloaderEntriesAppend=""
+typeset -gA __ammIsoBootloaderConfigAvail=(
+	[menu_clear]="Clear the screen when exiting the menu"
+	[menu_title]=""
+	[menu_background]=""
+	[menu_vshift]=""
+	[menu_rows]=""
+	[menu_margin]=""
+	[menu_helpmsgrow]=""
+	[menu_tabmsgrow]=""
+	[menu_color_border]="Border Area"
+	[menu_color_sel]="Selected item"
+	[menu_color_unsel]="Unselected menu item"
+	[menu_color_title]="Title bar"
+	[menu_color_tabmsg]="Press [Tab] message"
+	[menu_color_hotsel]="Selected hotkey"
+	[menu_color_hotkey]="Unselected hotkey"
+	[menu_color_help]="Help text"
+	[menu_color_scrollbar]="A scrollbar of some type? Not sure."
+	[menu_color_timeout]=""
+	[menu_color_timeout_msg]=""
+	[menu_color_cmdmark]=""
+	[menu_color_cmdline]=""
+	[menu_tabmsg]=""
+)
+# -----------------------------------------------------------------------------
+# Manipulation of ISO files
+# -----------------------------------------------------------------------------
+
+function ammIsoExtractIsoinfo {
+	:
+}
+
+function ammIsoExtract {
+	typeset iso="$1"
+	typeset dstdir="${2:-$__AMMLIB_DATATMP/iso}"
+	typeset method="${3:-}"
+
+	# We have multiple extract solutions available
+	# - mount -o loop : need root
+	# - FuseISO :  ammLibLoad fuse.iso
+	# - isoinfo :  ammExecExists isoinfo
+	# - udisk2  :  ammExecExists udiskctl
+	# - xorriso
+	# - 7z
+	# - rar
+
+}
+
+
+function ammIsoCreate {
+	typeset srcdir="$1"
+	typeset dstiso="${2:-${srcdir#/}.iso}"
+	typeset volumeid="${3:-myiso}"
+	typeset bootloaderbios="${4:-}"
+	typeset bootloaderuefi="${5:-}"
+
+	#bootloaderbios="isolinux/isolinux.bin"
+	#bootloaderusef="images/efiboot.img"
+
+	# TODO: Validate volume name
+	
+
+	(
+		cd "$srcdir"
+		typeset MKISOFS_OPTS=""
+
+		if [[ -n "$bootloaderbios" ]]; then
+			MKISOFS_OPTS+=" -eltorito-catalog isolinux/boot.cat"
+			# Boot MBR
+			MKISOFS_OPTS+=" -eltorito-boot $bootloaderbios -no-emul-boot"
+			# Load size 4 = 4*512 = 1 CDRom block (default for BIOS too)
+			MKISOFS_OPTS+=" -boot-load-size 4 -boot-info-table"
+		fi
+
+		if [[ -n "$bootloaderuefi" ]]; then
+			# The Alt-boot will create a new eltorito section
+			MKISOFS_OPTS+=" -eltorito-alt-boot -efi-boot $bootloaderuefi -no-emul-boot"
+			MKISOFS_OPTS+=" -boot-load-size 4 -boot-info-table "
+		fi
+
+		# Format
+		MKISOFS_OPTS+=" -J -rock -volid $volumeid"
+
+set -x
+		mkisofs $MKISOFS_OPTS -verbose -output "$dstiso" .
+set +x
+	)
+
+	# Make the ISO bootable from USB too
+	if [[ -n "$bootloaderbios" ]]; then
+		typeset isohybrid_opts=""
+		[[ -n "$bootloaderuefi" ]] && isohybrid_opts+=" --uefi"
+		isohybrid $isohybrid_opts "$dstiso"
+	fi
+
+}
+

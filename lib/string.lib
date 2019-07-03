@@ -20,11 +20,10 @@ function ammStringContains {
 }
 
 function ammStringContainsWord {
-	typeset want="$1"
-	typeset phrase="$2"
+	typeset want="$1"; shift
 
 	# Lazy: just check
-	for w in $phrase; do
+	for w in "$@"; do
 		[[ "$w" == "$want" ]] && return 0
 	done
 
@@ -114,6 +113,43 @@ function ammStringToLower {
 function ammStringToUpper {
 	typeset -u str="${1:-}"
 	echo "$str"
+}
+
+# -----------------------------------------------------------------------------
+# Search and filter
+# -----------------------------------------------------------------------------
+function ammStringFilter {
+	typeset filterline="${1:-.+}"
+	typeset filtercolumn="${2:-}"
+	typeset displaycolumn="${3:-0}"
+	typeset file="${4:-}"
+
+	awk -v fl="$filterline" -v fc="$filtercolumn" -v dc="$displaycolumn" '
+		# Line matching
+		fl {
+			# Seek the column matching
+			for (i=1; i<=NF; i++) {
+				if (fc && ! $i ~ fc)
+					continue
+
+				# Display column relative to the finding
+				if (substr(dc,0,1) ~ /[+-]/)
+					print $( i + dc )
+				# Absolute column. Default to the whole line ($0)
+				else
+					print $dc
+				break
+			}
+		}' "$file" | tr -cd '[:print:]'
+}
+
+# -----------------------------------------------------------------------------
+# Sorting
+# -----------------------------------------------------------------------------
+function ammStringSortWords {
+	for w in "$@"; do
+		echo "$w"
+	done | sort | tr '\n' ' '
 }
 
 # -----------------------------------------------------------------------------

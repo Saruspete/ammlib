@@ -99,9 +99,7 @@ function ammIsoCreate {
 		# Format
 		MKISOFS_OPTS+=" -J -rock -volid $volumeid"
 
-set -x
 		mkisofs $MKISOFS_OPTS -verbose -output "$dstiso" .
-set +x
 	)
 
 	# Make the ISO bootable from USB too

@@ -6,6 +6,7 @@ if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
 fi
 
 function ammStringMetaInit {
+	# try to keep to coreutils
 	ammExecRequires sed seq tr
 }
 
@@ -51,6 +52,16 @@ function ammStringIsInteger {
 	[[ -z "${str//[0-9]/}" ]]
 }
 
+function ammStringIsHex {
+	typeset str="$1"
+
+	# If empty string or something not in hex
+	#if [[ -z "$str" ]] || [[ $str =~ *[![:xdigit:]]* ]]; then
+	if [[ -z "$str" ]] || [[ "$str" != "${str//[a-fA-F0-9]}" ]]; then
+		return 1
+	fi
+	return 0
+}
 
 function ammStringIsYes {
 	typeset str="$1"
@@ -60,6 +71,38 @@ function ammStringIsYes {
 function ammStringIsNo {
 	typeset str="$1"
 	[[ $str =~ ^[nN][oO]?$ ]]
+}
+
+function ammStringIsIPv4 {
+	typeset ip="${1:-}"
+
+	# Should test what is faster: this long & complete regex, or the str processing ?
+	# "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+	# Minimum IP format is x.y (empty are 0)
+	if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?(\.[0-9]{1,3})?$ ]]; then
+		OIFS=$IFS
+		IFS='.'
+		typeset -a ips=($ip)
+		IFS=$OIFS
+		# Last simple check on the values
+		[[ ${ips[0]} -le 255 ]] && [[ ${ips[1]} -le 255 ]] || return 1
+		if ( set +u; [[ -n ${ips[2]} ]] ); then
+			[[ ${ips[2]} -le 255 ]] || return 1
+		fi
+		if ( set +u; [[ -n ${ips[3]} ]] ); then
+			[[ ${ips[3]} -le 255 ]] || return 3
+		fi
+		return 0
+	fi
+	return 1
+}
+
+function ammStringIsIPv6 {
+	:
+}
+function ammStringIsIP {
+	typeset ip="$1"
+	ammStringIsIPv4 "$ip" || ammStringIsIPv6 "$ip"
 }
 
 
@@ -91,7 +134,8 @@ function ammStringTrim {
 	fi
 }
 
-function ammStringCapitalize {
+#function ammStringCapitalize {
+function ammStringToCapital {
 	typeset str="${1:-}"
 
 	if [[ "$str" == "-" ]]; then
@@ -107,12 +151,25 @@ function ammStringCapitalize {
 
 function ammStringToLower {
 	typeset -l str="${1:-}"
-	echo "$str"
+	if [[ "$str" == "-" ]]; then
+		while read str; do
+			echo "$str"
+		done
+	else
+		echo "$str"
+	fi
+
 }
 
 function ammStringToUpper {
 	typeset -u str="${1:-}"
-	echo "$str"
+	if [[ "$str" == "-" ]]; then
+		while read str; do
+			echo "$str"
+		done
+	else
+		echo "$str"
+	fi
 }
 
 # -----------------------------------------------------------------------------
@@ -124,12 +181,13 @@ function ammStringFilter {
 	typeset displaycolumn="${3:-0}"
 	typeset file="${4:-}"
 
+	ammLogDbg "fl=$filterline fc=$filtercolumn dc=$displaycolumn file=$file"
 	awk -v fl="$filterline" -v fc="$filtercolumn" -v dc="$displaycolumn" '
 		# Line matching
-		fl {
+		match($0, fl) {
 			# Seek the column matching
 			for (i=1; i<=NF; i++) {
-				if (fc && ! $i ~ fc)
+				if (length(fc) && ! match($i, fc))
 					continue
 
 				# Display column relative to the finding
@@ -140,8 +198,17 @@ function ammStringFilter {
 					print $dc
 				break
 			}
-		}' "$file" | tr -cd '[:print:]'
+		}' "$file" | tr -cd '\t\n [:print:]'
 }
+
+# -----------------------------------------------------------------------------
+# Counting
+# -----------------------------------------------------------------------------
+function ammStringCountWords {
+	typeset -a arr=($@)
+	echo ${#arr[@]}
+}
+
 
 # -----------------------------------------------------------------------------
 # Sorting

@@ -1,0 +1,41 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+#function ammTestMetaInit {
+#	ammExecRequires awk
+#}
+
+# -----------------------------------------------------------------------------
+# library for testing other libraries
+# -----------------------------------------------------------------------------
+
+function ammTestGroup {
+	typeset group="$1"
+	ammLogInf "===== Testing $group"
+}
+
+function ammTestFunction {
+	typeset func="$1"; shift
+
+	typeset out
+	out="$($func "$@")"
+	typeset ret=$?
+
+	# Return code color
+	typeset color="red"
+	[[ $ret -eq 0 ]] && color="green"
+	typeset retc="$(ammLogColor $color)$ret$(ammLogColor rst)"
+
+	# Display result
+	echo "$func '$@'  =[$retc]=> ${out}"
+
+	return $ret
+}

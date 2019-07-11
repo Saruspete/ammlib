@@ -1,7 +1,0 @@
-== global: glb:global typ:global ovr:global loctyp: locovr=
-++ func1: glb:global typ:global ovr:global
-== global: glb:func1 typ:func1 ovr:global loctyp: locovr=func1
-
-== global: glb:global typ:global ovr:global loctyp: locovr=func1
-++ func2: glb:global typ:global ovr:global
-== global: glb:func2 typ:func2 ovr:global loctyp: locovr=func2

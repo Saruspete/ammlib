@@ -1,4 +1,4 @@
-# Adrien' Modular Library
+# Bash Modular Library
 
 ## Use Case
 
@@ -10,7 +10,7 @@ This is an attempt to provide a quality common library, that can be :
 - secure: reduce the risk of typos and undefined behaviour, check return code
 - fault-tolerant: protects itself against various env failures, sanitize inputs
 - debuggable: helps keeping track of processing, especially during failures
-- packable: generates a single file to be 
+- packable: generates a single packed script with the required modules for embbedding
 
 
 ## General Requirements and targeted environment
@@ -45,6 +45,8 @@ The naming convention helps avoiding name collision and typos.
 
 Almost all resources in the library are prefixed by "amm", in a format or another.
 
+For general ideas on how to write shell scripts, please [have a look to my guide for production bash scripting](https://docs.google.com/presentation/d/1a4IAux4tNo7F7mQ6fbzIVPEHxQQ0buD15Cm8vSMJFb0/edit).
+
 ### Functions
 
 Functions must be :
@@ -68,7 +70,25 @@ Example: For a variable keeping track of logs, set in logs.lib
 
 ### Tests
 
-All tests must be done using `[[` operator. 
+All tests must be done using `[[` operator.  
+Do not use the old idiom `[ x$var = x ]`, prefer the more readable `[[ -n "$var" ]]` (non empty) or its counterpart `[[ -z "$var" ]]` (empty)
+
+### Strings
+
+All strings must be enclosed with double quotes `"`. This is to allow variable expansion, and protext special chars.
+If you want to use a special char or syntax, you simply close the double quote, and reopen it after.
+
+```bash
+typeset base=/sys/class/net/
+typeset iface=lo
+
+typeset tmppath
+for tmppath in "$base/"*; do
+	if [[ "${tmppath##*/}" == "$iface" ]] && {
+		echo "Iface $iface found !"
+	}
+done
+```
 
 
 
@@ -108,10 +128,50 @@ Examples:
 
 
 
-## Extra: Pitfals and how to write them
+## Extra: Pitfals and how to avoid them
+
+### Variable visibility leak when vars are not typeset'd
+
+Even when using loops, you must declare the variables before:
+```bash
+typeset arg
+for arg in "$@"; do
+	: # Do something
+done
+```
+
+### Testing if a value exists with 'set -o nounset' enabled
+With `set -o nounset` you cannot access a variable not previously declared. This is also true for function arguments.
+
+To workaround this, we'll use the default value: `${var:-default}`
+
+```bash
+function multiply {
+	typeset v1="${1:-}"
+	typeset v2="${2:-$v1}"
+
+	if [[ -n "$v1" ]]; then
+		echo $(( $v1 * $v2 ))
+		return 0
+	else
+		return 1
+	fi
+}
+```
+
+### Testing if an array key exists with 'set -o nounset' enabled
+
+The easiest idiom for this is using a subshell + disabling set -o :
+```bash
+typeset -A array=([banana]="yellow", [apple]="red")
+# this will fail due to "set -o nounset", even with a default value
+[[ -n "${array[pear]}" ]]
+# So disable it in a subshell
+( set +u; [[ -n "${array[pear]}" ]] ) && echo "I know color of pear";
+```
 
 ### Locale impact character expansion and sorting results
-```
+```shell
 $ export LC_ALL=en_US.utf8
 $ ls /usr/bin/[G-H]*
 /usr/bin/GET

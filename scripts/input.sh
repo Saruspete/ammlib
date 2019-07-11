@@ -15,13 +15,17 @@ ammLibLoad input
 
 ammInputRegister "toto"
 ammInputRegister "hostname" "Hostname of target machine" "localhost" "ammInputValidateHost"
-ammInputRegister "age" "int"
+ammInputRegister "age" "Whats the age of the captain" "666" "ammInputValidateInt"
 
 ammInputPopulate
-ammInputPopulate cmdline "rd."
+ammInputPopulate cmdline ""
+
+ammInputBatch AutoTry
+#ammInputBatch +DieOnErr
 
 echo toto = $(ammInputGet "toto")
 echo titi = $(ammInputGet "titi" "Any non empty value" "" "" "ammInputValidateNotEmpty")
 echo host = $(ammInputGet "hostname")
-echo lvm  = $(ammInputGet "lvm.lv")
+echo lvm  = $(ammInputGet "rd.lvm.lv" "LVM LV To activate" "" "" "ammInputValidateNotEmpty")
 
+ammInputBlueprint

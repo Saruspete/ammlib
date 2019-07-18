@@ -73,6 +73,24 @@ function ammStringIsNo {
 	[[ $str =~ ^[nN][oO]?$ ]]
 }
 
+function ammStringIsTrue {
+	typeset -l str="$1"
+
+	# Empty is false
+	[[ -z "$str" ]] && return 1
+
+	# "no" string
+	ammStringIsNo "$str" && return 1
+	# 0 value
+	ammStringIsInteger "$str" && [[ $str -eq 0 ]] && return 1
+	# True
+	[[ "$str" == "false" ]] && return 1
+
+	# Any other value is valid
+	return 0
+}
+
+
 function ammStringIsIPv4 {
 	typeset ip="${1:-}"
 
@@ -170,6 +188,17 @@ function ammStringToUpper {
 	else
 		echo "$str"
 	fi
+}
+
+
+function ammStringNormalize {
+	typeset file="$1"
+	# Inspired from https://www.linuxquestions.org/questions/programming-9/merge-lines-in-a-file-using-sed-191121/
+	grep -Pv '^\s*#' "$file" \
+	| sed -e :a -e N -Ee 's/\\\s*(#.*)?\n^\s*/ /' -e ta
+	# https://www.gnu.org/software/sed/manual/sed.html#Joining-lines
+	# | sed -e ':x /\\$/ { N; s/\\\n//g ; bx }'
+	# | sed -e ':x /\\$/ { N; s/\\\s*(#.*)?\n^\n//g ; bx }'
 }
 
 # -----------------------------------------------------------------------------

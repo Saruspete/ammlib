@@ -18,6 +18,12 @@ if [[ -z "$BASH" ]] || [[ "$(cat /proc/$$/comm)" != "bash" ]]; then
 	:
 fi
 
+if [[ "${BASH_VERSINFO:-0}" -lt 4 ]]; then
+	echo >&2 "This requires bash >= 4 to run."
+	return 1 2>/dev/null
+	exit 1
+fi
+
 #
 # FACT: We are now in bash
 #

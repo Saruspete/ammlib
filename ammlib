@@ -40,7 +40,6 @@ if [[ -z "$__AMMLIB_TTY" ]] || ! [[ -e $__AMMLIB_TTY ]]; then
 	__AMMLIB_INTERACTIVE=false
 fi
 
-
 # Check the readlink usability
 if type -t readlink >/dev/null; then
 	[[ "$(readlink -f "$__AMMLIB_REALPATH")" -ef "$__AMMLIB_REALPATH" ]] || {
@@ -114,6 +113,15 @@ function ammLibLocatePattern {
 	done
 }
 
+function ammLibNameFromPath {
+	typeset path="$1"
+
+	path="${path##*/}"
+	path="${path%.lib}"
+
+	echo "$path"
+}
+
 function ammLibGetSymbols {
 	for file in "$@"; do
 		grep -Po '^[\s]*(function[\s]+[^\s]+|[^\s]+\(\))[\s]*{' $file | awk '
@@ -131,14 +139,18 @@ function ammLibIsSublib {
 
 function ammLibMetaInitGetName {
 	typeset libname="$1"
-	
+
+	# Input name is lowercase. Up only first char: main => Main
 	typeset funcpref="${libname^}"
-	ammLibIsSublib "$libname" && {
+
+	# If it's a sub-library, prefix is MainSub
+	if ammLibIsSublib "$libname"; then
+		# Reset the prefix
 		funcpref=""
-		for f in ${libname//. }; do
+		for f in ${libname//./ }; do
 			funcpref+=${f^}
 		done
-	}
+	fi
 
 	echo "amm${funcpref}MetaInit"
 }
@@ -152,8 +164,9 @@ function ammLibLoadable {
 
 		# If the given path was a file, find its libname from path
 		if [[ -e "$libfile" ]]; then
-			libname="${libfile##*/}"
-			libname="${libname%.lib}"
+			libname="$(ammLibNameFromPath $libfile)"
+			#libname="${libfile##*/}"
+			#libname="${libname%.lib}"
 		# Else, find our file
 		else
 			libfile="$(ammLibLocate "$libname")"
@@ -165,7 +178,7 @@ function ammLibLoadable {
 			# try to load it in a subshell to check init
 			typeset initfunc="$(ammLibMetaInitGetName "$libname")"
 			typeset inittext=""
-			inittext="$( . $libfile || exit 1; if \type $initfunc >/dev/null 2>&1; then $initfunc; exit $?; else exit 0; fi;)"
+			inittext="$(ammLogSilence 1; . $libfile || exit 1; if \type $initfunc >/dev/null 2>&1; then $initfunc; exit $?; else exit 0; fi;)"
 
 			# Dont stop loading, just log error and increase return
 			if [[ $? -ne 0 ]]; then
@@ -300,6 +313,27 @@ function ammLibCompact {
 	:
 }
 
+function ammLibListModules {
+
+	typeset libpath lib
+	for libpath in $(ammLibLocatePattern); do
+		[[ -s "$libpath" ]] || continue
+		typeset lib=${libpath##*/}
+		lib=${lib%.lib}
+
+		echo
+		echo "====== $lib ($libpath)"
+	done
+}
+
+function ammLibListFunctions {
+	typeset filename="${1:-}"
+
+	typeset file
+	for file in $(ammLibLocatePattern $filename); do
+		ammLibGetSymbols "$file"
+	done
+}
 
 # -----------------------------------------------------------------------------
 # Logging

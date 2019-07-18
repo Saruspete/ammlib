@@ -395,6 +395,7 @@ exec 97>&1 98>&2 # Must be plain int, not the variable
 typeset __AMMLOG_FDDBG=99
 typeset __AMMLOG_LOGFILE=""
 typeset __AMMLOG_LOGTERM=""
+typeset __AMMLOG_SILENT="0"
 
 function _ammLog {
 	typeset tag="$1"; shift
@@ -407,13 +408,18 @@ function _ammLog {
 	# Read stdin
 	if [[ "$@" = "-" ]]; then
 		while read line; do
-			echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $line${colorrst}"
+			# Silent mode doesn't write any log
+			if [[ "$__AMMLOG_SILENT" == "0" ]]; then
+				echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $line${colorrst}"
+			fi
 		done
 
 	# Standard args
 	else
-		# Display
-		echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $@${colorrst}"
+		# Silent mode doesn't display any log
+		if [[ "$__AMMLOG_SILENT" == "0" ]]; then
+			echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $@${colorrst}"
+		fi
 	fi
 }
 
@@ -460,11 +466,14 @@ function ammLogDbg {
 	fi
 }
 
-function ammLogStdout {
-	typeset type="$1"
-	while read line; do
-		ammLog${type} "$line"
-	done
+function ammLogSilence {
+	typeset enabled="$1"
+
+	if [[ "$enabled" == "0" ]]; then
+		__AMMLOG_SILENT=0
+	else
+		__AMMLOG_SILENT=1
+	fi
 }
 
 # Log xtrace (run in another process, and shares FD)

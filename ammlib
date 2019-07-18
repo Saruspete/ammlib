@@ -46,6 +46,10 @@ if type -t readlink >/dev/null; then
 	}
 fi
 
+
+typeset __AMMLIB_USERNAME="$(\id -nu)"
+typeset __AMMLIB_USERID="$(\id -u)"
+
 #
 # Set and create base folders to be used by library
 #
@@ -448,7 +452,67 @@ function ammLogWriteTerm {
 
 function ammExecLogged {
 	# TODO: Log the exec, return code and output of the command
+	set -x
 	"$@"
+}
+
+function ammExecAsUser {
+	typeset userrunas="${1:-$__AMMLIB_USERNAME}"; shift
+
+	typeset usercurrent="$__AMMLIB_USERNAME"
+	typeset -i ret=0
+	typeset stmp
+
+	# Exec from stdin
+	if [[ "$@" == "-" ]]; then
+
+		# If no user specified, or we already are correct one...
+		if [[ -z "$userrunas" ]] || [[ "$userrunas" == "$usercurrent" ]]; then
+			eval "$(cat)" 98>&- 99>&-
+			ret=$?
+
+		# root... yay !
+		elif [[ "$usercurrent" == "root" ]]; then
+			# runuser is like su, but without PAM. Preferred when exec from root
+			cat | runuser -m "$userrunas" 98>&- 99>&-
+			ret=$?
+
+		else
+			ammLogErr "Cannot change from user $usercurrent to user $userrunas"
+			ret=4
+		fi
+
+	# Exec from args
+	else
+		# No user specified, or already correct user
+		if [[ -z "$userrunas" ]] || [[ "$userrunas" == "$usercurrent" ]]; then
+			ammLogDbg "Using eval to run as '$userrunas' cmd: '$@'"
+			eval "$@" 98>&- 99>&-
+			ret=$?
+
+		# root... yay !
+		elif [[ "$usercurrent" == "root" ]]; then
+			ammLogDbg "Using su to run as '$userrunas' cmd: '$*'"
+			# I need to flatten
+			# runuser is like su, but without PAM. Preferred when exec from root
+			runuser -m -c "$*" "$userrunas" 98>&- 99>&-
+			ret=$?
+
+		# Maybe handle sudo ?
+		elif stmp="$(sudo -nl 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$stmp" ]]; then
+			log_dbg "Using sudo to run as '$userrunas' cmd: '$@'"
+			# TODO: parse $stmp output more...
+			sudo -n -u "$userrunas" "$@" 98>&- 99>&-
+			ret=$?
+
+			# Fails...
+		else
+			log_err "Cannot exec '$@' as user $userrunas from user $usercurrent"
+			ret=4
+		fi
+
+	fi
+
 }
 
 function ammExecExists {

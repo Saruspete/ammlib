@@ -116,7 +116,13 @@ function ammStringIsIPv4 {
 }
 
 function ammStringIsIPv6 {
-	:
+	typeset ip="${1:-}"
+
+	# ::1
+	if [[ $ip =~ ^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$ ]]; then
+		return 0
+	fi
+	return 1
 }
 function ammStringIsIP {
 	typeset ip="$1"

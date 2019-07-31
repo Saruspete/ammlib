@@ -1,11 +1,14 @@
 ==== Input
-AskHostname: question
 
 ==== Hardware
 ListByVendor
 ListByNumaNode
 GetNumaNode
 UpdatePci
+
+==== Process
+SetAffinity
+
 
 ==== Network
 ping
@@ -14,27 +17,68 @@ ssh
 waituntilping
 
 
+
 ==== Exec
-DelayExec (timeout, perl, etc...)
 runas
+SetTimeout
 
 ==== String
-trim / ltrim / rtrim
-ucfirst
 
-==== PkgRpm
 
-==== PkgYum
+==== Binaries / ELF
 
-==== PkgDpkg
 
-==== PkgApt
+==== Pkg
+
+List
+ListVersions
+Install
+Verify
+WhatProvides
+Upgrade
+
+
+sublib: rpm yum dpkg apt emerge
 
 ==== Chroot
+
+Create
+SetKernel
+InstallDevel
+InstallDebug
+
+sublib: centos debian gentoo
+
+==== Iso
+Extract
+Create
+
+
+==== Bootloader Isolinux
+BootloaderInit
+BootloaderAddEntry
 
 ==== Services
 
 ==== LXC
 
 ==== Fs
-zfs, xfs, ext4
+Create
+AttrGet / Set
+
+sublib: zfs, xfs, ext4
+
+==== Syscfg : Configure the local system
+
+==== Syscfg.network
+
+ifaceNameSet / Get
+routeSet / Get
+ipSet / Get
+iptables
+
+==== Syscfg.kdump
+
+==== syscfg.sudo
+
+==== syscfg.

@@ -213,3 +213,20 @@ This generates an output like this :
    (ammlib::ammLibLoadable::149)  ammLibLocate kernel
    (ammlib::ammLibLocate::84)  typeset libname=kernel
 ```
+
+
+## Extra naming convension for modules functions
+
+### Execution
+
+For process wrappers, we split the tasks in 3 different functions.
+Take the example of a network traceroute: `ammNetworkTraceroute`
+- `ammNetworkTracerouteCmd` returns the command line to be used 
+- `ammNetworkTracerouteParse` parses the output of the command and returns variables, usable from `eval`
+- `ammNetworkTraceroute` is a helper using the Parse function and returns a quick and usable result 
+
+This split allows to extend process execution with process library, that provides timeout, parallelism, multi-users and other features...
+
+### Ideas / Research
+Research: using `::` as class separator: `ammNetwork::Traceroute`
+

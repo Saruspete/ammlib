@@ -43,6 +43,12 @@ function ammStringEndsWith {
 	[[ "${check%$want}" != "$check" ]]
 }
 
+function ammStringIsFile {
+	typeset file="$1"
+
+	[[ -f "$file" ]]
+}
+
 function ammStringIsInteger {
 	typeset str="$1"
 
@@ -207,6 +213,24 @@ function ammStringNormalize {
 	# | sed -e ':x /\\$/ { N; s/\\\s*(#.*)?\n^\n//g ; bx }'
 }
 
+function ammStringInputToLines {
+	typeset input="$1"
+
+	# Read stdin
+	if [[ "$input" == "-" ]]; then
+		cat
+
+	# Read from file
+	elif ammStringIsFile "$input"; then
+		cat "$input"
+
+	# Just output input
+	else
+		echo "$input"
+	fi
+}
+
+
 # -----------------------------------------------------------------------------
 # Search and filter
 # -----------------------------------------------------------------------------
@@ -244,6 +268,20 @@ function ammStringCountWords {
 	echo ${#arr[@]}
 }
 
+function ammStringCountLines {
+	typeset input="$1"
+
+	typeset wcout=""
+
+	if [[ -e "$input" ]]; then
+		wcout="$(wc -l $input)"
+
+	else
+		wcout="$(echo "$input" | wc -l)"
+	fi
+
+	echo ${wcout%% *}
+}
 
 # -----------------------------------------------------------------------------
 # Sorting

@@ -466,6 +466,23 @@ function ammLogDbg {
 	fi
 }
 
+function ammLogMissingBin {
+
+	# Load the package modules
+	if ! ammLibLoadable pkg; then
+		ammLogErr "Cannot load pkg library. Cannot find required packages"
+		return 1
+	fi
+	ammLibLoad pkg
+
+	typeset binlist
+	for binlist in "$@"; do
+		for bin in $binlist; do
+			ammPkgWhatProvides $bin
+		done
+	done
+}
+
 function ammLogSilence {
 	typeset enabled="$1"
 

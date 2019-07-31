@@ -14,8 +14,14 @@ fi
 #}
 
 # -----------------------------------------------------------------------------
-# 
+# Filesystem mount management
 # -----------------------------------------------------------------------------
+
+function ammFsMounted {
+	typeset mnt="$1"
+
+	typeset mntpath="$(readlink -f $mnt)"
+}
 
 function ammFsMount {
 	typeset mntsrc="$2"
@@ -44,3 +50,8 @@ function ammFsMount {
 	# Do the mount
 	mount $mnttype $mntopts "$mntsrc" "$mntdst"
 }
+
+
+# -----------------------------------------------------------------------------
+# Filesystem creation
+# -----------------------------------------------------------------------------

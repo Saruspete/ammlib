@@ -107,7 +107,69 @@ function ammProcessLastRun {
 }
 
 # -----------------------------------------------------------------------------
-# Process creation and management
+# Custom naming execution
+# -----------------------------------------------------------------------------
+
+function ammProcessRun {
+	typeset funcname="$1"; shift
+
+	if ! ammIsFunc "${funcname}Cmd"; then
+		ammLogErr "Unable to run '$funcname' as not '${funcname}Cmd' is defined"
+		return 1
+	fi
+
+	if ! ammIsFunc "${funcname}Parse"; then
+		ammLogErr "Unable to run '$funcname' as not '${funcname}Parse' is defined"
+		return 1
+	fi
+
+	# TODO: Add some options parsing for generic features like custom-user, timeout, etc...
+
+	typeset -i ret=0
+	typeset    cmd="$(${funcname}Cmd "$@")"
+	typeset    tmpbase="$__AMMLIB_DATATMP/ammProcess/${funcname}"
+	mkdir -p "$tmpbase"
+
+	# Call the executing function
+	$cmd >$tmpbase/stdout 2>$tmpbase/stderr
+	ret=$?
+
+	# Call the parsing function
+	${funcname}Parse "$tmpbase/stdout" "$tmpbase/stderr"
+
+	# Return real result
+	return $ret
+}
+
+
+# -----------------------------------------------------------------------------
+# Process timeout
+# -----------------------------------------------------------------------------
+
+function ammProcessTimeout {
+	typeset time="$1"; shift
+
+	typeset ret="-1"
+	if ammExecExists timeout; then
+		timeout --preserve-status $time "$@"
+		ret=$?
+	elif ammExecExists perl; then
+		perl -e "alarm $time; exec @ARGV" "$@"
+		ret=$?
+	else
+		ammLogErr "Unable to find a suitable timeout function"
+		return 1
+	fi
+
+	return $ret
+}
+
+function ammProcessAlarm {
+	:
+}
+
+# -----------------------------------------------------------------------------
+# Process pool and parallism
 # -----------------------------------------------------------------------------
 
 typeset -gA __AMMPROCESS_POOL
@@ -226,26 +288,10 @@ function ammProcessPoolTaskAdd {
 
 	echo "$@" >> "$datapath/jobs.txt"
 	__AMMPROCESS_POOL_LASTJOBID[$name]="$(( $(ammStringCountLines "$datapath/jobs.txt") -1 ))"
+
+	echo ${__AMMPROCESS_POOL_LASTJOBID[$name]}
 }
 
-
-function ammProcessTimeout {
-	typeset time="$1"; shift
-
-	typeset ret="-1"
-	if ammExecExists timeout; then
-		timeout --preserve-status $time "$@"
-		ret=$?
-	elif ammExecExists perl; then
-		perl -e "alarm $time; exec @ARGV" "$@"
-		ret=$?
-	else
-		ammLogErr "Unable to find a suitable timeout function"
-		return 1
-	fi
-
-	return $ret
-}
 
 # -----------------------------------------------------------------------------
 # Daemon management

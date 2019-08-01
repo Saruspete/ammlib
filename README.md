@@ -97,10 +97,10 @@ done
 Tabs are meant to specify an indentation level, a logical separation between blocks of code.  it's up to the user to decide if he wants 2, 4, or any unusual number of spaces for the tabs.
 Spaces are used to visually align similar lines to the human eye.
 
-This logic alignment / human eye distinction keeps visual correct, and allows everyone to have it's choices respected. 
+This logic / human eye distinction keeps visual alignment correct, and allows everyone to have it's choices respected. 
 
-Also in bash, use of tabs allows to use the heredoc construct "<<-EOT"
-The - before "EOT" signifiy "Remove all leading tabs when using the code block".
+Also in bash, use of tabs allows to use the heredoc construct `<<-EOT`
+The `-` before `EOT` signifiy "Remove all leading tabs when using the code block".
 That allows to keep a correct indentation in the code, without having to output them or using parsing hacks.
 
 

@@ -8,6 +8,8 @@
 
 set -u
 
+export LC_ALL=C
+
 #
 # Compatibility check
 #
@@ -80,7 +82,9 @@ function _ammClean {
 	:
 
 	# clean global temp vars
-	[[ -d "$__AMMLIB_DATATMP" ]] && rm -fr "$__AMMLIB_DATATMP"
+	if [[ -z ${AMMLIB_DEBUG:-} ]]; then
+		[[ -d "$__AMMLIB_DATATMP" ]] && rm -fr "$__AMMLIB_DATATMP"
+	fi
 }
 
 # -----------------------------------------------------------------------------

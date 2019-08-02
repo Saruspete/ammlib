@@ -1,0 +1,245 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammNetworkMetaInit {
+	ammLibLoad process string
+}
+
+# -----------------------------------------------------------------------------
+# Ping helpers
+# -----------------------------------------------------------------------------
+
+function ammNetworkPingCmd {
+	typeset    dest="$1"
+	typeset -i count="${2:-1}"
+	typeset -i tmout="${3:-2}"
+	typeset -i deadl="${4:-5}"
+	typeset -i size="${5:-56}"
+	typeset    extraopts="${6:-}"
+
+	echo ping -c ${count} -W $tmout -w $deadl - $dest
+}
+
+function ammNetworkPingParse {
+	typeset stdout="$1"
+	typeset stderr="$2"
+
+	# Error reporting
+	# PING 1.1 (1.0.0.1) 56(84) bytes of data.
+	# 64 bytes from 1.0.0.1: icmp_seq=1 ttl=56 time=5.51 ms
+	# 64 bytes from 1.0.0.1: icmp_seq=2 ttl=56 time=5.06 ms
+	# 64 bytes from 1.0.0.1: icmp_seq=3 ttl=56 time=5.34 ms
+	# ^C
+	# --- 1.1 ping statistics ---
+	# 3 packets transmitted, 3 received, 0% packet loss, time 4ms
+	# rtt min/avg/max/mdev = 5.064/5.304/5.510/0.202 ms
+
+	echo "typeset ERR='' RES=''"
+	echo "typeset -A TIMES"
+
+	# Fist check if we had stderr
+	typeset line
+	while read line; do
+		if ammStringContains "$line" "Name or service not known"; then
+			echo "ERR='unknown host'"
+			return 1
+		fi
+	done < <(ammStringInputToLines "$stderr")
+
+	while read line; do
+		:
+	done < <(ammStringInputToLines "$stdout")
+
+}
+
+function ammNetworkPing {
+	typeset dest="$1"
+
+	typeset cmd="$(ammNetworkPingCmd "$dest" 3 1 5)"
+	
+
+}
+
+# -----------------------------------------------------------------------------
+# Traceoute helpers
+# -----------------------------------------------------------------------------
+function ammNetworkTracerouteCmd {
+	typeset dest="$1"
+	typeset opts="${2:-}"
+
+	typeset cmd="traceroute"
+
+	# 
+	if ammStringIsIPv6 "$dest"; then
+		cmd="traceroute6"
+	fi
+
+	cmd+="$opts $dest"
+
+	echo "$cmd"
+}
+
+function ammNetworkTracerouteParse {
+
+	typeset stdout="${1:-}"
+	typeset stderr="${2:-}"
+
+	typeset tgthost tgtip
+	echo 'typeset err=""'
+	echo 'typeset -a dns ip timeall timemin timeavg timemax err'
+
+	#typeset hop gwdns gwip timing1 _junk
+	#$stdout | while read  hop gwdns gwip timing1 _junk; do
+	typeset hop data lasthop
+	while read  hop data; do
+		# Parse line to positionning parameters
+		data="${data//'*'/_}"
+		set - $data
+
+		# Skip first line
+		if [[ $hop == "traceroute" ]]; then
+			tgthost="$2"
+			tgtip="$3"
+			continue
+		fi
+
+		typeset -i timetot=0 timecnt=0
+		typeset    dns="" ip="" timeall=""  errstr=""
+
+		# Traceroute may have unusual output with asymetric routes
+		#  7  * 108.170.245.1 (108.170.245.1)  4.949 ms  5.384 ms
+		#  5  193.252.137.10 (193.252.137.10)  5.405 ms  5.220 ms  5.345 ms
+		#  9  par21s11-in-f3.1e100.net (172.217.19.227)  5.000 ms 108.170.244.177 (108.170.244.177)  5.991 ms par21s11-in-f3.1e100.net (172.217.19.227)  4.934 ms
+		while [[ -n "${1:-}" ]]; do
+
+			# New route added
+			if [[ -n "${2:-}" ]] && [[ "${2#(}" != "$2" ]]; then
+				dns+="$1 "
+				ip+="$2 "
+				shift 2
+			fi
+
+			# No response and no time
+			if [[ "$1" == "_" ]]; then
+				timeall+="999999 "
+				errstr+="timeout  "
+				shift
+
+			# Simple response, use last
+			elif [[ -n "${2:-}" ]] && [[ "$2" == "ms" ]]; then
+				#timetot+=$(($1 * 1000))
+				timetot+="${1//./}"
+				timecnt+=1
+				timeall+="${1//.} "
+				shift 2
+
+				if [[ -n "${1:-}" ]] && [[ "${1:0:1}" == "!" ]]; then
+					typeset errcode="${1#!}"
+					typeset errstr=""
+					case "$errcode" in
+						H)  errstr+="Host unreachable "  ;;
+						N)  errstr+="Network unreachable " ;;
+						P)  errstr+="Port unreachable " ;;
+						S)  errstr+="Source route failed " ;;
+						F)  errstr+="Fragmentation needed " ;;
+						X)  errstr+="communication administratively prohibited " ;;
+						V)  errstr+="Host precedence violation " ;;
+						C)  errstr+="precedence cutoff in effect " ;;
+						[0-9]) errstr+="ICMP Error code '$errcode' " ;;
+					esac
+
+					shift
+				fi
+
+			else
+				ammLogWrn "Unhandled output: '$1'"
+				shift
+			fi
+
+		done
+
+		ip="${ip//[()]/}"
+
+		[[ $timecnt -eq 0 ]] && timecnt=1
+		typeset -i avg=$(($timetot / $timecnt))
+
+		typeset -i t min=9999999 max=0
+		for t in $timeall; do
+			[[ $t -lt $min ]] && min=$t
+			[[ $t -gt $max ]] && max=$t
+		done
+
+		echo "dns[$hop]='$dns'; ip[$hop]='$ip' timeall[$hop]='$timeall' timemin[$hop]='$min' timeavg[$hop]='$avg' timemax[$hop]='$max' err[$hop]='$errstr'"
+		lasthop=$hop
+	done < <(ammStringInputToLines $stdout)
+
+	echo "hops='$lasthop'"
+
+}
+
+
+
+function ammNetworkTraceroutetcpCmd {
+	typeset dest="$1"
+	typeset port="${2:-22}"
+	typeset opts="${3:-}"
+
+	ammNetworkTracerouteCmd "$dest" "-T -p $port $opts"
+}
+
+# -----------------------------------------------------------------------------
+# Port and service tests
+# -----------------------------------------------------------------------------
+
+
+function ammNetworkPortOpen {
+	typeset dest="$1"
+	typeset port="$2"
+	typeset tmout="${3:-2}"
+
+	typeset ret=1
+	typeset prefix=""
+	[[ -n "$tmout" ]] && prefix="ammProcessTimeout $tmout"
+	
+
+	# Try with nc. Beware: there is netcat-openbsd & netcat-traditional
+	if ammExecExists "nc"; then
+		# TODO: Check for nmap vs netcat
+		$prefix nc -z "$dest" "$port"
+		ret=$?
+
+	# Pretty standard telnet, but not everywhere
+	elif ammExecExists "telnet"; then
+		$prefix telnet "$dest" "$port" 0>/dev/null 2>/dev/null| grep 'Escape character is' >/dev/null
+		ret=$?
+
+	# Fallback to bash only (no option available, and buggy timeout)
+	else
+		typeset tmpscript="$__AMMLIB_DATATMP/ammNetwork/script.portopen.sh"
+
+		# Create temp script for using timeout
+		if ! [[ -s "$tmpscript" ]]; then
+			mkdir -p "${tmpscript%/*}"
+			echo >| "$tmpscript" "#!/usr/bin/env bash"
+			echo >> "$tmpscript" "exec 5<> /dev/tcp/$dest/$port; [[ \$? -eq 0 ]] && exec 5>&-"
+			chmod +x "$tmpscript"
+		fi
+
+		$prefix "$tmpscript" "$dest" "$port" 2>/dev/null
+		ret=$?
+	fi
+
+	return $ret
+}
+
+# -----------------------------------------------------------------------------
+# 
+# -----------------------------------------------------------------------------

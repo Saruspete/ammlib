@@ -143,7 +143,7 @@ function ammProcessRun {
 
 
 # -----------------------------------------------------------------------------
-# Process timeout
+# Process timeout and repeat
 # -----------------------------------------------------------------------------
 
 function ammProcessTimeout {
@@ -166,6 +166,29 @@ function ammProcessTimeout {
 
 function ammProcessAlarm {
 	:
+}
+
+function ammProcessUntil {
+	typeset func="$1"
+	typeset limit=${2:-300}
+	typeset timewait="${3:-2}"
+
+	typeset -i i=0 r=0
+	while :; do
+
+		# Call
+		$func
+		r=$?
+
+		[[ $r -eq 0 ]] && return 0
+
+		[[ $i -ge $limit ]] && break
+		sleep $timewait
+
+		i+=1
+	done
+
+	return $r
 }
 
 # -----------------------------------------------------------------------------

@@ -517,6 +517,42 @@ function ammLogWriteTerm {
 }
 
 # -----------------------------------------------------------------------------
+# Environment helpers
+# -----------------------------------------------------------------------------
+
+function _ammEnvAdd {
+	typeset var="$1"; shift
+	typeset where="${1:-after}"
+	if [[ "${1:-}" == "beore" ]] || [[ "${1:-}" == "after" ]]; then
+		where="$1"
+		shift
+	fi
+
+	typeset p
+	for p in "$@"; do
+		if [[ -d "$p" ]]; then
+			if [[ "$where" == "before" ]]; then
+				eval export $var="$p:\$$var"
+			else
+				eval export $var="\$$var:$p"
+			fi
+		fi
+	done
+}
+
+function ammEnvPathAdd {
+	_ammEnvAdd "PATH" "$@"
+}
+
+function ammEnvLibAdd {
+	_ammEnvAdd "LD_LIBRARY_PATH" "$@"
+}
+
+function ammEnvManAdd {
+	_ammEnvAdd "MANPATH" "$@"
+}
+
+# -----------------------------------------------------------------------------
 # Execution helpers
 # -----------------------------------------------------------------------------
 

@@ -598,9 +598,7 @@ function ammExecExists {
 		done
 
 		# If binary was not found in $PATH, stop here
-		if [[ -z "$binfound" ]]; then
-			return 1
-		fi
+		[[ -z "$binfound" ]] && return 1
 	done
 	return 0
 }
@@ -617,17 +615,24 @@ function ammExecRequires {
 }
 
 function ammExecRequiresOne {
+	if ! ammExecRequestOne "$@"; then
+		ammLogErr "Unable to find any of required binaries '$@' in $PATH"
+		exit 1
+	fi
+	return 0
+}
+
+function ammExecRequestOne {
 	typeset r=1
 	typeset bin
 	for bin in "$@"; do
-		ammLogDbg "Trying to find required bin '$bin'"
+		ammLogDbg "Trying to find requested bin '$bin'"
 		ammExecExists "$bin" && return 0
 	done
 
-	ammLogErr "Unable to find any of required binaries "$@" in $PATH"
-	exit 1
+	ammLogWrn "Unable to find any of requested binaries '$@' in $PATH"
+	return 1
 }
-
 
 # -----------------------------------------------------------------------------
 # Internal script state (bash) helpers

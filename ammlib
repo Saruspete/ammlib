@@ -402,8 +402,13 @@ typeset __AMMLOG_LOGTERM=""
 typeset __AMMLOG_SILENT="0"
 
 function _ammLog {
+	# Remove tracing if enabled to limit spam
+	typeset redbg=""
+	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
+
 	typeset tag="$1"; shift
 	typeset fmt="$1"; shift
+
 
 	typeset color="$(ammLogColor $fmt)"
 	typeset colorrst="$(ammLogColor reset)"
@@ -425,6 +430,9 @@ function _ammLog {
 			echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $@${colorrst}"
 		fi
 	fi
+
+	# Restart tracing if was enabled
+	$redbg
 }
 
 
@@ -454,6 +462,10 @@ function ammLogInf {
 
 function ammLogDbg {
 
+	# Remove tracing if enabled to limit spam
+	typeset redbg=""
+	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
+
 	# Only send to log on verbose level
 	if [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
 		_ammLog "DBG" "bold blue" "$@"
@@ -468,6 +480,9 @@ function ammLogDbg {
 			: # echo "$@" >> "${__AMMLOG_DBGFILE}.${_AMMLOG_DEPTH}"
 		fi
 	fi
+
+	# Restart tracing if was enabled
+	$redbg
 }
 
 function ammLogMissingBin {

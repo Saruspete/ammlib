@@ -208,11 +208,15 @@ function ammLibLoadable {
 function ammLibLoad {
 	typeset -i r=0
 
-	typeset libfile=""
+	typeset libfile="" libname= l=
 	for libname in "$@"; do
+
+		libname="${libname//\"/}"
+		libname="${libname//\'/}"
 
 		# For submodule, you need to load parent module first
 		if ammLibIsSublib "$libname"; then
+
 			# If the name is indeed a submodule, stop here
 			typeset parentlib="${libname%.*}"
 			typeset parentlibpath="$(ammLibLocate "$parentlib")"
@@ -224,7 +228,7 @@ function ammLibLoad {
 				done
 
 				if [[ -z "$parentloaded" ]]; then
-					ammLogErr "Cannot load '$libname' with ammLibLoad: look like a sub-lib of '$parentlib'."
+					ammLogErr "Cannot load '$libname' with ammLibLoad: look like a sub-lib of '$parentlib' and its parent '$parentlib' is not loaded"
 					r=r+1
 					continue
 				fi
@@ -243,6 +247,9 @@ function ammLibLoad {
 
 		if [[ $libavailable -eq 0 ]]; then
 
+			# Add lib early to avoid within-module reloading
+			__AMMLIB_LOADED+=" $libname"
+
 			# Init was ok, source and use lib
 			. $libfile
 
@@ -250,7 +257,6 @@ function ammLibLoad {
 			typeset metainit="$(ammLibMetaInitGetName $libname)"
 			ammIsFunc $metainit && $metainit
 
-			__AMMLIB_LOADED+=" $libname"
 			continue
 
 		else
@@ -264,9 +270,7 @@ function ammLibLoad {
 		fi
 	done
 
-	# A failed lib loading is fatal
-	[[ $r -ne 0 ]] && exit $r
-	return 0
+	return $r
 }
 
 
@@ -298,17 +302,15 @@ function ammLibUnload {
 	done
 }
 
-function ammLibRequires {
+function ammLibRequire {
 	for libname in "$@"; do
 
 		# Spawn it in a subshell to accomodate all potential exec / checks
 		ammLogDbg "Trying to load required lib '$libname'"
-		( ammLibLoadable "$libname" )
-
-		[[ $? -ne 0 ]] && {
+		if ! ammLibLoad "$libname"; then
 			ammLogErr "Unable to load required library '$libname'. Exiting"
 			exit 1
-		}
+		fi
 	done
 
 	return 0

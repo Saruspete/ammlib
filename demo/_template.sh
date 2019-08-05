@@ -11,5 +11,5 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibLoad "MODULE TO TEST"
+ammLibRequire "MODULE TO TEST"
 

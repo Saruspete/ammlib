@@ -12,7 +12,7 @@ fi
 function ammProcessMetaInit {
 	# Stick with coreutils
 	ammExecRequires tr head
-	ammLibLoad string
+	ammLibRequire string
 	:
 }
 

@@ -12,7 +12,7 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibLoad test string
+ammLibRequire test string
 
 typeset file1="$__AMMLIB_DATATMP/$0.data1"
 typeset file2="$__AMMLIB_DATATMP/$0.data2"

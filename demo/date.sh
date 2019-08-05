@@ -11,7 +11,7 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibLoad test date
+ammLibRequire test date
 
 #echo ${!__ammDate*}
 #echo ${!__AMMLIB*}

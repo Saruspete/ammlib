@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammIsoMetaInit {
-	ammLibLoad string
+	ammLibRequire string
 }
 
 typeset -gA __ammIsoBootloaderConfig=()

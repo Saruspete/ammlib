@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammKernelMetaInit {
-	ammLibLoad string
+	ammLibRequire string
 	ammExecRequires wc
 }
 

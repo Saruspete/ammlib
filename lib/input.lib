@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammInputMetaInit {
-	ammLibLoad string
+	ammLibRequire string
 }
 
 # Prefix to look for

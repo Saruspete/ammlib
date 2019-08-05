@@ -12,6 +12,6 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibLoad process network
+ammLibRequire process network
 
 ammProcessRun ammNetworkTraceroute 9.9.9.9

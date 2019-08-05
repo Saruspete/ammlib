@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammBootloaderIsolinuxMetaInit {
-	ammLibLoad string
+	ammLibRequire string
 
 }
 

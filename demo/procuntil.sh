@@ -12,7 +12,7 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibLoad network process
+ammLibRequire network process
 
 ammLogInf "Will try to connect to 127.0.0.1:1112, every second, up to 30 times"
 ammLogInf "You can exec: 'nc -l 1112' to make it listen"

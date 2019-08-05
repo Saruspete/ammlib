@@ -12,7 +12,7 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibLoad "process"
+ammLibRequire "process"
 
 
 ammProcessPoolCreate "toto"

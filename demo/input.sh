@@ -11,7 +11,7 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibLoad input
+ammLibRequire input
 
 ammInputRegister "toto"
 ammInputRegister "hostname" "Hostname of target machine" "localhost" "ammInputValidateHost"

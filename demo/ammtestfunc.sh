@@ -22,6 +22,6 @@ typeset libname="${func#amm}"
 libname="${libname,}"
 libname="${libname%%[A-Z]*}"
 
-ammLibLoad "$libname"
+ammLibRequire "$libname"
 
 $func "$@"

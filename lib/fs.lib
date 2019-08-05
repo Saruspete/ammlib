@@ -42,7 +42,7 @@ function ammFsMount {
 		mkdir -p "$mntdst"
 	}
 
-	ammChrootMounted "$mntdst" && {
+	ammFsMounted "$mntdst" && {
 		ammLogInf "Mountpoint '$mntdst' already mounted"
 		return 0
 	}

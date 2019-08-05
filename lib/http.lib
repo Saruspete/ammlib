@@ -11,7 +11,7 @@ fi
 
 function amm##NAME##MetaInit {
 	ammExecRequiresOne curl wget
-	ammLibLoad "exec"
+	ammLibRequire "exec"
 
 }
 

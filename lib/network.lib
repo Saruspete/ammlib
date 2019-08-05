@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammNetworkMetaInit {
-	ammLibLoad process string
+	ammLibRequire process string
 }
 
 # -----------------------------------------------------------------------------
@@ -54,6 +54,7 @@ function ammNetworkPingParse {
 		fi
 	done < <(ammStringInputToLines "$stderr")
 
+	# TODO: ping parsing
 	while read line; do
 		:
 	done < <(ammStringInputToLines "$stdout")

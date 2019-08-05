@@ -77,6 +77,13 @@ ammTestFunction ammStringIsYes "yEs"
 ammTestFunction ammStringIsYes "Yaaaaaay"
 ammTestFunction ammStringIsYes "nope"
 
+ammTestGroup "Validation - URI"
+ammTestFunction ammStringIsUri "hello"
+ammTestFunction ammStringIsUri "hello world"
+ammTestFunction ammStringIsUri "http://host/path"
+ammTestFunction ammStringIsUri "http://fqdn.domain.tld:1234/path?var1=val1&var2=val2"
+ammTestFunction ammStringIsUri "file:///tmp/toto"
+ammTestFunction ammStringIsUri "git+ssh://hostname.domain.tld:123"
 
 ammTestGroup "Parsing - List Expand"
 ammTestFunction ammStringListExpand "1,2,10-30,34,34,30-35,9-4"

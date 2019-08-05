@@ -1,44 +1,162 @@
-# vim: ft=sh
+# vim: ft=sh ts=4
 
-if [[ -z "$__AMMLIB_ROOT" ]]; then
-	echo >&2 "You must not source this library: Use function ammLibLoad"
-    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
-	# to do that, you're smart enough to understand why it's a bad idea ;-)
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
 	exit 1
 fi
 
+# -----------------------------------------------------------------------------
+# Meta init
+# -----------------------------------------------------------------------------
+
+#typeset -g AMMPKGYUM_AVAIL_
+
 # Some tools are required for this module to work
-function ammPkgyumInit {
+function ammPkgYumMetaInit {
+	ammLibRequire pkg.rpm string
 	ammExecRequires cksum gzip awk
+
+	#ammExecRequires "repoquery"
 }
 
-function ammPkgyumDownload {
-	typeset    dst="$1"; shift
-	typeset -i ret=0
+function ammPkgYumIsAvailable {
+	typeset rootpath="${1:-}"
 
-	cd "$dst"
-	for file in "$@"; do
-		(
-			cd "$dst"
-			rpm2cpio "$file" | cpio -idmv
-		)
-		ret+=$?
+	[[ -x "$rootpath/usr/bin/yum" ]]
+}
+
+# -----------------------------------------------------------------------------
+# Standard operations
+# -----------------------------------------------------------------------------
+
+function _ammPkgYum {
+	typeset act="$1"; shift
+
+	typeset opts=""
+	$__AMMLIB_INTERACTIVE || opts+="-y"
+
+	# Check if input contains options
+	while [[ -n "${1:-}" ]]; do
+		if ammStringIsOption "$1"; then
+			opts+=" $1"
+			shift
+		else
+			break
+		fi
 	done
-	return $ret
+
+	yum $act $opts "$@"
+}
+
+function _ammPkgYumRepoquery {
+	typeset act="$1"; shift
+	ammExecRequest "repoquery" || return 1
+
+	typeset opts=""
+
+	# Check if input contains options
+	while [[ -n "${1:-}" ]]; do
+		if ammStringIsOption "$1"; then
+			opts+=" $1"
+			shift
+		else
+			break
+		fi
+	done
+
+	repoquery $act $opts "$@"
+}
+
+function ammPkgYumInstall {
+	# TODO: Make more checks for "upgrade" or "downgrade" if version provided
+	_ammPkgYum "install" "$@"
+}
+
+function ammPkgYumRemove {
+	_ammPkgYum "remove" "$@"
+}
+
+function ammPkgYumSearch {
+	_ammPkgYum "info" "$@"
+}
+
+
+function ammPkgYumInfoRequiredBy {
+	_ammPkgYum "deplist" "$@" | awk '
+		$1 == "package:" { printf "\n"$2; }
+		$1 == "provider:" { printf " $2"; }
+	'
+}
+
+function ammPkgYumInfoWhatProvides {
+
+	# Check for all input
+	for element in "$@"; do
+		# If it's a file already installed, use rpm (faster)
+		if [[ -e "$element" ]]; then
+			ammPkgRpmWhatProvides "$element"
+
+		# Else, query all repordata
+		else
+			_ammPkgYum "provides" "$element"
+		fi
+	done
+}
+
+function ammPkgYumInfoContents {
+	# Check for all input
+	for pkg in "$@"; do
+		# For each pkg, list content
+		_ammPkgYumRepoquery "--provides" "$pkg"
+	done
 }
 
 # What versions are available for a package
-function ammPkgyumInfoVersions {
+function ammPkgYumInfoVersions {
 	typeset pkg="$1"
 	yum info $pkg
 }
 
 
+# -----------------------------------------------------------------------------
+# Data extraction
+# -----------------------------------------------------------------------------
 
-#
+function ammPkgYumDownload {
+	typeset outdir="$1"; shift
+
+	if ammExecExists yumdownloader >/dev/null; then
+		yumdownloader --destdir "$outdir" "$@"
+/
+	else
+		yum --downloadonly --downloaddir="$outdir"
+	fi
+}
+
+function ammPkgYumExtract {
+
+	for pkg in "$@"; do
+		# if the file does not exists, try to find it
+		if ! [[ -e "$pkg" ]]; then
+
+		# The file does exists, but is it a rpm ?
+		elif !
+
+		fi
+	done
+
+	ammPkgRpmExtract "$@"
+}
+
+function ammPkgYumExtractRecursive {
+	:
+}
+
+# -----------------------------------------------------------------------------
 # Yum emulation
-#
-function _ammPkgyumRepodataCache {
+# -----------------------------------------------------------------------------
+
+function _ammPkgYumRepodataCache {
 	typeset cks="$(echo "$1"|cksum)"; cks="${cks// /_}"
 	typeset t="$__AMMLIB_DATATMP/pkgyum.repodata.$cks"
 
@@ -47,17 +165,17 @@ function _ammPkgyumRepodataCache {
 }
 
 # Basic yum emulation
-function ammPkgyumRepodataGet {
+function ammPkgYumRepodataGet {
 	typeset url="$1"
 
 	# We need http tools for this
-	ammLibLoad http || {
+	if ! ammLibLoad http ; then
 		ammLogErr "Unable to load http library."
 		return 99
-	}
+	fi
 
 	# Download the file listing
-	typeset cache="$(_ammPkgyumRepodataCache "$url")"
+	typeset cache="$(_ammPkgYumRepodataCache "$url")"
 	typeset repomd="$cache/repomd.xml"
 	ammHttpFetch "$url/repodata/repomd.xml" "$repomd"
 
@@ -79,7 +197,7 @@ function ammPkgyumRepodataGet {
 	echo "$cache"
 }
 
-function _ammPkgyumRepodataParseFilelist {
+function _ammPkgYumRepodataParseFilelist {
 	typeset repodata="$1"; shift
 
 	# Parse all search
@@ -143,12 +261,11 @@ function _ammPkgyumRepodataParseFilelist {
 }
 
 # Emulate the "yum provides" feature
-function ammPkgyumRepodataWhatProvides {
-	
+function ammPkgYumRepodataWhatProvides {
 	typeset url="$1"; shift
 	typeset pkgs=""
 
-	typeset repodata="$(ammPkgyumRepodataGet "$url")"
-	
-	_ammPkgyumRepodataParseFilelist "$repodata" "$@" | sort | uniq
+	typeset repodata="$(ammPkgYumRepodataGet "$url")"
+
+	_ammPkgYumRepodataParseFilelist "$repodata" "$@" | sort | uniq
 }

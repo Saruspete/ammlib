@@ -1,8 +1,7 @@
 # vim: ft=sh ts=4
 
 if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE)
-	: Use function ammLibLoad"
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
 	exit 1
 fi
 
@@ -11,13 +10,191 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammPkgMetaInit {
-	ammExecRequires awk
-	for i in ${!BASH_SOURCE[@]}; do
-		echo >&2 "$i = ${BASH_SOURCE[$i]}::${FUNCNAME[$i]}::${BASH_LINENO[$i]}"
-	done
-	exit 1
+	ammLibRequire string
+	ammExecRequires ldd
 }
 
 # -----------------------------------------------------------------------------
-# Some description for your lib
+# Sub-libraries managment
 # -----------------------------------------------------------------------------
+
+typeset -gA __AMMPKG_PATHTOTYPE
+
+function ammPkgManagerDetect {
+	typeset rootpath="${1:-/}"
+
+	# Portage: Gentoo
+	if [[ -s "$rootpath/var/lib/portage/world" ]]; then
+		echo "portage";
+
+	# RPM: Redhat, Centos, Mandriva
+	elif [[ -s "$rootpath/var/lib/yum/uuid" ]]; then
+		echo "yum"
+	elif [[ -s "$rootpath/var/lib/dnf/groups.json" ]]; then
+		#echo "dnf"
+		echo "yum"
+	elif [[ -s "$rootpath/var/lib/rpm/Packages" ]]; then
+		echo "rpm";
+
+	# apt: Debian, Ubuntu
+	elif [[ -d "$rootpath/var/lib/apt" ]]; then
+		echo "apt"
+
+	# No quick way to find, try with loading all libs
+	else
+		typeset -a mgr
+		typeset sublib
+		for sublib in $(ammLibLocatePattern "pkg.*"); do
+			ammLogDbg "Found sublib '$sublib'"
+			if ammLibLoadable "$sublib" >/dev/null; then
+				ammLibLoad "$sublib"
+
+				typeset libtype="${subliv#pkg.}"
+
+				# If the package manager is ok, good
+				if ammPkg${libtype^}IsAvailable "$rootpath"; then
+					mgr+=("$libtype")
+				fi
+			fi
+		done
+
+		if [[ ${#mgr[@]} -eq 1 ]]; then
+			echo $mgr
+			return 0
+		elif [[ ${#mgr[@]} -gt 1 ]]; then
+			#$AMMLIB_INTERACTIVE &&
+			ammLogWrn "Multiple package managers available: '${mgr[@]}'"
+			return 1
+		else
+			ammLogErr "Unhandled or inexistant package manager on '$rootpath'"
+			return 1
+		fi
+	fi
+
+	return 0
+}
+
+function _ammPkgProxy {
+	typeset func="$1"; shift
+
+	typeset path="/"
+	if [[ -n "${1:-}" ]] && [[ -d "$1" ]]; then
+		path="$1"
+		shift
+	fi
+
+	# Use the mapping if available
+	if ( set +u; [[ -n ${__AMMPKG_PATHTOTYPE[$path]} ]] ); then
+		lib="${__AMMPKG_PATHTOTYPE[$path]}"
+
+	# Else, create and populate it
+	else
+		lib="$(ammPkgManagerDetect "$path")"
+		if [[ -n "$lib" ]]; then
+			__AMMPKG_PATHTOTYPE[$path]="$lib"
+		fi
+	fi
+
+	# Load the target library
+	if ! ammLibLoad "pkg.$lib"; then
+		ammLogErr "Unable to load package manager '$lib' for path '$path'. This should be reported !"
+		return 1
+	fi
+
+	# Call the target function
+	ammPkg${lib^}${func} "$@"
+}
+
+# -----------------------------------------------------------------------------
+# Main package manager operations
+# -----------------------------------------------------------------------------
+
+function ammPkgInstall {
+	_ammPkgProxy "Install" "$@"
+}
+
+function ammPkgRemove {
+	_ammPkgProxy "Remove" "$@"
+}
+
+# What files or requirements does a pkg need
+function ammPkgInfoRequires {
+	_ammPkgProxy "InfoRequires" "$@"
+}
+
+function ammPkgInfoWhatProvides {
+	_ammPkgProxy "InfoWhatProvides" "$@"
+}
+
+# -----------------------------------------------------------------------------
+# Less used package manager operations
+# -----------------------------------------------------------------------------
+
+function ammPkgFix {
+	_ammPkgProxy "Fix" "$@"
+}
+
+function ammPkgExtract {
+	_ammPkgProxy "Extract" "$@"
+}
+
+# -----------------------------------------------------------------------------
+# Generic fetcher
+# -----------------------------------------------------------------------------
+function ammPkgExtractWithDeps {
+	typeset dest="$1"; shift
+
+	typeset packagesToDl=""
+	typeset tmpdir="$__AMMLIB_DATATMP/ammPkg/extract"
+	mkdir -p "$tmpdir"
+
+	# For each provided element, we'll guess its type, action and extract it
+	typeset element
+	for element in "$@"; do
+		case $(ammStringType "$element") in
+			uri)
+				if ! ammLibLoad http >/dev/null; then
+					ammLogErr "Cannot load required library http to process uri '$element'. Skipping"
+					continue
+				fi
+
+				# Download the uri
+				if ! ammHttpFetch "$element" "$tmpdir"; then
+					ammLogErr "Unable to fetch uri '$element'"
+					continue
+				fi
+
+				packagesToDl+=""
+				;;
+
+			# Existing file
+			file)
+				if ! ammLibLoadable bin.elf >/dev/null; then
+					ammLogErr "Cannot load required library bin.elf to process file '$element'. Skipping"
+					continue
+				fi
+
+				# stdout will contain files already available.
+				# stderr will contains libraries not matched
+				ammBinElfLddRecursive "$element"
+
+				ammPkgWhatProvides "$element"
+				;;
+
+			# Should be a package name
+			*)
+
+				# Just append to packages to download
+				packagesToDl+="$element "
+				;;
+
+		esac
+
+	done
+
+	# With every element downloaded, extract them and their dependencies
+	typeset pkg
+	for pkg in $packagesToDl; do
+		ammPkgExtract "$pkg"
+	done
+}

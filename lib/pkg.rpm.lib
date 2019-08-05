@@ -1,26 +1,27 @@
-# vim: ft=sh
+# vim: ft=sh ts=4
 
-if [[ -z "$__AMMLIB_ROOT" ]]; then
-	echo >&2 "You must not source this library: Use function ammLibLoad"
-    # Of course you can export the _AMMLIB_ROOT var, but if you're smart enough
-	# to do that, you're smart enough to understand why it's a bad idea ;-)
+if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
 	exit 1
 fi
 
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
 # Some tools are required for this module to work
-function ammPkgrpmMetaInit {
-	ammExecRequires rpm rpm2cpio
+function ammPkgRpmMetaInit {
+	ammExecRequires rpm rpm2cpio cpio
 }
 
 # -----------------------------------------------------------------------------
 # Extract data
 # -----------------------------------------------------------------------------
 
-function ammPkgrpmExtract {
+function ammPkgRpmExtract {
 	typeset    dst="$1"; shift
 	typeset -i ret=0
 
-	cd "$dst"
 	for file in "$@"; do
 		# Exec in subshell to avoid changing script cwd
 		(
@@ -37,39 +38,66 @@ function ammPkgrpmExtract {
 # -----------------------------------------------------------------------------
 
 # What does a package requires
-function ammPkgrpmInfoRequires {
-	
+function ammPkgRpmInfoRequires {
 	for file in "$@"; do
 		rpm -q --requires "$file"
 	done
 }
 
 # What does a package provides
-function ammPkgrpmInfoProvides {
-	:
+function ammPkgRpmInfoProvides {
+
+	[[ -z "${1:-}" ]] && return 0
+
+	typeset rpmopts=""
+
+	# If the first arg is a folder, and it has a valid rpmlib db, use it
+	if [[ -d "$1" ]] && [[ -s "$1/var/lib/rpm/Packages" ]]; then
+		rpmopts+=" --root='$1'"
+	fi
+
+	# Process all packages
+	for pkg in "$@"; do
+		rpm $rpmopts "$pkg" || {
+			:
+		}
+	done
 }
 
 # What package provides a given 
-function ammPkgrpmInfoWhatProvides {
+function ammPkgRpmInfoWhatProvides {
 	:
 }
 
 # 
-function ammPkgrpmInfoRequiresToPkg {
-	:
+function ammPkgRpmInfoRequiresToPkg {
+	[[ -z "${1:-}" ]] && return 0
+
+	typeset rpmopts=""
+
+	# If the first arg is a folder, and it has a valid rpmlib db, use it
+	if [[ -d "$1" ]] && [[ -s "$1/var/lib/rpm/Packages" ]]; then
+		rpmopts+=" --root='$1'"
+	fi
+
+	# Process all packages
+	for pkg in "$@"; do
+		ammPkgInfoRequires $pkg
+	done
+
 }
 
 # -----------------------------------------------------------------------------
 # RPM DB Helper
 # -----------------------------------------------------------------------------
-function ammPkgrpmDbInit {
+function ammPkgRpmDbInit {
 	typeset prefix="${1:-}"
 
 	mkdir -p "$root"
 	rpm --root="$root" --initdb
 }
 
-function ammPkgrpmDbKeyImport {
+function ammPkgRpmDbKeyImport {
 	typeset prefix="${1:-}"; shift;
 
 	typeset rpmopts=""
@@ -79,7 +107,7 @@ function ammPkgrpmDbKeyImport {
 	done
 }
 
-function ammPkgrpmDbExport {
+function ammPkgRpmDbExport {
 	typeset prefix="${1:-}"
 	typeset exportdir="$2"
 
@@ -93,14 +121,14 @@ function ammPkgrpmDbExport {
 	done
 }
 
-function ammPkgrpmDbImport {
+function ammPkgRpmDbImport {
 	typeset rpmdb="$1"
 	typeset import="$2"
 
-	fo
+	
 }
 
-function ammPkgrpmDbRecover {
+function ammPkgRpmDbRecover {
 	typeset prefix="${1:-}"
 
 	# First, try a simple recover
@@ -109,7 +137,7 @@ function ammPkgrpmDbRecover {
 
 }
 
-function ammPkgrpmDbMigrate {
+function ammPkgRpmDbMigrate {
 	typeset prefix="${1:-}"
 
 	# 

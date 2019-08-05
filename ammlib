@@ -419,7 +419,10 @@ function _ammLog {
 		while read line; do
 			# Silent mode doesn't write any log
 			if [[ "$__AMMLOG_SILENT" == "0" ]]; then
-				echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $line${colorrst}"
+				echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$] $line${colorrst}"
+			# Special case: only error on stdout
+			elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
+				echo "[$date][$tag][$$] $line"
 			fi
 		done
 
@@ -427,7 +430,9 @@ function _ammLog {
 	else
 		# Silent mode doesn't display any log
 		if [[ "$__AMMLOG_SILENT" == "0" ]]; then
-			echo >&$__AMMLOG_FDSTD -e "${color}[$date]$color[$tag][$$] $@${colorrst}"
+			echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$] $@${colorrst}"
+		elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
+			echo "[$date][$tag][$$] $@"
 		fi
 	fi
 
@@ -467,7 +472,7 @@ function ammLogDbg {
 	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
 
 	# Only send to log on verbose level
-	if [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
+	if [[ -n "${AMMLIB_DEBUG:-}" ]] || [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
 		_ammLog "DBG" "bold blue" "$@"
 
 	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
@@ -507,6 +512,8 @@ function ammLogSilence {
 
 	if [[ "$enabled" == "0" ]]; then
 		__AMMLOG_SILENT=0
+	elif [[ "$enabled" == "onlyerr" ]]; then
+		__AMMLOG_SILENT=2
 	else
 		__AMMLOG_SILENT=1
 	fi

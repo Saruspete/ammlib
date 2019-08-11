@@ -315,6 +315,79 @@ function ammProcessPoolTaskAdd {
 	echo ${__AMMPROCESS_POOL_LASTJOBID[$name]}
 }
 
+# -----------------------------------------------------------------------------
+# User changing execution
+# -----------------------------------------------------------------------------
+
+
+function ammProcessRunAs {
+	typeset runas="$1"; shift
+
+	typeset curruser="$__AMMLIB_USERNAME"
+	typeset ret=0
+
+	# Exec from stdin
+	if [[ "$@" = "-" ]]; then
+		ammLogDbg "Reading commands to run as '$runas' from stdin"
+
+		# If no user specified, or we already are correct one...
+		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
+			eval "$(cat)" 98>&- 99>&-
+			ret=$?
+
+		# root... yay !
+		elif [[ "$curruser" = "root" ]]; then
+			cat | su -m "$runas" 98>&- 99>&-
+			ret=$?
+
+		elif ammExecExists sudo >/dev/null && sudo -nl 2>/dev/null|grep 'may run the following commands' >/dev/null; then
+			ammLogDbg "Using sudo to run as '$runas' from stdin"
+			# maybe should parse "sudo -l" output more...
+			typeset line
+			while read line; do
+				sudo -n -u "$runas" $line 98>&- 99>&-
+			done
+
+		# No way to change ?
+		else
+			ammLogErr "Cannot change from user $curruser to user $runas"
+			ret=4
+		fi
+
+	# Exec from parameters
+	else
+
+		# No user specified, or already correct user
+		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
+			ammLogDbg "Using eval to run as '$runas' cmd: '$@'"
+			#eval "$@" 98>&- 99>&-
+			"$@" 98>&- 99>&-
+			ret=$?
+
+		# root... yay !
+		elif [[ "$curruser" = "root" ]]; then
+			ammLogDbg "Using su to run as '$runas' cmd: '$*'"
+			# I need to flatten, hence '$*' instead of '$@'. Beware...
+			su -m -c "$*" "$runas" 98>&- 99>&-
+			ret=$?
+
+		# Maybe handle sudo ?
+		elif ammExecExists sudo >/dev/null && sudo -nl 2>/dev/null|grep 'may run the following commands' >/dev/null; then
+			ammLogDbg "Using sudo to run as '$runas' cmd: '$@'"
+			# maybe should parse "sudo -l" output more...
+			sudo -n -u "$runas" "$@" 98>&- 99>&-
+			ret=$?
+
+		# Fails...
+		else
+			ammLogErr "Cannot exec '$@' as user $runas from user $curruser"
+			ret=4
+		fi
+	fi
+
+	return $ret
+}
+
 
 # -----------------------------------------------------------------------------
 # Daemon management

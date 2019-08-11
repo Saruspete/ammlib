@@ -79,8 +79,94 @@ function ammHttpFetch {
 	fi
 }
 
+function ammHttpFetchAuto {
+	typeset src="$1"
+	typeset dst="${2:-$TMP_BASE/${src##*/}}"
+	typeset opt="${3:-}"
+	typeset ret=0
+
+
+	# git: URL ends with .git  or start as git://
+	if [[ $src =~ ^git:// ]] || [[ $src =~ .+\.git$ ]]; then
+		if is_binary "git"; then
+			(
+				mkdir -p "$dst"
+				cd "$dst"
+				git clone "$src" .
+			)
+			ret=$?
+		else
+			log_err "Cannot find git"
+			ret=99
+		fi
+
+	# scp: host:path
+	elif [[ $src =~ ^[a-zA-Z0-9_\-\.]+:.+$ ]]; then
+		ammLogWrn "scp not yet implemented"
+		ret=99
+
+	# RSYNC
+	elif [[ $src =~ ^rsync:// ]]; then
+		if ammExecExists "rsync"; then
+			rsync -a "$src" "$dst"
+			ret=$?
+		else
+			ammLogErr "Cannot find rsync"
+			ret=99
+		fi
+
+	# HTTP: curl or wget
+	elif [[ $src =~ ^https?:// ]]; then
+
+		ammHttpFetch "$src" "$dst" "$opt"
+		ret=$?
+
+	# Local file: "./"
+	elif [[ -e "$(readlink -f $src)" ]]; then
+		ammLogInf "Fetching '$src' with cp"
+		cp -r "$src" "$dst"
+		ret=$?
+	else
+		ammLogErr "Unable to process url '$src'"
+		ret=99
+	fi
+
+	echo "$dst"
+	return $ret
+}
+
 
 
 # -----------------------------------------------------------------------------
-# Site specific impementations
+# Special sites (to be split into submodule ?
 # -----------------------------------------------------------------------------
+
+function ammHttpGithubBranchGet {
+	typeset projectpath="$1"
+	typeset branch="${2:-master}"
+
+	# Get the atom feed, and grep the related tag...
+	typeset url="https://github.com/$projectpath/commits/${branch}.atom"
+	typeset out="$(ammHttpFetch "$url" "-")"
+	typeset commitid="${out#*<id>tag:github.com,2008:Grit::Commit/}"
+	commitid="${commitid%%</id>*}"
+	typeset commitdate="${out#*<updated>}"
+	commitdate="${commitdate%%</updated>*}"
+
+	echo "$commitdate $commitid"
+	[[ -n "$commitdate" ]]
+}
+
+function ammHttpGithubReleaseGet {
+	typeset projectpath="$1"
+	typeset tag="${2:-latest}"
+
+	typeset url="https://github.com/$projectpath/releases/$tag"
+	typeset out="$(ammHttpFetch "$url" "-" "nofollow")"
+	# curl will output the html with new location href
+	# wget will show the redirect url
+	typeset vers="$(echo "$out"| grep -Po 'releases/tag/.+[" ]' | cut -d/ -f 3 | tr -d '"')"
+	echo "$vers"
+	[[ -n "$vers" ]]
+}
+

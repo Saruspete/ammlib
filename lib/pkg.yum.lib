@@ -45,12 +45,13 @@ function _ammPkgYum {
 		fi
 	done
 
+	ammLogDbg "Executing yum with args: $act $opts $@"
 	yum $act $opts "$@"
 }
 
 function _ammPkgYumRepoquery {
-	typeset act="$1"; shift
-	ammExecRequest "repoquery" || return 1
+
+	ammExecExists "repoquery" >/dev/null || return 1
 
 	typeset opts=""
 
@@ -64,7 +65,8 @@ function _ammPkgYumRepoquery {
 		fi
 	done
 
-	repoquery $act $opts "$@"
+	ammLogDbg "Executing repoquery with args: $opts $@"
+	repoquery $opts "$@" 2>/dev/null
 }
 
 function ammPkgYumInstall {
@@ -91,14 +93,39 @@ function ammPkgYumInfoRequiredBy {
 function ammPkgYumInfoWhatProvides {
 
 	# Check for all input
+	typeset element
 	for element in "$@"; do
 		# If it's a file already installed, use rpm (faster)
 		if [[ -e "$element" ]]; then
-			ammPkgRpmWhatProvides "$element"
+			ammPkgRpmInfoWhatProvides "$element"
 
 		# Else, query all repordata
 		else
-			_ammPkgYum "provides" "$element"
+			# If repoquery is available, use it
+			if ammExecExists repoquery >/dev/null; then
+				_ammPkgYumRepoquery --queryformat="%{name}.%{arch}" --whatprovides "$element"
+
+			# Else, fallback to yum + parsing
+			else
+				typeset key val pkg=""
+				_ammPkgYum "provides" "$element" 2>/dev/null | while IFS=: read key val; do
+					key="$(ammStringTrim "$key")"
+					val="$(ammStringTrim "$val")"
+
+					# if we are within a finding block, print the package and reset it to avoid double print
+					if [[ "$key" == "Filename" ]]; then
+						if [[ -n "$pkg" ]]; then
+							echo $pkg
+							pkg=""
+						fi
+
+					# pkg is only empty after a Filename key, or at start
+					else
+						[[ -z "$pkg" ]] && pkg="$key"
+					fi
+
+				done
+			fi
 		fi
 	done
 }
@@ -114,7 +141,7 @@ function ammPkgYumInfoContents {
 # What versions are available for a package
 function ammPkgYumInfoVersions {
 	typeset pkg="$1"
-	yum info $pkg
+	_ammPkgYum info $pkg
 }
 
 
@@ -122,30 +149,109 @@ function ammPkgYumInfoVersions {
 # Data extraction
 # -----------------------------------------------------------------------------
 
+function ammPkgYumDownloadRecursive {
+	typeset outdir="$1"; shift
+
+	[[ -d "$outdir" ]] || mkdir -p "$outdir"
+
+	ammLogDbg "Downloading into '$outdir' packages: $@"
+
+	typeset tag pkg _junk
+	typeset -i ret=1
+
+	# TODO: dnf handles repotrack and yumdownloader with dnf-utils
+	# Messages: 
+	# [SKIPPED] bash-4.4.23-6.fc29.x86_64.rpm: Already downloaded
+	# (6/16): fedora-gpg-keys-29-5.noarch.rpm       1.3 MB/s | 102 kB     00:00
+	if ammExecExists repotrack >/dev/null; then
+		typeset opts="--download_path='$outdir'"
+		# For dnf, download_path does not exists. Use destdir, like yumdownloader
+		[[ "$(readlink -f $(type -P repotrack))" == "/usr/libexec/dnf-utils" ]] && opts="--destdir='$outdir'"
+
+		repotrack $opts "$@" 2>/dev/null | while read tag pkg _junk; do
+			tag="${tag%:}"
+			pkg="${pkg%:}"
+
+			# Message: Downloading info-5.1-5.el7.x86_64.rpm
+			if [[ "$tag" == "Downloading" ]]; then
+				echo "$outdir/$pkg"
+
+			# Message: rpm.todel/htop-2.2.0-3.el7.x86_64.rpm already exists and appears to be complete
+			elif [[ -e "$tag" ]]; then
+				echo "$tag"
+
+			#  dnf output
+			elif [[ -f "$outdir/$pkg" ]]; then
+				echo "$outdir/$pkg"
+			fi
+
+		done
+	else
+		ammLogErr "Unable to find repotrack"
+		return 1
+	fi
+
+	return 0
+}
+
 function ammPkgYumDownload {
 	typeset outdir="$1"; shift
 
+	[[ -d "$outdir" ]] || mkdir -p "$outdir"
+
+	ammLogDbg "Downloading into '$outdir' packages: $@"
+
+	typeset tag pkg _junk
+	typeset -i ret=1
+
+	# TODO: dnf handles repotrack and yumdownloader with dnf-utils
+	# Messages: 
+	# [SKIPPED] bash-4.4.23-6.fc29.x86_64.rpm: Already downloaded
+	# (6/16): fedora-gpg-keys-29-5.noarch.rpm       1.3 MB/s | 102 kB     00:00
 	if ammExecExists yumdownloader >/dev/null; then
-		yumdownloader --destdir "$outdir" "$@"
-/
+
+		# TODO: does not work as is
+		yumdownloader --destdir "$outdir" "$@" 2>/dev/null | while read tag pkg _junk; do
+			# Message: ---> Package htop.x86_64 0:2.2.0-3.el7 will be installed
+			echo "$outdir/${pkg%:}"
+		done
+
+	# Fallback to std yum
 	else
-		yum --downloadonly --downloaddir="$outdir"
+		_ammPkgYum --downloadonly --downloaddir="$outdir" 2>/dev/null
 	fi
 }
 
 function ammPkgYumExtract {
+	typeset dst="$1"; shift
 
-	for pkg in "$@"; do
-		# if the file does not exists, try to find it
-		if ! [[ -e "$pkg" ]]; then
+	ammLogDbg "Extracting into '$dst' packages: $@"
 
-		# The file does exists, but is it a rpm ?
-		elif !
+	typeset pkgs="" pkgname pkgfile file
+	for pkgfile in "$@"; do
+		# if it's a file, just extract it from rpm
+		if [[ -e "$pkgfile" ]]; then
+			#pkgname="$(ammPkgRpmInfo "$pkgfile")"
+			:
+
+		# The file does not exists, download it
+		else
+			pkgname="$pkgfile"
+			pkgfile="$(ammPkgYumDownload "$__AMMLIB_DATA/pkgRpm/Packages" "$pkgname")"
+
+			if [[ -z "$pkgfile" ]]; then
+				ammLogErr "Unable to download package '$pkgname'. Out: '$pkgfile'"
+				continue
+			fi
 
 		fi
+
+		# extract the package (maybe multiple due to dependencies)
+		for file in $pkgfile; do
+			ammPkgRpmExtract "$dst" "$file"
+		done
 	done
 
-	ammPkgRpmExtract "$@"
 }
 
 function ammPkgYumExtractRecursive {

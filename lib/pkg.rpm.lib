@@ -23,10 +23,11 @@ function ammPkgRpmExtract {
 	typeset -i ret=0
 
 	for file in "$@"; do
+		ammLogDbg "Extracting package '$file' into '$dst'"
 		# Exec in subshell to avoid changing script cwd
 		(
 			cd "$dst"
-			rpm2cpio "$file" | cpio -idmv
+			rpm2cpio "$file" | cpio -idm 2>/dev/null
 		)
 		ret+=$?
 	done
@@ -37,36 +38,51 @@ function ammPkgRpmExtract {
 # Queries
 # -----------------------------------------------------------------------------
 
+function _ammPkgRpm {
+
+	typeset opts=""
+	while [[ -n "${1:-}" ]]; do
+		if ammStringIsOption "$1"; then
+			opts+=" $1"
+			shift
+
+		# Maybe a special case
+		else
+
+			# If the arg is a folder, and it has a valid rpmlib db, use it
+			if [[ -d "$1" ]] && [[ -s "$1/var/lib/rpm/Packages" ]]; then
+				opts+=" --root='$1'"
+				shift
+			else
+				break
+			fi
+		fi
+	done
+
+	# Exec the query + opts
+	ammLogDbg "Executing rpm with args: $opts $@"
+	rpm $opts "$@"
+}
+
 # What does a package requires
 function ammPkgRpmInfoRequires {
 	for file in "$@"; do
-		rpm -q --requires "$file"
+		_ammPkgRpm --query  --queryformat="%{name}.%{arch}" --requires "$file"
 	done
 }
 
 # What does a package provides
 function ammPkgRpmInfoProvides {
-
-	[[ -z "${1:-}" ]] && return 0
-
-	typeset rpmopts=""
-
-	# If the first arg is a folder, and it has a valid rpmlib db, use it
-	if [[ -d "$1" ]] && [[ -s "$1/var/lib/rpm/Packages" ]]; then
-		rpmopts+=" --root='$1'"
-	fi
-
-	# Process all packages
-	for pkg in "$@"; do
-		rpm $rpmopts "$pkg" || {
-			:
-		}
-	done
+	_ammPkgRpm --query --queryformat="%{name}.%{arch}" --fileprovide "$@"
 }
 
-# What package provides a given 
+# What package provides a given element
 function ammPkgRpmInfoWhatProvides {
-	:
+
+	typeset element
+	for element in "$@"; do
+		_ammPkgRpm --query  --queryformat="%{name}.%{arch}" --file "$element"
+	done
 }
 
 # 

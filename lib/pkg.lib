@@ -12,6 +12,14 @@ fi
 function ammPkgMetaInit {
 	ammLibRequire string
 	ammExecRequires ldd
+
+	# Try to load the local package manager to avoid redundancy
+	typeset localpkgmgr="$(ammPkgManagerDetect)"
+	if [[ -n "$localpkgmgr" ]]; then
+		ammLibLoad "pkg.$localpkgmgr" && __AMMPKG_PATHTOTYPE[/]="$localpkgmgr"
+	fi
+
+	return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -49,7 +57,7 @@ function ammPkgManagerDetect {
 			if ammLibLoadable "$sublib" >/dev/null; then
 				ammLibLoad "$sublib"
 
-				typeset libtype="${subliv#pkg.}"
+				typeset libtype="${sublib#pkg.}"
 
 				# If the package manager is ok, good
 				if ammPkg${libtype^}IsAvailable "$rootpath"; then
@@ -78,7 +86,7 @@ function _ammPkgProxy {
 	typeset func="$1"; shift
 
 	typeset path="/"
-	if [[ -n "${1:-}" ]] && [[ -d "$1" ]]; then
+	if [[ -n "${1:-}" ]] && [[ -d "$1" ]] && [[ "$func" != "Extract" ]]; then
 		path="$1"
 		shift
 	fi
@@ -141,60 +149,149 @@ function ammPkgExtract {
 # -----------------------------------------------------------------------------
 # Generic fetcher
 # -----------------------------------------------------------------------------
+
+function _ammPkgDepsFindBin {
+
+	! ammExecExists ldd && return 1
+
+	typeset file
+	for file in "$@"; do
+
+		typeset lib _arrow file address _junk
+		while read lib _arrow file address _junk; do
+			# Empty file: maybe vdso or ld-linux or error msg "not a dynamic executable"
+			[[ -n "$file" ]] || continue
+			#[[ "$lib" == "libc.so.6" ]] || continue
+
+			if [[ -e "$file" ]]; then
+					echo "$file"
+			else
+				echo >&2 "$lib"
+			fi
+
+			# Recursion
+			[[ -e "$file" ]] && _ammPkgDepsFindBin "$file"
+
+		done < <(ldd "$file" 2>/dev/null)
+	done
+}
+
+
+# @description Smart extractor for a package, binary or feature and its dependencies
+# @ærg $1 string Destination path for extraction.
+# @arg $@ string List of packages, binaries or urls to extract, with their dependencies
 function ammPkgExtractWithDeps {
 	typeset dest="$1"; shift
 
-	typeset packagesToDl=""
+	if ! [[ -d "$dest" ]]; then
+		ammLogErr "Destination '$dest' does not exists. Create it beforehand"
+		return 1
+	fi
+
+	typeset    pkgsToDl
+	typeset -A pkgFiles
 	typeset tmpdir="$__AMMLIB_DATATMP/ammPkg/extract"
 	mkdir -p "$tmpdir"
 
 	# For each provided element, we'll guess its type, action and extract it
 	typeset element
 	for element in "$@"; do
-		case $(ammStringType "$element") in
-			uri)
-				if ! ammLibLoad http >/dev/null; then
-					ammLogErr "Cannot load required library http to process uri '$element'. Skipping"
+		typeset type="$(ammStringType "$element")"
+		ammLogDbg "Processing element '$element' (type: $type)"
+
+		#
+		# URI: Download the file locally for further analysis
+		#
+		if [[ "$type" == "uri" ]]; then
+			if ! ammLibLoad http >/dev/null; then
+				ammLogErr "Cannot load required library http to process uri '$element'. Skipping"
+				continue
+			fi
+
+			typeset destfile="$tmpdir/${elements##*/}"
+
+			# Download the uri
+			if ! ammHttpFetch "$element" "$destfile"; then
+				ammLogErr "Unable to fetch uri '$element' as '$destfile'"
+				continue
+			fi
+
+			#pkgFiles+="$destfile "
+
+			# Override the just downloaded file
+			if [[ -e "$destfile" ]]; then
+				type="file"
+				element="$destfile"
+			fi
+		fi
+
+		#
+		# file: check format
+		#
+		if [[ "$type" == "file" ]]; then
+
+			# For now, assume a binary. Else, just skip (may comment following test)
+			if head -n 1 "$element" | grep ELF >/dev/null 2>&1; then
+
+				ammLogDbg "Extracting dependencies from ELF binary '$element'"
+
+				typeset file
+				for file in $(_ammPkgDepsFindBin $element 2>&1 | sort -u); do
+					ammLogDbg "Searching package for file '$file'"
+
+					# if file is not absolute, we are missing it. Add a refrence to /lib in the path
+					if [[ "${file:0:1}" != "/" ]]; then
+						file="*lib*/$file"
+					fi
+
+					# File already in cache, already found. Skip
+					if ( set +u; [[ -n "${pkgFiles[$file]}" ]] ) ; then
+						ammLogDbg "File $file already found its package(s): '${pkgFiles[$file]}'"
+						continue
+
+					# Finds from which package the file comes from
+					else
+						typeset pkg="$(ammPkgInfoWhatProvides "$file")"
+						if [[ -z "$pkg" ]]; then
+							ammLogWrn "Unable to find package providing file '$file'."
+							continue
+						fi
+
+						# Check output for multiple packages
+						[[ "${pkg// /}" != "$pkg" ]] && ammLogWrn "Multiple packages found providing file '$file': $pkg"
+
+						pkgFiles[$file]="$pkg"
+						pkgsToDl+="$pkg "
+					fi
+				done
+
+			# not a binary... just find its owner and add it
+			else
+
+				# Find the owner
+				typeset pkg="$(ammPkgInfoWhatProvides "$element")"
+				if [[ -z "$pkg" ]]; then
+					ammLogWrn "Unable to find package providing file '$element'."
 					continue
 				fi
 
-				# Download the uri
-				if ! ammHttpFetch "$element" "$tmpdir"; then
-					ammLogErr "Unable to fetch uri '$element'"
-					continue
-				fi
+				# And add it
+				pkgsToDl+="$pkg "
+			fi
 
-				packagesToDl+=""
-				;;
-
-			# Existing file
-			file)
-				if ! ammLibLoadable bin.elf >/dev/null; then
-					ammLogErr "Cannot load required library bin.elf to process file '$element'. Skipping"
-					continue
-				fi
-
-				# stdout will contain files already available.
-				# stderr will contains libraries not matched
-				ammBinElfLddRecursive "$element"
-
-				ammPkgWhatProvides "$element"
-				;;
-
-			# Should be a package name
-			*)
-
-				# Just append to packages to download
-				packagesToDl+="$element "
-				;;
-
-		esac
+		# Should be a package name
+		else
+			# Just append to packages to download
+			pkgsToDl+="$element "
+		fi
 
 	done
 
 	# With every element downloaded, extract them and their dependencies
+	ammLogInf "Will extract packages: $pkgsToDl"
+
 	typeset pkg
-	for pkg in $packagesToDl; do
-		ammPkgExtract "$pkg"
+	for pkg in $pkgsToDl; do
+		ammPkgExtract "$dest" "$pkg"
 	done
 }

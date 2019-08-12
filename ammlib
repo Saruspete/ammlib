@@ -477,7 +477,10 @@ function ammLogDbg {
 
 	# Only send to log on verbose level
 	if [[ -n "${AMMLIB_DEBUG:-}" ]] || [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
-		_ammLog "DBG" "bold blue" "$@"
+		# Get the caller
+		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}"
+
+		_ammLog "DBG" "bold blue" "[$callerdbg] $@"
 
 	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
 	else

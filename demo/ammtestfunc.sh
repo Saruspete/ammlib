@@ -18,8 +18,15 @@ readonly MYPATH="${MYSELF%/*}"
 }
 
 typeset func="$1"; shift
-typeset libname="${func#amm}"
+typeset libname=""
+
+# Allow to test private functions
+libname="${func##*_}"
+# Remove the prefix
+libname="${libname#amm}"
+# Lowercase the first char (should be package name)
 libname="${libname,}"
+# And remove all trailing element from the first uppercase
 libname="${libname%%[A-Z]*}"
 
 ammLibRequire "$libname"

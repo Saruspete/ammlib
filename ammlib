@@ -74,6 +74,8 @@ typeset __AMMLIB_DATA="$HOME/.ammlib/data/"
 
 trap _ammClean EXIT INT TERM QUIT ILL ABRT
 
+# @description  (private) TRAP handler to clean
+# @noarg
 function _ammClean {
 	# wait for any process in background
 	wait
@@ -93,6 +95,9 @@ function _ammClean {
 typeset __AMMLIB_SEARCHPATH="${__AMMLIB_ROOT}/lib"
 typeset __AMMLIB_LOADED="amlib"
 
+# @description  Locate the library file matching given name
+# @arg $1  (string) Name of the library to be loaded (eg, process)
+# @stdout  (path) Path of the first matching file (in $__AMMLIB_SEARCHPATH)
 function ammLibLocate {
 	typeset libname="$1"
 
@@ -106,6 +111,9 @@ function ammLibLocate {
 	done
 }
 
+# @description  Locate all libraries that starts with the given pattern
+# @arg $1  The pattern to search against
+# @stdout  (path) the list of libraries that matches the given pattern
 function ammLibLocatePattern {
 	typeset libpattern="$1"
 
@@ -117,6 +125,9 @@ function ammLibLocatePattern {
 	done
 }
 
+# @descripton  return the library name of a given file
+# @arg $1  (path) The file path to get the name from
+# @stdout  (string) name of the library
 function ammLibNameFromPath {
 	typeset path="$1"
 
@@ -126,6 +137,8 @@ function ammLibNameFromPath {
 	echo "$path"
 }
 
+# @description  List all symbols and functions for packing
+# @arg $@  (path[]) List of files to extract symbols from
 function ammLibGetSymbols {
 	for file in "$@"; do
 		grep -Po '^[\s]*(function[\s]+[^\s]+|[^\s]+\(\))[\s]*{' $file | awk '
@@ -136,11 +149,15 @@ function ammLibGetSymbols {
 	done
 }
 
+# @description  Check if the given libname is a sub-library
+# @exitcode  0 on success
 function ammLibIsSublib {
 	typeset libname="$1"
 	[[ "${libname//./}" != "$libname" ]]
 }
 
+# @description  Get the function name for the library' constructor
+# @arg $1  (string) library name
 function ammLibMetaInitGetName {
 	typeset libname="$1"
 
@@ -159,6 +176,11 @@ function ammLibMetaInitGetName {
 	echo "amm${funcpref}MetaInit"
 }
 
+
+# @description  Test if a library is loadable (it's requirements are met)
+# @arg $@  (string[]) Name of the library
+# @exitcode 0  If all modules are loadable
+# @exitcode 1+ if one or more module cannot be loaded
 function ammLibLoadable {
 
 	typeset -i r=0
@@ -205,6 +227,10 @@ function ammLibLoadable {
 	return $r
 }
 
+# @description  Load a library
+# @arg $@  (string[]) Library name to be loaded
+# @exitcode 0 if all modules were loaded successfully
+# @exitcode 1+ if one or more module failed to load
 function ammLibLoad {
 	typeset -i r=0
 
@@ -273,7 +299,8 @@ function ammLibLoad {
 	return $r
 }
 
-
+# @description  Unload a module from the current session
+# @arg $@   (string[]) List of modules to unload
 function ammLibUnload {
 	typeset -i r=0
 
@@ -302,6 +329,8 @@ function ammLibUnload {
 	done
 }
 
+# @description  Similar to ammLibLoad but exit if a module cannot be loaded
+# @arg $@  (string[]) List of modules to be loaded
 function ammLibRequire {
 	for libname in "$@"; do
 
@@ -321,6 +350,8 @@ function ammLibCompact {
 	:
 }
 
+# @description List modules currently available
+# @noargs
 function ammLibListModules {
 
 	typeset libpath lib
@@ -375,6 +406,8 @@ typeset -i __AMMLOG_DEPTH=0
 	PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
 }
 
+# @description  Colorize the text with values in __AMMLOG_TERMCODES
+# @$ color codes to be printed
 function ammLogColor {
 	typeset -r esc="\033["
 	typeset -a codes=()

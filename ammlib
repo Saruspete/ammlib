@@ -420,10 +420,16 @@ function ammLogColor {
 	echo -e "${esc}$(_ammLogColorJoin ";" ${codes[@]})m"
 }
 
+# @description  Returns the Time for the logs
+# @noargs
+# @stdout  Date format HH:MM:SS
 function ammLogTime {
 	date '+%H:%M:%S'
 }
 
+# @description  Returns the Date for the logs
+# @noargs
+# @stdout  Dat format yyyy-mm-dd
 function ammLogDate {
 	date '+%y-%m-%d'
 }
@@ -438,6 +444,11 @@ typeset __AMMLOG_LOGFILE=""
 typeset __AMMLOG_LOGTERM=""
 typeset __AMMLOG_SILENT="0"
 
+# @description  (private) Generic log function for logging
+# @arg $1  (string) tag
+# @arg $2  (string) format, passed to ammLogColor, thus keys of $__AMMLOG_TERMCODES
+# @arg $@  (string[]) Text to be logged. If only "-", read as stdin.
+# @stdout  (string) Resulting log
 function _ammLog {
 	# Remove tracing if enabled to limit spam
 	typeset redbg=""
@@ -445,7 +456,6 @@ function _ammLog {
 
 	typeset tag="$1"; shift
 	typeset fmt="$1"; shift
-
 
 	typeset color="$(ammLogColor $fmt)"
 	typeset colorrst="$(ammLogColor reset)"
@@ -484,24 +494,34 @@ function _ammLogWrite {
 	typeset color=""
 }
 
+# @description  Log a fatal error and terminate script
+# @arg $@  Log text for fatal error. If "-", text is read from stdin
 function ammLogDie {
 	_ammLog "ERR" "bold red" "$@"
 	exit 255
 }
 
+# @description  Log an error
+# @arg $@  Error text to log. If "-", text is read from stdin
 function ammLogErr {
 	# TODO: add calling path
 	_ammLog "ERR" "bold red" "$@"
 }
 
+# @description  Log a warning
+# @arg $@  warning text to log. If "-", text is read from stdin
 function ammLogWrn {
 	_ammLog "WRN" "bold yellow" "$@"
 }
 
+# @description  Log an information
+# @arg $@  Info text to log. If "-", text is read from stdin
 function ammLogInf {
 	_ammLog "INF" "bold green" "$@"
 }
 
+# @description  Log a debug info
+# @arg $@  Debug text to log. If "-", text is read from stdin
 function ammLogDbg {
 
 	# Remove tracing if enabled to limit spam
@@ -530,6 +550,8 @@ function ammLogDbg {
 	$redbg
 }
 
+# @description  Log for a missing binary, and try to find the packages providing them
+# @arg $@  List of missing binaries to search for
 function ammLogMissingBin {
 
 	# Load the package modules
@@ -547,6 +569,8 @@ function ammLogMissingBin {
 	done
 }
 
+# @description  Disable or enable logging
+# @arg $1  (string) Wanted state: 0 to disable logging, "onlyerr" to only log errors, anything else to enable logging
 function ammLogSilence {
 	typeset enabled="$1"
 
@@ -561,8 +585,12 @@ function ammLogSilence {
 
 # Log xtrace (run in another process, and shares FD)
 function ammLogDebugStore {
-	set +x
+	# Check if 
+	typeset undbg=""
+	[[ "${-//x/}" == "$-" ]] && { undbg="set +x"; }
+	set -x
 	ammLogDbg -
+	$undbg
 }
 
 function ammLogDebugEnable {
@@ -570,6 +598,8 @@ function ammLogDebugEnable {
 	BASH_XTRACEFD=$__AMMLOG_FDDBG
 }
 
+# @description  Log a message to the terminal (not through stdout). Only if session is interactive
+# @arg $1  (string) message to be written
 function ammLogWriteTerm {
 	typeset msg="$1"
 
@@ -585,7 +615,7 @@ function ammLogWriteTerm {
 function _ammEnvAdd {
 	typeset var="$1"; shift
 	typeset where="${1:-after}"
-	if [[ "${1:-}" == "beore" ]] || [[ "${1:-}" == "after" ]]; then
+	if [[ "${1:-}" == "before" ]] || [[ "${1:-}" == "after" ]]; then
 		where="$1"
 		shift
 	fi
@@ -602,14 +632,23 @@ function _ammEnvAdd {
 	done
 }
 
+# @description  Add a path to PATH
+# @arg $1  (string)(optionnal). Can be "before" or "after" (default)
+# @arg $@  (path[]) List of paths to be added to the env var
 function ammEnvPathAdd {
 	_ammEnvAdd "PATH" "$@"
 }
 
+# @description  Add a path to LD_LIBRARY_PATH
+# @arg $1  (string)(optionnal). Can be "before" or "after" (default)
+# @arg $@  (path[]) List of paths to be added to the env var
 function ammEnvLibAdd {
 	_ammEnvAdd "LD_LIBRARY_PATH" "$@"
 }
 
+# @description  Add a path to MANPATH
+# @arg $1  (string)(optionnal). Can be "before" or "after" (default)
+# @arg $@  (path[]) List of paths to be added to the env var
 function ammEnvManAdd {
 	_ammEnvAdd "MANPATH" "$@"
 }
@@ -624,6 +663,9 @@ function ammExecLogged {
 	"$@"
 }
 
+# @description  Execute a command as a different user
+# @arg $1  (string) User to run the command as
+# @arg $@  (string) the command to run, and its arguments. if "-", command is read from stdin
 function ammExecAsUser {
 	typeset userrunas="${1:-$__AMMLIB_USERNAME}"; shift
 
@@ -683,6 +725,10 @@ function ammExecAsUser {
 
 }
 
+# @description  Check if one or more command are available in PATH
+# @arg $@  (string) the executables to search for
+# @exitcode 0 if all are found
+# @exitcode 1 if at least one is not found
 function ammExecExists {
 
 	typeset bin
@@ -701,25 +747,10 @@ function ammExecExists {
 	return 0
 }
 
-function ammExecRequires {
-	typeset bin
-	for bin in "$@"; do
-		ammLogDbg "Trying to find required bin '$bin'"
-		ammExecExists "$bin" || {
-			ammLogErr "Unable to find required binary $bin in $PATH"
-			exit 1
-		}
-	done
-}
-
-function ammExecRequiresOne {
-	if ! ammExecRequestOne "$@"; then
-		ammLogErr "Unable to find any of required binaries '$@' in $PATH"
-		exit 1
-	fi
-	return 0
-}
-
+# @description  Check if at least one given command is available in PATH
+# @arg $@  (string) the executables to search for
+# @exitcode 0 if at least one is found
+# @exitcode 1 if none are found
 function ammExecRequestOne {
 	typeset r=1
 	typeset bin
@@ -728,19 +759,43 @@ function ammExecRequestOne {
 		ammExecExists "$bin" && return 0
 	done
 
-	ammLogWrn "Unable to find any of requested binaries '$@' in $PATH"
+	ammLogDbg "Unable to find any of requested binaries '$@' in $PATH"
 	return 1
+}
+
+
+# @description  Same as ammExecExists but calls ammLogDie and terminate the script if any requested binary is not found
+# @arg $@  (string) Binaries to search for in PATH
+function ammExecRequires {
+	typeset bin
+	for bin in "$@"; do
+		ammLogDbg "Trying to find required bin '$bin'"
+		ammExecExists "$bin" || ammLogDie "Unable to find required binary $bin in $PATH"
+	done
+	return 0
+}
+
+# @description  Same as ammExecRequestOne but calls ammLogDie and terminates if none of requested binary is found
+function ammExecRequiresOne {
+	ammExecRequestOne "$@" || ammLogDie "Unable to find any of required binaries '$@' in $PATH"
+	return 0
 }
 
 # -----------------------------------------------------------------------------
 # Internal script state (bash) helpers
 # -----------------------------------------------------------------------------
 
+# @description  Check if given name is a function
+# @exitcode 0  is a function
+# @exitcode 1  is not a function
 function ammIsFunc {
 	[[ "$(type -t "$1")" == "function" ]]
 }
 
 
+# @description  Check if name if a variable
+# @exitcode 0  is a defined variable
+# @exitcode 1  is not a variable
 function ammIsVar {
 	typeset varname="$1"
 

@@ -196,6 +196,7 @@ function _ammPkgDepsFindBin {
 
 
 # @description Smart extractor for a package, binary or feature and its dependencies
+#
 # @ærg $1 string Destination path for extraction.
 # @arg $@ string List of packages, binaries or urls to extract, with their dependencies
 function ammPkgExtractWithDeps {
@@ -254,7 +255,7 @@ function ammPkgExtractWithDeps {
 				ammLogDbg "Extracting dependencies from ELF binary '$element'"
 
 				typeset file
-				for file in $(_ammPkgDepsFindBin $element 2>&1 | sort -u); do
+				for file in $(_ammPkgDepsFindBin $element 2>/dev/null | sort -u); do
 					ammLogDbg "Searching package for file '$file'"
 
 					# if file is not absolute, we are missing it. Add a refrence to /lib in the path
@@ -310,6 +311,6 @@ function ammPkgExtractWithDeps {
 
 	typeset pkg
 	for pkg in $pkgsToDl; do
-		ammPkgExtract "$dest" "$pkg"
+		ammPkgExtract "$dest" "$pkg" || ammLogWrn "Error while extracting '$pkg' to '$dest': ret=$?"
 	done
 }

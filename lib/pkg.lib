@@ -28,6 +28,11 @@ function ammPkgMetaInit {
 
 typeset -gA __AMMPKG_PATHTOTYPE
 
+# @description Detect the package manager for a given path
+#
+# @arg $1 the path to search for related package manager
+#
+# @stdout  The package manager library name (without "pkg." prefix). ex: "yum"
 function ammPkgManagerDetect {
 	typeset rootpath="${1:-/}"
 
@@ -82,10 +87,17 @@ function ammPkgManagerDetect {
 	return 0
 }
 
+# @description (private) dispatch generic pkg call to selected submodule
+#
+# @arg $1  (string) function name to call
+# @arg $2  (path)(optionnal)
+# @arg $@  (any) argument to pass to the selected function
 function _ammPkgProxy {
 	typeset func="$1"; shift
 
 	typeset path="/"
+	# Some functions like "Extract" need a path.
+	# TODO: make it smarter, like test if the path is a valid chroot or smth like this
 	if [[ -n "${1:-}" ]] && [[ -d "$1" ]] && [[ "$func" != "Extract" ]]; then
 		path="$1"
 		shift
@@ -150,6 +162,12 @@ function ammPkgExtract {
 # Generic fetcher
 # -----------------------------------------------------------------------------
 
+# @description Private: lists all libraries needed by a file and all these libraries dependencies too
+#
+# @arg $@  file path to scan for librariries
+#
+# @stdout List of libraries path with matching file (their full path)
+# @stderr List of libraries without matching file (only printin name)
 function _ammPkgDepsFindBin {
 
 	! ammExecExists ldd && return 1

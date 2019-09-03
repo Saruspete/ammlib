@@ -29,6 +29,9 @@ function ammPkgYumIsAvailable {
 # Standard operations
 # -----------------------------------------------------------------------------
 
+# @description  (private) proxy for rpm executable
+#
+# @arg $1  (string) Action for RPM to exec
 function _ammPkgYum {
 	typeset act="$1"; shift
 
@@ -149,6 +152,12 @@ function ammPkgYumInfoVersions {
 # Data extraction
 # -----------------------------------------------------------------------------
 
+# @description  Download an archive from configured yum repositories and all dependencies
+#
+# @arg $1  (path)     Path where to download the packages (will be created if does not exists)
+# @arg $@  (string[]) Packages to download
+#
+# @stdout  (path[]) List of archives downloaded
 function ammPkgYumDownloadRecursive {
 	typeset outdir="$1"; shift
 
@@ -193,7 +202,12 @@ function ammPkgYumDownloadRecursive {
 
 	return 0
 }
-
+# @description  Download an archive from configured yum repositories
+#
+# @arg $1  (path)     Path where to download the packages (will be created if does not exists)
+# @arg $@  (string[]) Packages to download
+#
+# @stdout  (path[]) List of archives downloaded
 function ammPkgYumDownload {
 	typeset outdir="$1"; shift
 
@@ -222,6 +236,10 @@ function ammPkgYumDownload {
 	fi
 }
 
+# @description  Extract one or more packages into provided path
+#
+# @arg $1  (path)     Where to extract the archives
+# @arg $@  (string[]) Archives or package names to be extracted
 function ammPkgYumExtract {
 	typeset dst="$1"; shift
 

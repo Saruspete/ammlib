@@ -564,7 +564,7 @@ function ammLogMissingBin {
 	typeset binlist
 	for binlist in "$@"; do
 		for bin in $binlist; do
-			ammPkgWhatProvides $bin
+			ammPkgInfoWhatProvides $bin
 		done
 	done
 }
@@ -770,14 +770,20 @@ function ammExecRequires {
 	typeset bin
 	for bin in "$@"; do
 		ammLogDbg "Trying to find required bin '$bin'"
-		ammExecExists "$bin" || ammLogDie "Unable to find required binary $bin in $PATH"
+		if ! ammExecExists "$bin"; then
+			ammLogMissingBin "$bin"
+			ammLogDie "Unable to find required binary $bin in $PATH"
+		fi
 	done
 	return 0
 }
 
 # @description  Same as ammExecRequestOne but calls ammLogDie and terminates if none of requested binary is found
 function ammExecRequiresOne {
-	ammExecRequestOne "$@" || ammLogDie "Unable to find any of required binaries '$@' in $PATH"
+	if ! ammExecRequestOne "$@"; then
+		ammLogMissingBin "$@"
+		ammLogDie "Unable to find any of required binaries '$@' in $PATH"
+	fi
 	return 0
 }
 

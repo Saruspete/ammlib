@@ -249,6 +249,22 @@ function ammPkgExtractWithDeps {
 		#
 		if [[ "$type" == "file" ]]; then
 
+			typeset epkg="$(ammPkgInfoWhatProvides "$element")"
+
+			# File belongs to a package
+			if [[ -n "$epkg" ]]; then
+				pkgsToDl+="$epkg "
+
+			# Not part of a package. Just copy it
+			else
+				typeset realelem="$(readlink -f $element)"
+				typeset copydest="$dest/$realelem"
+				[[ -d "${copydest%/*}" ]] || mkdir -p "${copydest%/*}"
+				rsync -avX "$element" "$copydest"
+
+				# TODO: handle the case where $element != realelem (symlinked)
+			fi
+
 			# For now, assume a binary. Else, just skip (may comment following test)
 			if head -n 1 "$element" | grep ELF >/dev/null 2>&1; then
 

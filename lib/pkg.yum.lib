@@ -217,29 +217,41 @@ function ammPkgYumDownload {
 
 	typeset f1 f2 f3 f4 _junk
 	typeset -i ret=1
+	typeset -a dlcmd=""
 
+	# Select the best available command
 	if ammExecExists yumdownloader >/dev/null; then
-
 		ammLogDbg "Using yumdownloader to download '$@'"
-		yumdownloader --destdir "$outdir" "$@" 2>/dev/null | while read f1 f2 f3 f4 _junk; do
-			# YUM: ---> Package htop.x86_64 0:2.2.0-3.el7 will be installed
-			if [[ "$f1" == "--->" ]]; then
-				echo "$outdir/${f3%.*}-${f4}.${f3##*.}.rpm"
+		dlcmd=(yumdownloader --destdir "$outdir" "$@")
 
-			# DNF: glibc-2.28-33.fc29.x86_64.rpm     3.0 MB/s | 3.8 MB    00:01
-			elif [[ "$f1" =~ .+\.rpm ]]; then
-				echo "$outdir/$f1"
+	# Need to do some checks due to yum being lazy
+	else
+		ammLogDbg "Failback to yum to download '$@'"
+		typeset cmdbase="_ammPkgYum --downloadonly --downloaddir=\"$outdir\""
+		dlcmd=(eval "(" $cmdbase install "$@" ";" $cmdbase reinstall "$@" ")")
+	fi
 
-			# DNF: [SKIPPED] glibc-2.28-33.fc29.x86_64.rpm: Already downloaded
-			elif [[ "$f1" == "[SKIPPED]" ]]; then
-				echo "$outdir/${f2%:}"
+	${dlcmd[@]} 2>/dev/null | while read f1 f2 f3 f4 _junk; do
+		# YUM: ---> Package htop.x86_64 0:2.2.0-3.el7 will be installed
+		if [[ "$f1" == "--->" ]]; then
+			# The downloaded version is the new or update
+			if [[ "$_junk" =~ be\ (an\ update|(re)?installed) ]]; then
+				# f3: keep only name
+				# f4: keep version without slot
+				# f3: add dist + arch
+				echo "$outdir/${f3%.*}-${f4#*:}.${f3##*.}.rpm"
 			fi
 
-		done
-	# Fallback to std yum
-	else
-		_ammPkgYum --downloadonly --downloaddir="$outdir" 2>/dev/null
-	fi
+		# DNF: glibc-2.28-33.fc29.x86_64.rpm     3.0 MB/s | 3.8 MB    00:01
+		elif [[ "$f1" =~ .+\.rpm ]]; then
+			echo "$outdir/$f1"
+
+		# DNF: [SKIPPED] glibc-2.28-33.fc29.x86_64.rpm: Already downloaded
+		elif [[ "$f1" == "[SKIPPED]" ]]; then
+			echo "$outdir/${f2%:}"
+		fi
+
+	done
 }
 
 # @description  Extract one or more packages into provided path

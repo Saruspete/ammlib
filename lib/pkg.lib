@@ -199,13 +199,7 @@ function _ammPkgDepsFindBin {
 #
 # @ærg $1 string Destination path for extraction.
 # @arg $@ string List of packages, binaries or urls to extract, with their dependencies
-function ammPkgExtractWithDeps {
-	typeset dest="$1"; shift
-
-	if ! [[ -d "$dest" ]]; then
-		ammLogErr "Destination '$dest' does not exists. Create it beforehand"
-		return 1
-	fi
+function ammPkgFindDeps {
 
 	typeset    pkgsToDl
 	typeset -A pkgFiles
@@ -322,11 +316,25 @@ function ammPkgExtractWithDeps {
 
 	done
 
-	# With every element downloaded, extract them and their dependencies
-	ammLogInf "Will extract packages: $pkgsToDl"
+	echo "$pkgsToDl"
+}
 
-	typeset pkg
-	for pkg in $pkgsToDl; do
+# @description  Extract required dependencies for a package, binary or feature
+#
+# @args $1 (path)  destination folder where to extract the data
+# @args $@ (string) packages or binaries
+function ammPkgExtractWithDeps {
+	typeset dest="$1"; shift
+
+	if ! [[ -d "$dest" ]]; then
+		ammLogErr "Destination '$dest' does not exists. Create it beforehand"
+		return 1
+	fi
+
+	ammLogInf "Calling dependency analysis for $@"
+	for pkg in $(ammPkgFindDeps "$@"); do
 		ammPkgExtract "$dest" "$pkg" || ammLogWrn "Error while extracting '$pkg' to '$dest': ret=$?"
 	done
 }
+
+

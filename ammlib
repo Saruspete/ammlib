@@ -20,8 +20,10 @@ if [[ -z "$BASH" ]] || [[ "$(cat /proc/$$/comm)" != "bash" ]]; then
 	:
 fi
 
-if [[ "${BASH_VERSINFO:-0}" -lt 4 ]]; then
-	echo >&2 "This requires bash >= 4 to run."
+#
+
+if [[ "${BASH_VERSINFO[0]:-0}" -lt 4 ]]; then
+	echo >&2 "This requires bash >= 4.2 to run."
 	return 1 2>/dev/null
 	exit 1
 fi
@@ -84,7 +86,9 @@ function _ammClean {
 	:
 
 	# clean global temp vars
-	if [[ -z ${AMMLIB_DEBUG:-} ]]; then
+	if [[ -n ${AMMLIB_DEBUG:-} ]]; then
+		ammLog::Inf "Keeping temporary path '$__AMMLIB_DATATMP'"
+	else
 		[[ -d "$__AMMLIB_DATATMP" ]] && rm -fr "$__AMMLIB_DATATMP"
 	fi
 }
@@ -93,12 +97,12 @@ function _ammClean {
 # Module loading
 # -----------------------------------------------------------------------------
 typeset __AMMLIB_SEARCHPATH="${__AMMLIB_ROOT}/lib"
-typeset __AMMLIB_LOADED="amlib"
+typeset __AMMLIB_LOADED="ammlib"
 
 # @description  Locate the library file matching given name
 # @arg $1  (string) Name of the library to be loaded (eg, process)
 # @stdout  (path) Path of the first matching file (in $__AMMLIB_SEARCHPATH)
-function ammLibLocate {
+function ammLib::Locate {
 	typeset libname="$1"
 
 	typeset libpath
@@ -114,7 +118,7 @@ function ammLibLocate {
 # @description  Locate all libraries that starts with the given pattern
 # @arg $1  The pattern to search against
 # @stdout  (path) the list of libraries that matches the given pattern
-function ammLibLocatePattern {
+function ammLib::LocatePattern {
 	typeset libpattern="$1"
 
 	typeset libpath lib
@@ -128,7 +132,7 @@ function ammLibLocatePattern {
 # @descripton  return the library name of a given file
 # @arg $1  (path) The file path to get the name from
 # @stdout  (string) name of the library
-function ammLibNameFromPath {
+function ammLib::NameFromPath {
 	typeset path="$1"
 
 	path="${path##*/}"
@@ -139,7 +143,7 @@ function ammLibNameFromPath {
 
 # @description  List all symbols and functions for packing
 # @arg $@  (path[]) List of files to extract symbols from
-function ammLibGetSymbols {
+function ammLib::GetSymbols {
 	for file in "$@"; do
 		grep -Po '^[\s]*(function[\s]+[^\s]+|[^\s]+\(\))[\s]*{' $file | awk '
 			/function[ ]+([^ ]+)/ {print $2}
@@ -151,21 +155,21 @@ function ammLibGetSymbols {
 
 # @description  Check if the given libname is a sub-library
 # @exitcode  0 on success
-function ammLibIsSublib {
+function ammLib::IsSublib {
 	typeset libname="$1"
 	[[ "${libname//./}" != "$libname" ]]
 }
 
 # @description  Get the function name for the library' constructor
 # @arg $1  (string) library name
-function ammLibMetaInitGetName {
+function ammLib::MetaInitGetName {
 	typeset libname="$1"
 
 	# Input name is lowercase. Up only first char: main => Main
 	typeset funcpref="${libname^}"
 
 	# If it's a sub-library, prefix is MainSub
-	if ammLibIsSublib "$libname"; then
+	if ammLib::IsSublib "$libname"; then
 		# Reset the prefix
 		funcpref=""
 		for f in ${libname//./ }; do
@@ -173,7 +177,7 @@ function ammLibMetaInitGetName {
 		done
 	fi
 
-	echo "amm${funcpref}MetaInit"
+	echo "amm${funcpref}::MetaInit"
 }
 
 
@@ -181,7 +185,7 @@ function ammLibMetaInitGetName {
 # @arg $@  (string[]) Name of the library
 # @exitcode 0  If all modules are loadable
 # @exitcode 1+ if one or more module cannot be loaded
-function ammLibLoadable {
+function ammLib::Loadable {
 
 	typeset -i r=0
 
@@ -190,36 +194,47 @@ function ammLibLoadable {
 
 		# If the given path was a file, find its libname from path
 		if [[ -e "$libfile" ]]; then
-			libname="$(ammLibNameFromPath $libfile)"
+			libname="$(ammLib::NameFromPath $libfile)"
 			#libname="${libfile##*/}"
 			#libname="${libname%.lib}"
 		# Else, find our file
 		else
-			libfile="$(ammLibLocate "$libname")"
+			libfile="$(ammLib::Locate "$libname")"
 		fi
 
 		# If the lib exists, load it
 		if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
 
 			# try to load it in a subshell to check init
-			typeset initfunc="$(ammLibMetaInitGetName "$libname")"
+			typeset initfunc="$(ammLib::MetaInitGetName "$libname")"
 			typeset inittext=""
 
-			# Code 98 = fail during the load (parsing error ?)
-			inittext="$(ammLogSilence onlyerr; . $libfile || exit 98; if \type $initfunc >/dev/null 2>&1; then $initfunc; exit $?; else exit 0; fi;)"
-
-			# Dont stop loading, just log error and increase return
-			if [[ $? -ne 0 ]]; then
-				ammLogDbg "Unable to load lib '$libname' (file '$libfile'). Init check failed: '$inittext'"
-				r=r+1
-			fi
 
 			# Display the lib file
 			echo "$libfile"
 
+			# check for features starting from bash 4.2 (typeset -g)
+			if [[ "${BASH_VERSINFO[1]:-0}" -lt 2 ]]; then
+				if grep -P '(typeset|declare) -[a-zA-Z]*g[a-zA-Z]* ' $libfile >/dev/null 2>&1; then
+					ammLog::Dbg "Library '$libfile' needs bash >= 4.2"
+					r+=1
+					continue
+				fi
+			fi
+
+			# Code 98 = fail during the load (parsing error ?)
+			inittext="$(ammLog::Silence onlyerr; . $libfile || exit 98; if \type $initfunc >/dev/null 2>&1; then $initfunc; exit $?; else exit 0; fi;)"
+
+			# Dont stop loading, just log error and increase return
+			if [[ $? -ne 0 ]]; then
+				ammLog::Dbg "Unable to load lib '$libname' (file '$libfile'). Init check failed: '$inittext'"
+				r=r+1
+				continue
+			fi
+
 		# Unable to load the lib
 		else
-			ammLogDbg "Unable to locate library '$libname'"
+			ammLog::Dbg "Unable to locate library '$libname'"
 			r+=1
 		fi
 	done
@@ -231,7 +246,7 @@ function ammLibLoadable {
 # @arg $@  (string[]) Library name to be loaded
 # @exitcode 0 if all modules were loaded successfully
 # @exitcode 1+ if one or more module failed to load
-function ammLibLoad {
+function ammLib::Load {
 	typeset -i r=0
 
 	typeset libfile="" libname= l=
@@ -241,11 +256,11 @@ function ammLibLoad {
 		libname="${libname//\'/}"
 
 		# For submodule, you need to load parent module first
-		if ammLibIsSublib "$libname"; then
+		if ammLib::IsSublib "$libname"; then
 
 			# If the name is indeed a submodule, stop here
 			typeset parentlib="${libname%.*}"
-			typeset parentlibpath="$(ammLibLocate "$parentlib")"
+			typeset parentlibpath="$(ammLib::Locate "$parentlib")"
 			if [[ -n "$parentlibpath" ]]; then
 
 				typeset parentloaded=
@@ -254,7 +269,7 @@ function ammLibLoad {
 				done
 
 				if [[ -z "$parentloaded" ]]; then
-					ammLogErr "Cannot load '$libname' with ammLibLoad: look like a sub-lib of '$parentlib' and its parent '$parentlib' is not loaded"
+					ammLog::Err "Cannot load '$libname' with ammLib::Load: look like a sub-lib of '$parentlib' and its parent '$parentlib' is not loaded"
 					r=r+1
 					continue
 				fi
@@ -268,7 +283,7 @@ function ammLibLoad {
 		done
 
 		# Check if we can load requested lib
-		libfile="$(ammLibLoadable "$libname")"
+		libfile="$(ammLib::Loadable "$libname")"
 		typeset libavailable=$?
 
 		if [[ $libavailable -eq 0 ]]; then
@@ -280,16 +295,16 @@ function ammLibLoad {
 			. $libfile
 
 			# Call init
-			typeset metainit="$(ammLibMetaInitGetName $libname)"
-			ammIsFunc $metainit && $metainit
+			typeset metainit="$(ammLib::MetaInitGetName $libname)"
+			amm::IsFunc $metainit && $metainit
 
 			continue
 
 		else
 			if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
-				ammLogErr "Unable to load lib '$libname' due to failed init"
+				ammLog::Err "Unable to load lib '$libname' due to failed init (enable debug with AMMLIB_DEBUG=1 for more detail)"
 			else
-				ammLogErr "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
+				ammLog::Err "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
 			fi
 
 			r=r+1
@@ -301,7 +316,7 @@ function ammLibLoad {
 
 # @description  Unload a module from the current session
 # @arg $@   (string[]) List of modules to unload
-function ammLibUnload {
+function ammLib::Unload {
 	typeset -i r=0
 
 	# Find 
@@ -312,7 +327,7 @@ function ammLibUnload {
 		for l in $__AMMLIB_LOADED; do
 			# Not loaded
 			[[ "$libname" == "$l" ]] && {
-				libfile="$(ammLibLocate "$libname")"
+				libfile="$(ammLib::Locate "$libname")"
 				continue
 			}
 		done
@@ -322,7 +337,7 @@ function ammLibUnload {
 
 		# Remove symbols (functions)
 		typeset sym
-		for sym in $(ammLibGetSymbols "$libfile"); do
+		for sym in $(ammLib::GetSymbols "$libfile"); do
 			unset $sym
 		done
 
@@ -331,13 +346,13 @@ function ammLibUnload {
 
 # @description  Similar to ammLibLoad but exit if a module cannot be loaded
 # @arg $@  (string[]) List of modules to be loaded
-function ammLibRequire {
+function ammLib::Require {
 	for libname in "$@"; do
 
 		# Spawn it in a subshell to accomodate all potential exec / checks
-		ammLogDbg "Trying to load required lib '$libname'"
-		if ! ammLibLoad "$libname"; then
-			ammLogErr "Unable to load required library '$libname'. Exiting"
+		ammLog::Dbg "Trying to load required lib '$libname'"
+		if ! ammLib::Load "$libname"; then
+			ammLog::Err "Unable to load required library '$libname'. Exiting"
 			exit 1
 		fi
 	done
@@ -346,16 +361,16 @@ function ammLibRequire {
 }
 
 # Compact all libraries to a single file, to be embedded in scripts
-function ammLibCompact {
+function ammLib::Compact {
 	:
 }
 
 # @description List modules currently available
 # @noargs
-function ammLibListModules {
+function ammLib::ListModules {
 
 	typeset libpath lib
-	for libpath in $(ammLibLocatePattern); do
+	for libpath in $(ammLib::LocatePattern); do
 		[[ -s "$libpath" ]] || continue
 		typeset lib=${libpath##*/}
 		lib=${lib%.lib}
@@ -365,12 +380,12 @@ function ammLibListModules {
 	done
 }
 
-function ammLibListFunctions {
+function ammLib::ListFunctions {
 	typeset filename="${1:-}"
 
 	typeset file
-	for file in $(ammLibLocatePattern $filename); do
-		ammLibGetSymbols "$file"
+	for file in $(ammLib::LocatePattern $filename); do
+		ammLib::GetSymbols "$file"
 	done
 }
 
@@ -378,7 +393,7 @@ function ammLibListFunctions {
 # Logging
 # -----------------------------------------------------------------------------
 
-function _ammLogColorJoin {
+function _ammLog::ColorJoin {
 	typeset IFS="$1"; shift
 	echo "$*"
 }
@@ -408,7 +423,7 @@ typeset -i __AMMLOG_DEPTH=0
 
 # @description  Colorize the text with values in __AMMLOG_TERMCODES
 # @$ color codes to be printed
-function ammLogColor {
+function ammLog::Color {
 	typeset -r esc="\033["
 	typeset -a codes=()
 
@@ -417,20 +432,20 @@ function ammLogColor {
 		shift
 	done
 
-	echo -e "${esc}$(_ammLogColorJoin ";" ${codes[@]})m"
+	echo -e "${esc}$(_ammLog::ColorJoin ";" ${codes[@]})m"
 }
 
 # @description  Returns the Time for the logs
 # @noargs
 # @stdout  Date format HH:MM:SS
-function ammLogTime {
+function ammLog::Time {
 	date '+%H:%M:%S'
 }
 
 # @description  Returns the Date for the logs
 # @noargs
 # @stdout  Dat format yyyy-mm-dd
-function ammLogDate {
+function ammLog::Date {
 	date '+%y-%m-%d'
 }
 
@@ -446,10 +461,10 @@ typeset __AMMLOG_SILENT="0"
 
 # @description  (private) Generic log function for logging
 # @arg $1  (string) tag
-# @arg $2  (string) format, passed to ammLogColor, thus keys of $__AMMLOG_TERMCODES
+# @arg $2  (string) format, passed to ammLog::Color, thus keys of $__AMMLOG_TERMCODES
 # @arg $@  (string[]) Text to be logged. If only "-", read as stdin.
 # @stdout  (string) Resulting log
-function _ammLog {
+function _ammLog::Log {
 	# Remove tracing if enabled to limit spam
 	typeset redbg=""
 	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
@@ -457,9 +472,9 @@ function _ammLog {
 	typeset tag="$1"; shift
 	typeset fmt="$1"; shift
 
-	typeset color="$(ammLogColor $fmt)"
-	typeset colorrst="$(ammLogColor reset)"
-	typeset date="$(ammLogTime)"
+	typeset color="$(ammLog::Color $fmt)"
+	typeset colorrst="$(ammLog::Color reset)"
+	typeset date="$(ammLog::Time)"
 
 	# Read stdin
 	if [[ "$@" = "-" ]]; then
@@ -488,7 +503,7 @@ function _ammLog {
 }
 
 
-function _ammLogWrite {
+function _ammLog::Write {
 	typeset tar="$1"; shift
 	typeset fmt="$2"; shift
 	typeset color=""
@@ -496,33 +511,33 @@ function _ammLogWrite {
 
 # @description  Log a fatal error and terminate script
 # @arg $@  Log text for fatal error. If "-", text is read from stdin
-function ammLogDie {
-	_ammLog "ERR" "bold red" "$@"
+function ammLog::Die {
+	_ammLog::Log "ERR" "bold red" "$@"
 	exit 255
 }
 
 # @description  Log an error
 # @arg $@  Error text to log. If "-", text is read from stdin
-function ammLogErr {
+function ammLog::Err {
 	# TODO: add calling path
-	_ammLog "ERR" "bold red" "$@"
+	_ammLog::Log "ERR" "bold red" "$@"
 }
 
 # @description  Log a warning
 # @arg $@  warning text to log. If "-", text is read from stdin
-function ammLogWrn {
-	_ammLog "WRN" "bold yellow" "$@"
+function ammLog::Wrn {
+	_ammLog::Log "WRN" "bold yellow" "$@"
 }
 
 # @description  Log an information
 # @arg $@  Info text to log. If "-", text is read from stdin
-function ammLogInf {
-	_ammLog "INF" "bold green" "$@"
+function ammLog::Inf {
+	_ammLog::Log "INF" "bold green" "$@"
 }
 
 # @description  Log a debug info
 # @arg $@  Debug text to log. If "-", text is read from stdin
-function ammLogDbg {
+function ammLog::Dbg {
 
 	# Remove tracing if enabled to limit spam
 	typeset redbg=""
@@ -533,7 +548,7 @@ function ammLogDbg {
 		# Get the caller
 		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}"
 
-		_ammLog "DBG" "bold blue" "[$callerdbg] $@"
+		_ammLog::Log "DBG" "bold blue" "[$callerdbg] $@"
 
 	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
 	else
@@ -552,26 +567,26 @@ function ammLogDbg {
 
 # @description  Log for a missing binary, and try to find the packages providing them
 # @arg $@  List of missing binaries to search for
-function ammLogMissingBin {
+function ammLog::MissingBin {
 
 	# Load the package modules
-	if ! ammLibLoadable pkg; then
-		ammLogErr "Cannot load pkg library. Cannot find required packages"
+	if ! ammLib::Loadable pkg; then
+		ammLog::Err "Cannot load pkg library. Cannot find required packages"
 		return 1
 	fi
-	ammLibLoad pkg
+	ammLib::Load pkg
 
 	typeset binlist
 	for binlist in "$@"; do
 		for bin in $binlist; do
-			ammPkgInfoWhatProvides $bin
+			ammPkg::InfoWhatProvides $bin
 		done
 	done
 }
 
 # @description  Disable or enable logging
 # @arg $1  (string) Wanted state: 0 to disable logging, "onlyerr" to only log errors, anything else to enable logging
-function ammLogSilence {
+function ammLog::Silence {
 	typeset enabled="$1"
 
 	if [[ "$enabled" == "0" ]]; then
@@ -584,23 +599,23 @@ function ammLogSilence {
 }
 
 # Log xtrace (run in another process, and shares FD)
-function ammLogDebugStore {
+function ammLog::DebugStore {
 	# Check if 
 	typeset undbg=""
 	[[ "${-//x/}" == "$-" ]] && { undbg="set +x"; }
 	set -x
-	ammLogDbg -
+	ammLog::Dbg -
 	$undbg
 }
 
-function ammLogDebugEnable {
-	exec $__AMMLOG_FDDBG> >(ammLogDebugStore)
+function ammLog::DebugEnable {
+	exec $__AMMLOG_FDDBG> >(ammLog::DebugStore)
 	BASH_XTRACEFD=$__AMMLOG_FDDBG
 }
 
 # @description  Log a message to the terminal (not through stdout). Only if session is interactive
 # @arg $1  (string) message to be written
-function ammLogWriteTerm {
+function ammLog::WriteTerm {
 	typeset msg="$1"
 
 	$__AMMLIB_INTERACTIVE || return 0
@@ -612,7 +627,7 @@ function ammLogWriteTerm {
 # Environment helpers
 # -----------------------------------------------------------------------------
 
-function _ammEnvAdd {
+function _ammEnv::Add {
 	typeset var="$1"; shift
 	typeset where="${1:-after}"
 	if [[ "${1:-}" == "before" ]] || [[ "${1:-}" == "after" ]]; then
@@ -635,29 +650,29 @@ function _ammEnvAdd {
 # @description  Add a path to PATH
 # @arg $1  (string)(optionnal). Can be "before" or "after" (default)
 # @arg $@  (path[]) List of paths to be added to the env var
-function ammEnvPathAdd {
-	_ammEnvAdd "PATH" "$@"
+function ammEnv::PathAdd {
+	_ammEnv::Add "PATH" "$@"
 }
 
 # @description  Add a path to LD_LIBRARY_PATH
 # @arg $1  (string)(optionnal). Can be "before" or "after" (default)
 # @arg $@  (path[]) List of paths to be added to the env var
-function ammEnvLibAdd {
-	_ammEnvAdd "LD_LIBRARY_PATH" "$@"
+function ammEnv::LibAdd {
+	_ammEnv::Add "LD_LIBRARY_PATH" "$@"
 }
 
 # @description  Add a path to MANPATH
 # @arg $1  (string)(optionnal). Can be "before" or "after" (default)
 # @arg $@  (path[]) List of paths to be added to the env var
-function ammEnvManAdd {
-	_ammEnvAdd "MANPATH" "$@"
+function ammEnv::ManAdd {
+	_ammEnv::Add "MANPATH" "$@"
 }
 
 # -----------------------------------------------------------------------------
 # Execution helpers
 # -----------------------------------------------------------------------------
 
-function ammExecLogged {
+function ammExec::Logged {
 	# TODO: Log the exec, return code and output of the command
 	set -x
 	"$@"
@@ -666,7 +681,7 @@ function ammExecLogged {
 # @description  Execute a command as a different user
 # @arg $1  (string) User to run the command as
 # @arg $@  (string) the command to run, and its arguments. if "-", command is read from stdin
-function ammExecAsUser {
+function ammExec::AsUser {
 	typeset userrunas="${1:-$__AMMLIB_USERNAME}"; shift
 
 	typeset usercurrent="$__AMMLIB_USERNAME"
@@ -688,7 +703,7 @@ function ammExecAsUser {
 			ret=$?
 
 		else
-			ammLogErr "Cannot change from user $usercurrent to user $userrunas"
+			ammLog::Err "Cannot change from user $usercurrent to user $userrunas"
 			ret=4
 		fi
 
@@ -696,13 +711,13 @@ function ammExecAsUser {
 	else
 		# No user specified, or already correct user
 		if [[ -z "$userrunas" ]] || [[ "$userrunas" == "$usercurrent" ]]; then
-			ammLogDbg "Using eval to run as '$userrunas' cmd: '$@'"
+			ammLog::Dbg "Using eval to run as '$userrunas' cmd: '$@'"
 			eval "$@" 98>&- 99>&-
 			ret=$?
 
 		# root... yay !
 		elif [[ "$usercurrent" == "root" ]]; then
-			ammLogDbg "Using su to run as '$userrunas' cmd: '$*'"
+			ammLog::Dbg "Using su to run as '$userrunas' cmd: '$*'"
 			# I need to flatten
 			# runuser is like su, but without PAM. Preferred when exec from root
 			runuser -m -c "$*" "$userrunas" 98>&- 99>&-
@@ -710,14 +725,14 @@ function ammExecAsUser {
 
 		# Maybe handle sudo ?
 		elif stmp="$(sudo -nl 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$stmp" ]]; then
-			log_dbg "Using sudo to run as '$userrunas' cmd: '$@'"
+			ammLog::Dbg "Using sudo to run as '$userrunas' cmd: '$@'"
 			# TODO: parse $stmp output more...
 			sudo -n -u "$userrunas" "$@" 98>&- 99>&-
 			ret=$?
 
 			# Fails...
 		else
-			log_err "Cannot exec '$@' as user $userrunas from user $usercurrent"
+			ammLog::Err "Cannot exec '$@' as user $userrunas from user $usercurrent"
 			ret=4
 		fi
 
@@ -729,7 +744,7 @@ function ammExecAsUser {
 # @arg $@  (string) the executables to search for
 # @exitcode 0 if all are found
 # @exitcode 1 if at least one is not found
-function ammExecExists {
+function ammExec::Exists {
 
 	typeset bin
 	for bin in "$@"; do
@@ -751,38 +766,38 @@ function ammExecExists {
 # @arg $@  (string) the executables to search for
 # @exitcode 0 if at least one is found
 # @exitcode 1 if none are found
-function ammExecRequestOne {
+function ammExec::RequestOne {
 	typeset r=1
 	typeset bin
 	for bin in "$@"; do
-		ammLogDbg "Trying to find requested bin '$bin'"
-		ammExecExists "$bin" && return 0
+		ammLog::Dbg "Trying to find requested bin '$bin'"
+		ammExec::Exists "$bin" && return 0
 	done
 
-	ammLogDbg "Unable to find any of requested binaries '$@' in $PATH"
+	ammLog::Dbg "Unable to find any of requested binaries '$@' in $PATH"
 	return 1
 }
 
 
-# @description  Same as ammExecExists but calls ammLogDie and terminate the script if any requested binary is not found
+# @description  Same as ammExecExists but calls ammLog::Die and terminate the script if any requested binary is not found
 # @arg $@  (string) Binaries to search for in PATH
-function ammExecRequires {
+function ammExec::Requires {
 	typeset bin
 	for bin in "$@"; do
-		ammLogDbg "Trying to find required bin '$bin'"
-		if ! ammExecExists "$bin"; then
-			ammLogMissingBin "$bin"
-			ammLogDie "Unable to find required binary $bin in $PATH"
+		ammLog::Dbg "Trying to find required bin '$bin'"
+		if ! ammExec::Exists "$bin"; then
+			ammLog::MissingBin "$bin"
+			ammLog::Die "Unable to find required binary $bin in $PATH"
 		fi
 	done
 	return 0
 }
 
-# @description  Same as ammExecRequestOne but calls ammLogDie and terminates if none of requested binary is found
-function ammExecRequiresOne {
-	if ! ammExecRequestOne "$@"; then
-		ammLogMissingBin "$@"
-		ammLogDie "Unable to find any of required binaries '$@' in $PATH"
+# @description  Same as ammExecRequestOne but calls ammLog::Die and terminates if none of requested binary is found
+function ammExec::RequiresOne {
+	if ! ammExec::RequestOne "$@"; then
+		ammLog::MissingBin "$@"
+		ammLog::Die "Unable to find any of required binaries '$@' in $PATH"
 	fi
 	return 0
 }
@@ -794,7 +809,7 @@ function ammExecRequiresOne {
 # @description  Check if given name is a function
 # @exitcode 0  is a function
 # @exitcode 1  is not a function
-function ammIsFunc {
+function amm::IsFunc {
 	[[ "$(type -t "$1")" == "function" ]]
 }
 
@@ -802,7 +817,7 @@ function ammIsFunc {
 # @description  Check if name if a variable
 # @exitcode 0  is a defined variable
 # @exitcode 1  is not a variable
-function ammIsVar {
+function amm::IsVar {
 	typeset varname="$1"
 
 	typeset var

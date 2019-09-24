@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -9,8 +9,8 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammIsoMetaInit {
-	ammLibRequire string
+function ammIso::MetaInit {
+	ammLib::Require string
 }
 
 typeset -gA __ammIsoBootloaderConfig=()
@@ -44,20 +44,20 @@ typeset -gA __ammIsoBootloaderConfigAvail=(
 # Manipulation of ISO files
 # -----------------------------------------------------------------------------
 
-function ammIsoExtractIsoinfo {
+function ammIso::ExtractIsoinfo {
 	:
 }
 
-function ammIsoExtract {
+function ammIso::Extract {
 	typeset iso="$1"
 	typeset dstdir="${2:-$__AMMLIB_DATATMP/iso}"
 	typeset method="${3:-}"
 
 	# We have multiple extract solutions available
 	# - mount -o loop : need root
-	# - FuseISO :  ammLibLoad fuse.iso
-	# - isoinfo :  ammExecExists isoinfo
-	# - udisk2  :  ammExecExists udiskctl
+	# - FuseISO :  ammLib::Load fuse.iso
+	# - isoinfo :  ammExec::Exists isoinfo
+	# - udisk2  :  ammExec::Exists udiskctl
 	# - xorriso
 	# - 7z
 	# - rar
@@ -65,7 +65,7 @@ function ammIsoExtract {
 }
 
 
-function ammIsoCreate {
+function ammIso::Create {
 	typeset srcdir="$1"
 	typeset dstiso="${2:-${srcdir#/}.iso}"
 	typeset volumeid="${3:-myiso}"

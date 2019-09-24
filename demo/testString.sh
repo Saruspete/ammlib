@@ -12,7 +12,7 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibRequire test string
+ammLib::Require test string
 
 typeset file1="$__AMMLIB_DATATMP/$0.data1"
 typeset file2="$__AMMLIB_DATATMP/$0.data2"
@@ -48,42 +48,42 @@ EOT
 typeset data2="$(<$file2)"
 
 
-ammTestGroup "Modifier - trim"
-ammTestFunction ammStringTrim "   toto   "
-ammTestFunction ammStringTrim "-" < <(echo "		hehe  		 ")
-ammTestFunction ammStringTrim "-" "[^a-zA-Z0-1]" < <(echo "!!!dang!!^&&à)ç_" )
-ammTestFunction ammStringTrim "/toto/pouet/path////" "/"
+ammTest::Group "Modifier - trim"
+ammTest::Function ammString::Trim "   toto   "
+ammTest::Function ammString::Trim "-" < <(echo "		hehe  		 ")
+ammTest::Function ammString::Trim "-" "[^a-zA-Z0-1]" < <(echo "!!!dang!!^&&à)ç_" )
+ammTest::Function ammString::Trim "/toto/pouet/path////" "/"
 
-ammTestGroup "Modifier - Upper/Lower/capitalize"
-ammTestFunction ammStringToLower '-' < "$file1"
-ammTestFunction ammStringToUpper '-' < "$file1"
-ammTestFunction ammStringToCapital '-' < "$file1"
+ammTest::Group "Modifier - Upper/Lower/capitalize"
+ammTest::Function ammString::ToLower '-' < "$file1"
+ammTest::Function ammString::ToUpper '-' < "$file1"
+ammTest::Function ammString::ToCapital '-' < "$file1"
 
-ammTestGroup "Filter - data selection"
-ammTestFunction ammStringFilter "inet" "inet" "+1" "$file2"
-ammTestFunction ammStringFilter "[0-9]+:" ".+NO.CARRIER.+" "-1" "$file2"
+ammTest::Group "Filter - data selection"
+ammTest::Function ammString::Filter "inet" "inet" "+1" "$file2"
+ammTest::Function ammString::Filter "[0-9]+:" ".+NO.CARRIER.+" "-1" "$file2"
 
-ammTestGroup "Validation - Network"
-ammTestFunction ammStringIsIPv4 "1.1.1.1"
-ammTestFunction ammStringIsIPv4 "1.1.1"
-ammTestFunction ammStringIsIPv4 "1.1"
-ammTestFunction ammStringIsIPv4 "1.256"
-ammTestFunction ammStringIsIPv4 "duckduckgo.com"
-ammTestFunction ammStringIsIPv6 "::1"
+ammTest::Group "Validation - Network"
+ammTest::Function ammString::IsIPv4 "1.1.1.1"
+ammTest::Function ammString::IsIPv4 "1.1.1"
+ammTest::Function ammString::IsIPv4 "1.1"
+ammTest::Function ammString::IsIPv4 "1.256"
+ammTest::Function ammString::IsIPv4 "duckduckgo.com"
+ammTest::Function ammString::IsIPv6 "::1"
 
-ammTestGroup "Validation - User input"
-ammTestFunction ammStringIsYes "y"
-ammTestFunction ammStringIsYes "yEs"
-ammTestFunction ammStringIsYes "Yaaaaaay"
-ammTestFunction ammStringIsYes "nope"
+ammTest::Group "Validation - User input"
+ammTest::Function ammString::IsYes "y"
+ammTest::Function ammString::IsYes "yEs"
+ammTest::Function ammString::IsYes "Yaaaaaay"
+ammTest::Function ammString::IsYes "nope"
 
-ammTestGroup "Validation - URI"
-ammTestFunction ammStringIsUri "hello"
-ammTestFunction ammStringIsUri "hello world"
-ammTestFunction ammStringIsUri "http://host/path"
-ammTestFunction ammStringIsUri "http://fqdn.domain.tld:1234/path?var1=val1&var2=val2"
-ammTestFunction ammStringIsUri "file:///tmp/toto"
-ammTestFunction ammStringIsUri "git+ssh://hostname.domain.tld:123"
+ammTest::Group "Validation - URI"
+ammTest::Function ammString::IsUri "hello"
+ammTest::Function ammString::IsUri "hello world"
+ammTest::Function ammString::IsUri "http://host/path"
+ammTest::Function ammString::IsUri "http://fqdn.domain.tld:1234/path?var1=val1&var2=val2"
+ammTest::Function ammString::IsUri "file:///tmp/toto"
+ammTest::Function ammString::IsUri "git+ssh://hostname.domain.tld:123"
 
-ammTestGroup "Parsing - List Expand"
-ammTestFunction ammStringListExpand "1,2,10-30,34,34,30-35,9-4"
+ammTest::Group "Parsing - List Expand"
+ammTest::Function ammString::ListExpand "1,2,10-30,34,34,30-35,9-4"

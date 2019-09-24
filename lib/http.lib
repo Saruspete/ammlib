@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -10,8 +10,8 @@ fi
 # -----------------------------------------------------------------------------
 
 function amm##NAME##MetaInit {
-	ammExecRequiresOne curl wget
-	ammLibRequire "exec"
+	ammExec::RequiresOne curl wget
+	ammLib::Require "exec"
 
 }
 
@@ -19,7 +19,7 @@ function amm##NAME##MetaInit {
 # Generic HTTP features
 # -----------------------------------------------------------------------------
 
-function ammHttpFetch {
+function ammHttp::Fetch {
 	typeset src="$1"
 	typeset dst="$2"
 	typeset opts="${3:-follow silent}"
@@ -27,9 +27,9 @@ function ammHttpFetch {
 	#
 	# Curl
 	#
-	if ammExecExists "curl"; then
+	if ammExec::Exists "curl"; then
 		# TODO: Manage the proxy creds
-		ammLogInf "Fetching '$src' with curl"
+		ammLog::Inf "Fetching '$src' with curl"
 
 		# Process special parameters
 		typeset curlopts=""
@@ -38,7 +38,7 @@ function ammHttpFetch {
 				follow) curlopts+=" -L" ;;
 				nofollow) curlopts="${curlopts// -L/ /}" ;;
 				silent) curlopts+=" " ;;
-				*) ammLogErr "Unknown option: $o" ;;
+				*) ammLog::Err "Unknown option: $o" ;;
 			esac
 			shift
 		done
@@ -51,8 +51,8 @@ function ammHttpFetch {
 	#
 	# wget
 	#
-	elif ammExecExists "wget"; then
-		ammLogInf "Fetching '$src' with wget"
+	elif ammExec::Exists "wget"; then
+		ammLog::Inf "Fetching '$src' with wget"
 
 		# Process special parameters
 		typeset wgetopts=""
@@ -74,12 +74,12 @@ function ammHttpFetch {
 		return $ret
 
 	else
-		ammLogErr "Unable to find curl not wget for fetch_http"
+		ammLog::Err "Unable to find curl not wget for fetch_http"
 		return 99
 	fi
 }
 
-function ammHttpFetchAuto {
+function ammHttp::FetchAuto {
 	typeset src="$1"
 	typeset dst="${2:-$TMP_BASE/${src##*/}}"
 	typeset opt="${3:-}"
@@ -102,32 +102,32 @@ function ammHttpFetchAuto {
 
 	# scp: host:path
 	elif [[ $src =~ ^[a-zA-Z0-9_\-\.]+:.+$ ]]; then
-		ammLogWrn "scp not yet implemented"
+		ammLog::Wrn "scp not yet implemented"
 		ret=99
 
 	# RSYNC
 	elif [[ $src =~ ^rsync:// ]]; then
-		if ammExecExists "rsync"; then
+		if ammExec::Exists "rsync"; then
 			rsync -a "$src" "$dst"
 			ret=$?
 		else
-			ammLogErr "Cannot find rsync"
+			ammLog::Err "Cannot find rsync"
 			ret=99
 		fi
 
 	# HTTP: curl or wget
 	elif [[ $src =~ ^https?:// ]]; then
 
-		ammHttpFetch "$src" "$dst" "$opt"
+		ammHttp::Fetch "$src" "$dst" "$opt"
 		ret=$?
 
 	# Local file: "./"
 	elif [[ -e "$(readlink -f $src)" ]]; then
-		ammLogInf "Fetching '$src' with cp"
+		ammLog::Inf "Fetching '$src' with cp"
 		cp -r "$src" "$dst"
 		ret=$?
 	else
-		ammLogErr "Unable to process url '$src'"
+		ammLog::Err "Unable to process url '$src'"
 		ret=99
 	fi
 
@@ -141,13 +141,13 @@ function ammHttpFetchAuto {
 # Special sites (to be split into submodule ?
 # -----------------------------------------------------------------------------
 
-function ammHttpGithubBranchGet {
+function ammHttp::GithubBranchGet {
 	typeset projectpath="$1"
 	typeset branch="${2:-master}"
 
 	# Get the atom feed, and grep the related tag...
 	typeset url="https://github.com/$projectpath/commits/${branch}.atom"
-	typeset out="$(ammHttpFetch "$url" "-")"
+	typeset out="$(ammHttp::Fetch "$url" "-")"
 	typeset commitid="${out#*<id>tag:github.com,2008:Grit::Commit/}"
 	commitid="${commitid%%</id>*}"
 	typeset commitdate="${out#*<updated>}"
@@ -157,12 +157,12 @@ function ammHttpGithubBranchGet {
 	[[ -n "$commitdate" ]]
 }
 
-function ammHttpGithubReleaseGet {
+function ammHttp::GithubReleaseGet {
 	typeset projectpath="$1"
 	typeset tag="${2:-latest}"
 
 	typeset url="https://github.com/$projectpath/releases/$tag"
-	typeset out="$(ammHttpFetch "$url" "-" "nofollow")"
+	typeset out="$(ammHttp::Fetch "$url" "-" "nofollow")"
 	# curl will output the html with new location href
 	# wget will show the redirect url
 	typeset vers="$(echo "$out"| grep -Po 'releases/tag/.+[" ]' | cut -d/ -f 3 | tr -d '"')"

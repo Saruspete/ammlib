@@ -1,17 +1,17 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
 
-function ammTimeMetaInit {
-	ammExecRequires date
+function ammTime::MetaInit {
+	ammExec::Requires date
 }
 
 # Trim leading 0 and special hex date
-function ammTimeParseInt {
+function ammTime::ParseInt {
 	typeset int="${1:-}"
 
 	# Remove leading 0 (octal)
@@ -31,7 +31,7 @@ function ammTimeParseInt {
 # -----------------------------------------------------------------------------
 
 # Translate a time in format MM or HH:MM or HH:MM:SS in minutes
-function ammTimeToMin {
+function ammTime::ToMin {
 	typeset time="$1"
 	typeset th="${time%%:*}"
 	typeset tm="${time#*:}"
@@ -42,15 +42,15 @@ function ammTimeToMin {
 	echo $(( ${th#0} * 60 + ${tm#0} ))
 }
 
-function ammTimeIsInRange {
+function ammTime::IsInRange {
 	typeset timeCheck="$1"
 	typeset timeStart="$2"
 	typeset timeStop="$3"
 
 	# Normalize time
-	typeset tnorCheck="$(ammTimeToMin "$timeCheck")"
-	typeset tnorStart="$(ammTimeToMin "$timeStart")"
-	typeset tnorStop="$(ammTimeToMin "$timeStop")"
+	typeset tnorCheck="$(ammTime::ToMin "$timeCheck")"
+	typeset tnorStart="$(ammTime::ToMin "$timeStart")"
+	typeset tnorStop="$(ammTime::ToMin "$timeStop")"
 
 	# Standard time: start < stop
 	if [[ "$tnorStart" -le "$tnorStop" ]]; then
@@ -64,7 +64,7 @@ function ammTimeIsInRange {
 	
 }
 
-function ammTimeToEpoch {
+function ammTime::ToEpoch {
 	typeset time="$1"
 	date +%s -d "$time"
 }
@@ -77,7 +77,7 @@ function ammTimeToEpoch {
 # -----------------------------------------------------------------------------
 # Time related to business
 # -----------------------------------------------------------------------------
-function ammTimeIsBusinessRunning {
+function ammTime::IsBusinessRunning {
 	typeset timeCurr="$(date "+%H:%M")"
 
 	for timerange in "$@"; do
@@ -85,13 +85,13 @@ function ammTimeIsBusinessRunning {
 		typeset bizStop="${timerange##*-}"
 
 		# If we are in range, it's business time!
-		ammTimeIsInRange "$timeCurr" "$bizStart" "$bizStop" && return 0
+		ammTime::IsInRange "$timeCurr" "$bizStart" "$bizStop" && return 0
 	done
 
 	return 1
 }
 
-function ammTimeIsBusinessTimeFair {
+function ammTime::IsBusinessTimeFair {
 
 	# Setup the avail minutes array
 	typeset -a avail
@@ -102,8 +102,8 @@ function ammTimeIsBusinessTimeFair {
 	# Check registered time-ranges
 	typeset timerange
 	for timerange in "$@"; do
-		typeset minStart="$(ammTimeToMin "${timerange%%-*}")"
-		typeset minStop="$(ammTimeToMin "${timerange##*-}")"
+		typeset minStart="$(ammTime::ToMin "${timerange%%-*}")"
+		typeset minStop="$(ammTime::ToMin "${timerange##*-}")"
 
 		# Prepare loop minstop => minstart (decrement) to ease overnight
 		typeset -i i=$minStop

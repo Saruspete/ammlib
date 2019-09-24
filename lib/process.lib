@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -9,10 +9,10 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammProcessMetaInit {
+function ammProcess::MetaInit {
 	# Stick with coreutils
-	ammExecRequires tr head
-	ammLibRequire string
+	ammExec::Requires tr head
+	ammLib::Require string
 	:
 }
 
@@ -20,7 +20,7 @@ function ammProcessMetaInit {
 # Basic process state
 # -----------------------------------------------------------------------------
 
-function ammProcessExeGet {
+function ammProcess::ExeGet {
 	typeset pid="$1"
 
 	typeset base="/proc/$pid"
@@ -51,7 +51,7 @@ function ammProcessExeGet {
 	[[ -n "$exe" ]]
 }
 
-function ammProcessPidExists {
+function ammProcess::PidExists {
 	typeset pid="$1"
 	typeset exe="${2:-}"
 
@@ -65,9 +65,9 @@ function ammProcessPidExists {
 	# Check also the exe (comm or cmdline)
 	else
 		if [[ -d "$base" ]]; then
-			typeset exepath="$(ammProcessExeGet "$pid")"
+			typeset exepath="$(ammProcess::ExeGet "$pid")"
 			if [[ -z "$exepath" ]]; then
-				ammLogDbg "Unable to find exe path for pid $pid. Assuming from PID only"
+				ammLog::Dbg "Unable to find exe path for pid $pid. Assuming from PID only"
 				return 0
 			fi
 
@@ -102,7 +102,7 @@ function ammProcessPidExists {
 }
 
 
-function ammProcessLastRun {
+function ammProcess::LastRun {
 	:
 }
 
@@ -110,16 +110,16 @@ function ammProcessLastRun {
 # Custom naming execution
 # -----------------------------------------------------------------------------
 
-function ammProcessRun {
+function ammProcess::Run {
 	typeset funcname="$1"; shift
 
-	if ! ammIsFunc "${funcname}Cmd"; then
-		ammLogErr "Unable to run '$funcname' as not '${funcname}Cmd' is defined"
+	if ! amm::IsFunc "${funcname}Cmd"; then
+		ammLog::Err "Unable to run '$funcname' as not '${funcname}Cmd' is defined"
 		return 1
 	fi
 
-	if ! ammIsFunc "${funcname}Parse"; then
-		ammLogErr "Unable to run '$funcname' as not '${funcname}Parse' is defined"
+	if ! amm::IsFunc "${funcname}Parse"; then
+		ammLog::Err "Unable to run '$funcname' as not '${funcname}Parse' is defined"
 		return 1
 	fi
 
@@ -127,7 +127,7 @@ function ammProcessRun {
 
 	typeset -i ret=0
 	typeset    cmd="$(${funcname}Cmd "$@")"
-	typeset    tmpbase="$__AMMLIB_DATATMP/ammProcess/${funcname}"
+	typeset    tmpbase="$__AMMLIB_DATATMP/ammProcess::/${funcname}"
 	mkdir -p "$tmpbase"
 
 	# Call the executing function
@@ -146,29 +146,29 @@ function ammProcessRun {
 # Process timeout and repeat
 # -----------------------------------------------------------------------------
 
-function ammProcessTimeout {
+function ammProcess::Timeout {
 	typeset time="$1"; shift
 
 	typeset ret="-1"
-	if ammExecExists timeout; then
+	if ammExec::Exists timeout; then
 		timeout --preserve-status $time "$@"
 		ret=$?
-	elif ammExecExists perl; then
+	elif ammExec::Exists perl; then
 		perl -e "alarm $time; exec @ARGV" "$@"
 		ret=$?
 	else
-		ammLogErr "Unable to find a suitable timeout function"
+		ammLog::Err "Unable to find a suitable timeout function"
 		return 1
 	fi
 
 	return $ret
 }
 
-function ammProcessAlarm {
+function ammProcess::Alarm {
 	:
 }
 
-function ammProcessUntil {
+function ammProcess::Until {
 	typeset func="$1"
 	typeset limit=${2:-300}
 	typeset timewait="${3:-2}"
@@ -199,7 +199,7 @@ typeset -gA __AMMPROCESS_POOL
 typeset -gA __AMMPROCESS_POOL_LASTJOBID
 typeset -ga __AMMPROCESS_POOL_PID2JOBID
 
-function ammProcessPoolCreate {
+function ammProcess::PoolCreate {
 	typeset name="$1"
 
 	# Create holding folder
@@ -212,51 +212,51 @@ function ammProcessPoolCreate {
 }
 
 
-function ammProcessPoolExists {
+function ammProcess::PoolExists {
 	typeset name="$1"
 
 	# Check pool
 	if ! ( set +u; [[ -n "${__AMMPROCESS_POOL[$name]}" ]] ); then
-		ammLogErr "Unknown pool name '$name'"
+		ammLog::Err "Unknown pool name '$name'"
 		return 1
 	fi
 
 	typeset datapath="${__AMMPROCESS_POOL[$name]}"
 	if ! [[ -d "$datapath" ]]; then
-		ammLogErr "Pool '$name' var exists but not its datapath ($datapath)"
+		ammLog::Err "Pool '$name' var exists but not its datapath ($datapath)"
 		return 1
 	fi
 
 	echo "$datapath"
 }
 
-function ammProcessPoolStart {
+function ammProcess::PoolStart {
 	typeset name="$1"
 	typeset concurrency="${2:-5}"
 	typeset timeouttask="${3:-}"
 	typeset timeouttotal="${4:-}"
 
 	typeset -i nfailed=0
-	typeset datapath="$(ammProcessPoolExists "$name")"
+	typeset datapath="$(ammProcess::PoolExists "$name")"
 	[[ -z "$datapath" ]] && return 1
 
 	# Load the jobs todo
 	typeset -a joblist jobrunning
 	readarray joblist < "$datapath/jobs.txt"
-	ammLogDbg "Executing $joblist"
+	ammLog::Dbg "Executing $joblist"
 
 	# Start the pool
 	typeset -i jobid procid proccnt=0
 	for jobid in ${!joblist[@]}; do
-		typeset jobcmd="$(ammStringTrim "${joblist[$jobid]}")"
+		typeset jobcmd="$(ammString::Trim "${joblist[$jobid]}")"
 		typeset timeoutcmd=""
 
 		if [[ -n "$timeouttask" ]]; then
-			timeoutcmd="ammProcessTimeout $timeouttask"
+			timeoutcmd="ammProcess::Timeout $timeouttask"
 		fi
 
 		# Run the job (and close stdin)
-		ammLogInf "Starting $jobcmd (id:$jobid) in background"
+		ammLog::Inf "Starting $jobcmd (id:$jobid) in background"
 		echo "# Starting $jobcmd" >| "$datapath/job.$jobid.out"
 		$timeoutcmd $jobcmd >> "$datapath/job.$jobid.out" 2> "$datapath/job.$jobid.err" 0>/dev/null &
 		# A bit of bookkeeping
@@ -270,19 +270,19 @@ function ammProcessPoolStart {
 			# Find a candidate for finalization
 			for pid in ${!jobrunning[@]}; do
 				# Check if PID exists. If not, wait and reap it
-				if ! ammProcessPidExists $pid; then
+				if ! ammProcess::PidExists $pid; then
 					wait $pid
 					typeset -i ret=$?
 
 					if [[ $ret -eq 127 ]]; then
-						ammLogWrn "We waited for pid $pid but return code 127 (= was not created)"
+						ammLog::Wrn "We waited for pid $pid but return code 127 (= was not created)"
 					fi
 					[[ $ret -ne 0 ]] && nfailed+=1
 
 					# Populate return code in path and log
 					typeset -i jid="${__AMMPROCESS_POOL_PID2JOBID[$pid]}"
 					echo "$ret" > "$datapath/job.$jid.ret"
-					ammLogInf "Job $jid (pid:$pid) finished with return code $ret"
+					ammLog::Inf "Job $jid (pid:$pid) finished with return code $ret"
 
 					unset jobrunning[$pid]
 					unset __AMMPROCESS_POOL_PID2JOBID[$pid]
@@ -303,14 +303,14 @@ function ammProcessPoolStart {
 	return $nfailed
 }
 
-function ammProcessPoolTaskAdd {
+function ammProcess::PoolTaskAdd {
 	typeset name="$1"; shift
 
-	typeset datapath="$(ammProcessPoolExists "$name")"
+	typeset datapath="$(ammProcess::PoolExists "$name")"
 	[[ -z "$datapath" ]] && return 1
 
 	echo "$@" >> "$datapath/jobs.txt"
-	__AMMPROCESS_POOL_LASTJOBID[$name]="$(( $(ammStringCountLines "$datapath/jobs.txt") -1 ))"
+	__AMMPROCESS_POOL_LASTJOBID[$name]="$(( $(ammString::CountLines "$datapath/jobs.txt") -1 ))"
 
 	echo ${__AMMPROCESS_POOL_LASTJOBID[$name]}
 }
@@ -320,7 +320,7 @@ function ammProcessPoolTaskAdd {
 # -----------------------------------------------------------------------------
 
 
-function ammProcessRunAs {
+function ammProcess::RunAs {
 	typeset runas="$1"; shift
 
 	typeset curruser="$__AMMLIB_USERNAME"
@@ -328,7 +328,7 @@ function ammProcessRunAs {
 
 	# Exec from stdin
 	if [[ "$@" = "-" ]]; then
-		ammLogDbg "Reading commands to run as '$runas' from stdin"
+		ammLog::Dbg "Reading commands to run as '$runas' from stdin"
 
 		# If no user specified, or we already are correct one...
 		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
@@ -340,8 +340,8 @@ function ammProcessRunAs {
 			cat | su -m "$runas" 98>&- 99>&-
 			ret=$?
 
-		elif ammExecExists sudo >/dev/null && sudo -nl 2>/dev/null|grep 'may run the following commands' >/dev/null; then
-			ammLogDbg "Using sudo to run as '$runas' from stdin"
+		elif ammExec::Exists sudo >/dev/null && sudo -nl 2>/dev/null|grep 'may run the following commands' >/dev/null; then
+			ammLog::Dbg "Using sudo to run as '$runas' from stdin"
 			# maybe should parse "sudo -l" output more...
 			typeset line
 			while read line; do
@@ -350,7 +350,7 @@ function ammProcessRunAs {
 
 		# No way to change ?
 		else
-			ammLogErr "Cannot change from user $curruser to user $runas"
+			ammLog::Err "Cannot change from user $curruser to user $runas"
 			ret=4
 		fi
 
@@ -359,28 +359,28 @@ function ammProcessRunAs {
 
 		# No user specified, or already correct user
 		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
-			ammLogDbg "Using eval to run as '$runas' cmd: '$@'"
+			ammLog::Dbg "Using eval to run as '$runas' cmd: '$@'"
 			#eval "$@" 98>&- 99>&-
 			"$@" 98>&- 99>&-
 			ret=$?
 
 		# root... yay !
 		elif [[ "$curruser" = "root" ]]; then
-			ammLogDbg "Using su to run as '$runas' cmd: '$*'"
+			ammLog::Dbg "Using su to run as '$runas' cmd: '$*'"
 			# I need to flatten, hence '$*' instead of '$@'. Beware...
 			su -m -c "$*" "$runas" 98>&- 99>&-
 			ret=$?
 
 		# Maybe handle sudo ?
-		elif ammExecExists sudo >/dev/null && sudo -nl 2>/dev/null|grep 'may run the following commands' >/dev/null; then
-			ammLogDbg "Using sudo to run as '$runas' cmd: '$@'"
+		elif ammExec::Exists sudo >/dev/null && sudo -nl 2>/dev/null|grep 'may run the following commands' >/dev/null; then
+			ammLog::Dbg "Using sudo to run as '$runas' cmd: '$@'"
 			# maybe should parse "sudo -l" output more...
 			sudo -n -u "$runas" "$@" 98>&- 99>&-
 			ret=$?
 
 		# Fails...
 		else
-			ammLogErr "Cannot exec '$@' as user $runas from user $curruser"
+			ammLog::Err "Cannot exec '$@' as user $runas from user $curruser"
 			ret=4
 		fi
 	fi
@@ -394,20 +394,20 @@ function ammProcessRunAs {
 # -----------------------------------------------------------------------------
 typeset __AMMPROCESS_DAEMONSTATEBASE="$__AMMLIB_DATATMP/process.daemon/"
 
-function _ammProcessDaemonFilestate {
+function _ammProcess::DaemonFilestate {
 	typeset process="$1"
 	echo "$__AMMPROCESS_DAEMONSTATEBASE/$process"
 }
 
 
-function ammProcessDaemonCreate {
+function ammProcess::DaemonCreate {
 	:
 }
 
-function ammProcessDaemonIsAlive {
+function ammProcess::DaemonIsAlive {
 	:
 }
 
-function ammProcessDaemonZap {
+function ammProcess::DaemonZap {
 	:
 }

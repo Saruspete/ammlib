@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 #function amm##NAME##MetaInit {
-#	ammExecRequires awk
+#	ammExec::Requires awk
 #}
 
 # -----------------------------------------------------------------------------
@@ -18,7 +18,7 @@ fi
 # -----------------------------------------------------------------------------
 
 
-function ammServiceType {
+function ammService::Type {
 	typeset inittype="unknown"
 	typeset pid1comm="$(</proc/1/comm)"
 	[[ "$pid1comm" == "systemd" ]] && inittype="systemd"
@@ -26,10 +26,10 @@ function ammServiceType {
 
 	echo "$inittype"
 }
- __AMMSERVICE_TYPE="$(ammServiceType)"
+ __AMMSERVICE_TYPE="$(ammService::Type)"
 
 
-function _ammServicePathList {
+function _ammService::PathList {
 	if [[ "$__AMMSERVICE_TYPE" == "systemd" ]]; then
 
 		# Listing from https://www.freedesktop.org/software/systemd/man/systemd.unit.html
@@ -51,7 +51,7 @@ function _ammServicePathList {
 	fi
 }
 
-function ammServiceExists {
+function ammService::Exists {
 	typeset svcname="$1"
 	typeset prefix=""
 	typeset suffix=""
@@ -60,13 +60,13 @@ function ammServiceExists {
 		suffix=".service"
 	}
 
-	for dir in $(_ammServicePathList); do
+	for dir in $(_ammService::PathList); do
 		[[ -e "$dir/${prefix}${svcname}${suffix}" ]] && return 0
 	done
 	return 1
 }
 
-function ammServiceStateGet {
+function ammService::StateGet {
 	typeset svc="$1"
 
 }

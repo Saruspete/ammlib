@@ -12,13 +12,13 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibRequire "process"
+ammLib::Require "process"
 
 
-ammProcessPoolCreate "toto"
+ammProcess::PoolCreate "toto"
 
 for i in {1..9}; do
-	ammProcessPoolTaskAdd "toto" "sleep $i"
+	ammProcess::PoolTaskAdd "toto" "sleep $i"
 done
 
-ammProcessPoolStart "toto" 2 7
+ammProcess::PoolStart "toto" 2 7

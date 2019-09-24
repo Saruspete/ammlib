@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -9,14 +9,14 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammPkgMetaInit {
-	ammLibRequire string
-	ammExecRequires ldd
+function ammPkg::MetaInit {
+	ammLib::Require string
+	ammExec::Requires ldd
 
 	# Try to load the local package manager to avoid redundancy
-	typeset localpkgmgr="$(ammPkgManagerDetect)"
+	typeset localpkgmgr="$(ammPkg::ManagerDetect)"
 	if [[ -n "$localpkgmgr" ]]; then
-		ammLibLoad "pkg.$localpkgmgr" && __AMMPKG_PATHTOTYPE[/]="$localpkgmgr"
+		ammLib::Load "pkg.$localpkgmgr" && __AMMPKG_PATHTOTYPE[/]="$localpkgmgr"
 	fi
 
 	return 0
@@ -33,7 +33,7 @@ typeset -gA __AMMPKG_PATHTOTYPE
 # @arg $1 the path to search for related package manager
 #
 # @stdout  The package manager library name (without "pkg." prefix). ex: "yum"
-function ammPkgManagerDetect {
+function ammPkg::ManagerDetect {
 	typeset rootpath="${1:-/}"
 
 	# Portage: Gentoo
@@ -57,15 +57,15 @@ function ammPkgManagerDetect {
 	else
 		typeset -a mgr
 		typeset sublib
-		for sublib in $(ammLibLocatePattern "pkg.*"); do
-			ammLogDbg "Found sublib '$sublib'"
-			if ammLibLoadable "$sublib" >/dev/null; then
-				ammLibLoad "$sublib"
+		for sublib in $(ammLib::LocatePattern "pkg.*"); do
+			ammLog::Dbg "Found sublib '$sublib'"
+			if ammLib::Loadable "$sublib" >/dev/null; then
+				ammLib::Load "$sublib"
 
 				typeset libtype="${sublib#pkg.}"
 
 				# If the package manager is ok, good
-				if ammPkg${libtype^}IsAvailable "$rootpath"; then
+				if ammPkg::${libtype^}IsAvailable "$rootpath"; then
 					mgr+=("$libtype")
 				fi
 			fi
@@ -76,10 +76,10 @@ function ammPkgManagerDetect {
 			return 0
 		elif [[ ${#mgr[@]} -gt 1 ]]; then
 			#$AMMLIB_INTERACTIVE &&
-			ammLogWrn "Multiple package managers available: '${mgr[@]}'"
+			ammLog::Wrn "Multiple package managers available: '${mgr[@]}'"
 			return 1
 		else
-			ammLogErr "Unhandled or inexistant package manager on '$rootpath'"
+			ammLog::Err "Unhandled or inexistant package manager on '$rootpath'"
 			return 1
 		fi
 	fi
@@ -92,7 +92,7 @@ function ammPkgManagerDetect {
 # @arg $1  (string) function name to call
 # @arg $2  (path)(optionnal)
 # @arg $@  (any) argument to pass to the selected function
-function _ammPkgProxy {
+function _ammPkg::Proxy {
 	typeset func="$1"; shift
 
 	typeset path="/"
@@ -109,53 +109,53 @@ function _ammPkgProxy {
 
 	# Else, create and populate it
 	else
-		lib="$(ammPkgManagerDetect "$path")"
+		lib="$(ammPkg::ManagerDetect "$path")"
 		if [[ -n "$lib" ]]; then
 			__AMMPKG_PATHTOTYPE[$path]="$lib"
 		fi
 	fi
 
 	# Load the target library
-	if ! ammLibLoad "pkg.$lib"; then
-		ammLogErr "Unable to load package manager '$lib' for path '$path'. This should be reported !"
+	if ! ammLib::Load "pkg.$lib"; then
+		ammLog::Err "Unable to load package manager '$lib' for path '$path'. This should be reported !"
 		return 1
 	fi
 
 	# Call the target function
-	ammPkg${lib^}${func} "$@"
+	ammPkg${lib^}::${func} "$@"
 }
 
 # -----------------------------------------------------------------------------
 # Main package manager operations
 # -----------------------------------------------------------------------------
 
-function ammPkgInstall {
-	_ammPkgProxy "Install" "$@"
+function ammPkg::Install {
+	_ammPkg::Proxy "Install" "$@"
 }
 
-function ammPkgRemove {
-	_ammPkgProxy "Remove" "$@"
+function ammPkg::Remove {
+	_ammPkg::Proxy "Remove" "$@"
 }
 
 # What files or requirements does a pkg need
-function ammPkgInfoRequires {
-	_ammPkgProxy "InfoRequires" "$@"
+function ammPkg::InfoRequires {
+	_ammPkg::Proxy "InfoRequires" "$@"
 }
 
-function ammPkgInfoWhatProvides {
-	_ammPkgProxy "InfoWhatProvides" "$@"
+function ammPkg::InfoWhatProvides {
+	_ammPkg::Proxy "InfoWhatProvides" "$@"
 }
 
 # -----------------------------------------------------------------------------
 # Less used package manager operations
 # -----------------------------------------------------------------------------
 
-function ammPkgFix {
-	_ammPkgProxy "Fix" "$@"
+function ammPkg::Fix {
+	_ammPkg::Proxy "Fix" "$@"
 }
 
-function ammPkgExtract {
-	_ammPkgProxy "Extract" "$@"
+function ammPkg::Extract {
+	_ammPkg::Proxy "Extract" "$@"
 }
 
 # -----------------------------------------------------------------------------
@@ -168,9 +168,9 @@ function ammPkgExtract {
 #
 # @stdout List of libraries path with matching file (their full path)
 # @stderr List of libraries without matching file (only printin name)
-function _ammPkgDepsFindBin {
+function _ammPkg::DepsFindBin {
 
-	! ammExecExists ldd && return 1
+	! ammExec::Exists ldd && return 1
 
 	typeset file
 	for file in "$@"; do
@@ -188,7 +188,7 @@ function _ammPkgDepsFindBin {
 			fi
 
 			# Recursion
-			[[ -e "$file" ]] && _ammPkgDepsFindBin "$file"
+			[[ -e "$file" ]] && _ammPkg::DepsFindBin "$file"
 
 		done < <(ldd "$file" 2>/dev/null)
 	done
@@ -199,33 +199,33 @@ function _ammPkgDepsFindBin {
 #
 # @ærg $1 string Destination path for extraction.
 # @arg $@ string List of packages, binaries or urls to extract, with their dependencies
-function ammPkgFindDeps {
+function ammPkg::FindDeps {
 
 	typeset    pkgsToDl
 	typeset -A pkgFiles
-	typeset tmpdir="$__AMMLIB_DATATMP/ammPkg/extract"
+	typeset tmpdir="$__AMMLIB_DATATMP/ammPkg::/extract"
 	mkdir -p "$tmpdir"
 
 	# For each provided element, we'll guess its type, action and extract it
 	typeset element
 	for element in "$@"; do
-		typeset type="$(ammStringType "$element")"
-		ammLogDbg "Processing element '$element' (type: $type)"
+		typeset type="$(ammString::Type "$element")"
+		ammLog::Dbg "Processing element '$element' (type: $type)"
 
 		#
 		# URI: Download the file locally for further analysis
 		#
 		if [[ "$type" == "uri" ]]; then
-			if ! ammLibLoad http >/dev/null; then
-				ammLogErr "Cannot load required library http to process uri '$element'. Skipping"
+			if ! ammLib::Load http >/dev/null; then
+				ammLog::Err "Cannot load required library http to process uri '$element'. Skipping"
 				continue
 			fi
 
 			typeset destfile="$tmpdir/${elements##*/}"
 
 			# Download the uri
-			if ! ammHttpFetch "$element" "$destfile"; then
-				ammLogErr "Unable to fetch uri '$element' as '$destfile'"
+			if ! ammHttp::Fetch "$element" "$destfile"; then
+				ammLog::Err "Unable to fetch uri '$element' as '$destfile'"
 				continue
 			fi
 
@@ -243,7 +243,7 @@ function ammPkgFindDeps {
 		#
 		if [[ "$type" == "file" ]]; then
 
-			typeset epkg="$(ammPkgInfoWhatProvides "$element")"
+			typeset epkg="$(ammPkg::InfoWhatProvides "$element")"
 
 			# File belongs to a package
 			if [[ -n "$epkg" ]]; then
@@ -262,11 +262,11 @@ function ammPkgFindDeps {
 			# For now, assume a binary. Else, just skip (may comment following test)
 			if head -n 1 "$element" | grep ELF >/dev/null 2>&1; then
 
-				ammLogDbg "Extracting dependencies from ELF binary '$element'"
+				ammLog::Dbg "Extracting dependencies from ELF binary '$element'"
 
 				typeset file
-				for file in $(_ammPkgDepsFindBin $element 2>/dev/null | sort -u); do
-					ammLogDbg "Searching package for file '$file'"
+				for file in $(_ammPkg::DepsFindBin $element 2>/dev/null | sort -u); do
+					ammLog::Dbg "Searching package for file '$file'"
 
 					# if file is not absolute, we are missing it. Add a refrence to /lib in the path
 					if [[ "${file:0:1}" != "/" ]]; then
@@ -275,19 +275,19 @@ function ammPkgFindDeps {
 
 					# File already in cache, already found. Skip
 					if ( set +u; [[ -n "${pkgFiles[$file]}" ]] ) ; then
-						ammLogDbg "File $file already found its package(s): '${pkgFiles[$file]}'"
+						ammLog::Dbg "File $file already found its package(s): '${pkgFiles[$file]}'"
 						continue
 
 					# Finds from which package the file comes from
 					else
-						typeset pkg="$(ammPkgInfoWhatProvides "$file")"
+						typeset pkg="$(ammPkg::InfoWhatProvides "$file")"
 						if [[ -z "$pkg" ]]; then
-							ammLogWrn "Unable to find package providing file '$file'."
+							ammLog::Wrn "Unable to find package providing file '$file'."
 							continue
 						fi
 
 						# Check output for multiple packages
-						[[ "${pkg// /}" != "$pkg" ]] && ammLogWrn "Multiple packages found providing file '$file': $pkg"
+						[[ "${pkg// /}" != "$pkg" ]] && ammLog::Wrn "Multiple packages found providing file '$file': $pkg"
 
 						pkgFiles[$file]="$pkg"
 						pkgsToDl+="$pkg "
@@ -298,9 +298,9 @@ function ammPkgFindDeps {
 			else
 
 				# Find the owner
-				typeset pkg="$(ammPkgInfoWhatProvides "$element")"
+				typeset pkg="$(ammPkg::InfoWhatProvides "$element")"
 				if [[ -z "$pkg" ]]; then
-					ammLogWrn "Unable to find package providing file '$element'."
+					ammLog::Wrn "Unable to find package providing file '$element'."
 					continue
 				fi
 
@@ -312,6 +312,8 @@ function ammPkgFindDeps {
 		else
 			# Just append to packages to download
 			pkgsToDl+="$element "
+
+			ammPkg::InfoRequires "$element"
 		fi
 
 	done
@@ -323,17 +325,17 @@ function ammPkgFindDeps {
 #
 # @args $1 (path)  destination folder where to extract the data
 # @args $@ (string) packages or binaries
-function ammPkgExtractWithDeps {
+function ammPkg::ExtractWithDeps {
 	typeset dest="$1"; shift
 
 	if ! [[ -d "$dest" ]]; then
-		ammLogErr "Destination '$dest' does not exists. Create it beforehand"
+		ammLog::Err "Destination '$dest' does not exists. Create it beforehand"
 		return 1
 	fi
 
-	ammLogInf "Calling dependency analysis for $@"
-	for pkg in $(ammPkgFindDeps "$@"); do
-		ammPkgExtract "$dest" "$pkg" || ammLogWrn "Error while extracting '$pkg' to '$dest': ret=$?"
+	ammLog::Inf "Calling dependency analysis for $@"
+	for pkg in $(ammPkg::FindDeps "$@"); do
+		ammPkg::Extract "$dest" "$pkg" || ammLog::Wrn "Error while extracting '$pkg' to '$dest': ret=$?"
 	done
 }
 

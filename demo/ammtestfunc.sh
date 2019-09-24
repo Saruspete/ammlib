@@ -27,8 +27,8 @@ libname="${libname#amm}"
 # Lowercase the first char (should be package name)
 libname="${libname,}"
 # And remove all trailing element from the first uppercase
-libname="${libname%%[A-Z]*}"
+libname="${libname%%::*}"
 
-ammLibRequire "$libname"
+ammLib::Require "$libname"
 
 $func "$@"

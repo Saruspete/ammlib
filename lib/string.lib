@@ -1,26 +1,26 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
-function ammStringMetaInit {
+function ammString::MetaInit {
 	# try to keep to coreutils
-	ammExecRequires sed seq tr
+	ammExec::Requires sed seq tr
 }
 
 # -----------------------------------------------------------------------------
 # Tests of string content, types and values
 # -----------------------------------------------------------------------------
 
-function ammStringContains {
+function ammString::Contains {
 	typeset want="$1"
 	typeset check="$2"
 	[[ "${check//$want/}" != "$check" ]]
 }
 
-function ammStringContainsWord {
+function ammString::ContainsWord {
 	typeset want="$1"; shift
 
 	# Lazy: just check
@@ -31,25 +31,25 @@ function ammStringContainsWord {
 	return 1
 }
 
-function ammStringStartsWith {
+function ammString::StartsWith {
 	typeset want="$1"
 	typeset check="$2"
 	[[ "${check#$want}" != "$check" ]]
 }
 
-function ammStringEndsWith {
+function ammString::EndsWith {
 	typeset want="$1"
 	typeset check="$2"
 	[[ "${check%$want}" != "$check" ]]
 }
 
-function ammStringIsFile {
+function ammString::IsFile {
 	typeset file="$1"
 
 	[[ -f "$file" ]]
 }
 
-function ammStringIsInteger {
+function ammString::IsInteger {
 	typeset str="$1"
 
 	# Remove leading minus
@@ -58,7 +58,7 @@ function ammStringIsInteger {
 	[[ -z "${str//[0-9]/}" ]]
 }
 
-function ammStringIsHex {
+function ammString::IsHex {
 	typeset str="$1"
 
 	# If empty string or something not in hex
@@ -69,26 +69,26 @@ function ammStringIsHex {
 	return 0
 }
 
-function ammStringIsYes {
+function ammString::IsYes {
 	typeset str="$1"
 	[[ $str =~ ^[yY][eE]?[sS]?$ ]]
 }
 
-function ammStringIsNo {
+function ammString::IsNo {
 	typeset str="$1"
 	[[ $str =~ ^[nN][oO]?$ ]]
 }
 
-function ammStringIsTrue {
+function ammString::IsTrue {
 	typeset -l str="$1"
 
 	# Empty is false
 	[[ -z "$str" ]] && return 1
 
 	# "no" string
-	ammStringIsNo "$str" && return 1
+	ammString::IsNo "$str" && return 1
 	# 0 value
-	ammStringIsInteger "$str" && [[ $str -eq 0 ]] && return 1
+	ammString::IsInteger "$str" && [[ $str -eq 0 ]] && return 1
 	# True
 	[[ "$str" == "false" ]] && return 1
 
@@ -97,7 +97,7 @@ function ammStringIsTrue {
 }
 
 
-function ammStringIsIPv4 {
+function ammString::IsIPv4 {
 	typeset ip="${1:-}"
 
 	# Should test what is faster: this long & complete regex, or the str processing ?
@@ -121,26 +121,26 @@ function ammStringIsIPv4 {
 	return 1
 }
 
-function ammStringIsIPv6 {
+function ammString::IsIPv6 {
 	typeset ip="${1:-}"
 
 	# ::1
 	[[ $ip =~ ^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$ ]]
 }
 
-function ammStringIsIP {
+function ammString::IsIP {
 	typeset ip="$1"
-	ammStringIsIPv4 "$ip" || ammStringIsIPv6 "$ip"
+	ammString::IsIPv4 "$ip" || ammStringIsIPv6 "$ip"
 }
 
 # Check if the input looks like an option (starts with - or --)
-function ammStringIsOption {
+function ammString::IsOption {
 	typeset opt="$1"
 
 	[[ "${opt##--}" != "$opt" ]] || [[ "${opt##-}" != "$opt" ]]
 }
 
-function ammStringIsUri {
+function ammString::IsUri {
 	typeset uri="$1"
 
 	# from https://tools.ietf.org/html/rfc3986#appendix-B
@@ -148,38 +148,38 @@ function ammStringIsUri {
 	[[ $uri =~ ^(([^:/?#]+):)(//([^/?#]*))([^?#]*)(\?([^#]*))?(#(.*))? ]]
 }
 
-function ammStringIsDate {
+function ammString::IsDate {
 	typeset date="$1"
 
 	typeset s="[-_/]"
 	[[ $date =~ [0-9]{4}$s(0[0-9]|1[012])$s([012][0-9]|3[01]) ]]
 }
 
-function ammStringIsTime {
+function ammString::IsTime {
 	typeset time="$1"
 
 	[[ $time =~ ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])(\.[0-9]{3,9})? ]]
 }
 
-function ammStringType {
+function ammString::Type {
 	typeset str="$1"
 
 	# Network resources
-	if ammStringIsUri "$str"; then
+	if ammString::IsUri "$str"; then
 		echo "uri"
-	elif ammStringIsIPv4 "$str"; then
+	elif ammString::IsIPv4 "$str"; then
 		echo "ipv4"
-	elif ammStringIsIPv6 "$str"; then
+	elif ammString::IsIPv6 "$str"; then
 		echo "ipv6"
 
 	# Date / Time
-	elif ammStringIsDate "$str"; then
-		if ammStringIsTime "$str"; then
+	elif ammString::IsDate "$str"; then
+		if ammString::IsTime "$str"; then
 			echo "datetime"
 		else
 			echo "date"
 		fi
-	elif ammStringIsTime "$str"; then
+	elif ammString::IsTime "$str"; then
 		echo "time"
 
 	# Files
@@ -198,7 +198,7 @@ function ammStringType {
 # String modifiers
 # -----------------------------------------------------------------------------
 
-function _ammStringTrim {
+function _ammString::Trim {
 	typeset str="$1"
 	# Protect the / as used by the regex
 	typeset chars="${2////\\/}"
@@ -208,22 +208,22 @@ function _ammStringTrim {
 		-e "s/${chars}+$//g"
 }
 
-function ammStringTrim {
+function ammString::Trim {
 	typeset str="${1:-}"
 	typeset trimchars="${2:-[ \t\n]}"
 
 	
 	if [[ "$1" == "-" ]]; then
 		while read line; do
-			_ammStringTrim "$line" "$trimchars"
+			_ammString::Trim "$line" "$trimchars"
 		done
 	else
-		_ammStringTrim "$str" "$trimchars"
+		_ammString::Trim "$str" "$trimchars"
 	fi
 }
 
-#function ammStringCapitalize {
-function ammStringToCapital {
+#function ammString::Capitalize {
+function ammString::ToCapital {
 	typeset str="${1:-}"
 
 	if [[ "$str" == "-" ]]; then
@@ -237,7 +237,7 @@ function ammStringToCapital {
 	fi
 }
 
-function ammStringToLower {
+function ammString::ToLower {
 	typeset -l str="${1:-}"
 	if [[ "$str" == "-" ]]; then
 		while read str; do
@@ -249,7 +249,7 @@ function ammStringToLower {
 
 }
 
-function ammStringToUpper {
+function ammString::ToUpper {
 	typeset -u str="${1:-}"
 	if [[ "$str" == "-" ]]; then
 		while read str; do
@@ -261,7 +261,7 @@ function ammStringToUpper {
 }
 
 
-function ammStringNormalize {
+function ammString::Normalize {
 	typeset file="$1"
 	# Inspired from https://www.linuxquestions.org/questions/programming-9/merge-lines-in-a-file-using-sed-191121/
 	grep -Pv '^\s*#' "$file" \
@@ -271,7 +271,7 @@ function ammStringNormalize {
 	# | sed -e ':x /\\$/ { N; s/\\\s*(#.*)?\n^\n//g ; bx }'
 }
 
-function ammStringInputToLines {
+function ammString::InputToLines {
 	typeset input="$1"
 
 	# Read stdin
@@ -279,7 +279,7 @@ function ammStringInputToLines {
 		cat
 
 	# Read from file
-	elif ammStringIsFile "$input"; then
+	elif ammString::IsFile "$input"; then
 		cat "$input"
 
 	# Just output input
@@ -292,13 +292,13 @@ function ammStringInputToLines {
 # -----------------------------------------------------------------------------
 # Search and filter
 # -----------------------------------------------------------------------------
-function ammStringFilter {
+function ammString::Filter {
 	typeset filterline="${1:-.+}"
 	typeset filtercolumn="${2:-}"
 	typeset displaycolumn="${3:-0}"
 	typeset file="${4:-}"
 
-	ammLogDbg "fl=$filterline fc=$filtercolumn dc=$displaycolumn file=$file"
+	ammLog::Dbg "fl=$filterline fc=$filtercolumn dc=$displaycolumn file=$file"
 	awk -v fl="$filterline" -v fc="$filtercolumn" -v dc="$displaycolumn" '
 		# Line matching
 		match($0, fl) {
@@ -321,12 +321,12 @@ function ammStringFilter {
 # -----------------------------------------------------------------------------
 # Counting
 # -----------------------------------------------------------------------------
-function ammStringCountWords {
+function ammString::CountWords {
 	typeset -a arr=($@)
 	echo ${#arr[@]}
 }
 
-function ammStringCountLines {
+function ammString::CountLines {
 	typeset input="$1"
 
 	typeset wcout=""
@@ -344,7 +344,7 @@ function ammStringCountLines {
 # -----------------------------------------------------------------------------
 # Sorting
 # -----------------------------------------------------------------------------
-function ammStringSortWords {
+function ammString::SortWords {
 	for w in "$@"; do
 		echo "$w"
 	done | sort | tr '\n' ' '
@@ -354,7 +354,7 @@ function ammStringSortWords {
 # Advanced format parsers
 # -----------------------------------------------------------------------------
 
-function ammStringListExpand {
+function ammString::ListExpand {
 	typeset    listFull=""
 	typeset -i err=0
 
@@ -371,20 +371,20 @@ function ammStringListExpand {
 
 			# Some checks
 			[[ -z "$bgn" ]] && {
-				ammLogWrn "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
+				ammLog::Wrn "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
 				continue
 			}
 			[[ -z "$end" ]] && {
-				ammLogWrn "List end element '$end' (in group '$group') cannot be empty. Skipping"
+				ammLog::Wrn "List end element '$end' (in group '$group') cannot be empty. Skipping"
 				continue
 			}
 
-			! ammStringIsInteger "$bgn" && {
-				ammLogWrn "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
+			! ammString::IsInteger "$bgn" && {
+				ammLog::Wrn "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
 				continue
 			}
-			! ammStringIsInteger "$end" && {
-				ammLogWrn "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
+			! ammString::IsInteger "$end" && {
+				ammLog::Wrn "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
 				continue
 			}
 
@@ -418,7 +418,7 @@ function ammStringListExpand {
 # -----------------------------------------------------------------------------
 # Pretty print and display helpers
 # -----------------------------------------------------------------------------
-function ammStringRepeat {
+function ammString::Repeat {
 	typeset -i time="${1:-1}"
 	typeset    char="${2:- }"
 	seq -s "$char" $(($time+1)) | tr -d '[:digit:]'

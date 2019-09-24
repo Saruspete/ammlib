@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -9,29 +9,29 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammKernelMetaInit {
-	ammLibRequire string
-	ammExecRequires wc
+function ammKernel::MetaInit {
+	ammLib::Require string
+	ammExec::Requires wc
 }
 
 # -----------------------------------------------------------------------------
 # Kernel modules management
 # -----------------------------------------------------------------------------
 
-function ammKernelModList {
+function ammKernel::ModList {
 	
 	:
 }
 
-function ammKernelModDepList {
+function ammKernel::ModDepList {
 
 	typeset mod size cnt deps _junk
 	while read mod size cnt deps _junk; do
 		# if the module is the requested list
-		ammStringContainsWord "$mod" "$@" || continue
+		ammString::ContainsWord "$mod" "$@" || continue
 
 		# Recurse on these modules (and primt them before original calling module)
-		[[ "$deps" != "-" ]] && ammKernelModDepList ${deps//,/ }
+		[[ "$deps" != "-" ]] && ammKernel::ModDepList ${deps//,/ }
 		#echo -n " ${deps//,/ }"
 
 		# Finally, print current module
@@ -40,7 +40,7 @@ function ammKernelModDepList {
 }
 
 # Returns if a function has an unknown dependency
-function ammKernelModDepAreKnown {
+function ammKernel::ModDepAreKnown {
 	typeset kmod="$1"
 
 	typeset mod size refcnt deps _junk
@@ -55,9 +55,9 @@ function ammKernelModDepAreKnown {
 		deps="${deps//,/ }"
 
 		# All refcount are modules
-		if [[ "$(ammStringCountWords $deps)" == "$refcnt" ]]; then
-			ammLogDbg "Module '$kmod' has '$(ammStringCountWords $deps)' dependant modules for '$refcnt' ref counter"
-			#ammLogDbg 
+		if [[ "$(ammString::CountWords $deps)" == "$refcnt" ]]; then
+			ammLog::Dbg "Module '$kmod' has '$(ammString::CountWords $deps)' dependant modules for '$refcnt' ref counter"
+			#ammLog::Dbg 
 			return 0
 		fi
 	done < /proc/modules
@@ -66,7 +66,7 @@ function ammKernelModDepAreKnown {
 }
 
 
-function ammKernelModIsLoaded {
+function ammKernel::ModIsLoaded {
 	typeset kmod="$1"
 
 	typeset mod _junk
@@ -76,29 +76,29 @@ function ammKernelModIsLoaded {
 	return 1
 }
 
-function ammKernelModUnload {
+function ammKernel::ModUnload {
 
 	typeset ret=0 modlist=""
 
 	# Pass 1: create module dependency listing and check we can rmmod them all
 	typeset mod
 	for mod in "$@"; do
-	# for mod in $(ammKernelModList "$@"); do
+	# for mod in $(ammKernel::ModList "$@"); do
 		# Skip missing or already unloaded module
-		! ammKernelModIsLoaded "$mod" && continue
+		! ammKernel::ModIsLoaded "$mod" && continue
 
 		# check if we have unknown ref for this module (show stopper)
-		if ! ammKernelModDepAreKnown "$mod"; then
-			ammLogWrn "The module '$mod' has an unknown ref that is not another kmod. Cannot unload"
+		if ! ammKernel::ModDepAreKnown "$mod"; then
+			ammLog::Wrn "The module '$mod' has an unknown ref that is not another kmod. Cannot unload"
 			ret+=1
 			continue
 		fi
 
 		typeset dep deps
-		deps="$(ammKernelModDepList "$mod")"
+		deps="$(ammKernel::ModDepList "$mod")"
 		for dep in $deps; do
-			if ! ammKernelModDepAreKnown "$dep"; then
-				ammLogWrn "Cannot unload mod '$dep', dependency for '$mod'. Skipping"
+			if ! ammKernel::ModDepAreKnown "$dep"; then
+				ammLog::Wrn "Cannot unload mod '$dep', dependency for '$mod'. Skipping"
 				ret+=1
 				continue
 			fi
@@ -108,15 +108,15 @@ function ammKernelModUnload {
 	done
 
 	if [[ $ret -ne 0 ]]; then
-		ammLogErr "One or more module cannot be unloaded. Won't start the unloading"
+		ammLog::Err "One or more module cannot be unloaded. Won't start the unloading"
 		return $ret
 	fi
 
 	# Pass 2: Do the real mod unloading
 	for mod in $modlist; do
 		# Skip missing or already unloaded module
-		! ammKernelModIsLoaded "$mod" && continue
-		ammExecLogged \rmmod $mod
+		! ammKernel::ModIsLoaded "$mod" && continue
+		ammExec::Logged \rmmod $mod
 	done
 
 	return $ret
@@ -128,7 +128,7 @@ function ammKernelModUnload {
 # -----------------------------------------------------------------------------
 
 
-function ammKernelRmmod {
+function ammKernel::Rmmod {
 
 	typeset -i r=0
 	typeset -A moddep
@@ -148,7 +148,7 @@ function ammKernelRmmod {
 		# If this module matches
 		for mod in "$@"; do
 			if [[ $name =~ ^$mod$ ]]; then
-				ammLogInf "Module '$name' matched search '$mod' (refcnt:$refcnt modcnt:$modcnt deps:$deps)"
+				ammLog::Inf "Module '$name' matched search '$mod' (refcnt:$refcnt modcnt:$modcnt deps:$deps)"
 				matches[$name]="$(( $refcnt - $modcnt ))"
 			fi
 		done
@@ -159,8 +159,8 @@ function ammKernelRmmod {
 	for mod in ${!matches[@]}; do
 		# If we have remaining refcnt, we can't unload the mod. Display insights
 		if [[ ${matches[$mod]} -gt 0 ]]; then
-			ammLogErr "Cannot unload module '$mod': refcount is higher than mod dependencies (remains ${matches[$mod]} refs)"
-			ammLogErr "Provide here some help for module ...."
+			ammLog::Err "Cannot unload module '$mod': refcount is higher than mod dependencies (remains ${matches[$mod]} refs)"
+			ammLog::Err "Provide here some help for module ...."
 			refcnt+=1
 		fi
 	done
@@ -170,18 +170,18 @@ function ammKernelRmmod {
 
 	# Try to unload dependencies recursively
 	for mod in ${!matches[@]}; do
-		if ! ammKernelRmmod ${moddep[$mod]}; then
-			ammLogErr "Cannot unload dependencies for module '$mod'. Stopping"
+		if ! ammKernel::Rmmod ${moddep[$mod]}; then
+			ammLog::Err "Cannot unload dependencies for module '$mod'. Stopping"
 			return 1
 		fi
 	done
 
 	# try to unload the modules
 	for mod in ${!matches[@]}; do
-		ammLogInf "rmmod of $mod"
+		ammLog::Inf "rmmod of $mod"
 		#/sbin/rmmod $mod || {
 		echo "rmmod $mod" || {
-			ammLogErr "Cannot remove module '$mod'. Are you root ?"
+			ammLog::Err "Cannot remove module '$mod'. Are you root ?"
 			return 1
 		}
 	done

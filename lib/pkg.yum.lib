@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -12,14 +12,14 @@ fi
 #typeset -g AMMPKGYUM_AVAIL_
 
 # Some tools are required for this module to work
-function ammPkgYumMetaInit {
-	ammLibRequire pkg.rpm string
-	ammExecRequires cksum gzip awk
+function ammPkgYum::MetaInit {
+	ammLib::Require pkg.rpm string
+	ammExec::Requires cksum gzip awk
 
-	#ammExecRequires "repoquery"
+	#ammExec::Requires "repoquery"
 }
 
-function ammPkgYumIsAvailable {
+function ammPkgYum::IsAvailable {
 	typeset rootpath="${1:-}"
 
 	[[ -x "$rootpath/usr/bin/yum" ]]
@@ -32,7 +32,7 @@ function ammPkgYumIsAvailable {
 # @description  (private) proxy for rpm executable
 #
 # @arg $1  (string) Action for RPM to exec
-function _ammPkgYum {
+function _ammPkgYum:: {
 	typeset act="$1"; shift
 
 	typeset opts=""
@@ -40,7 +40,7 @@ function _ammPkgYum {
 
 	# Check if input contains options
 	while [[ -n "${1:-}" ]]; do
-		if ammStringIsOption "$1"; then
+		if ammString::IsOption "$1"; then
 			opts+=" $1"
 			shift
 		else
@@ -48,19 +48,19 @@ function _ammPkgYum {
 		fi
 	done
 
-	ammLogDbg "Executing yum with args: $act $opts $@"
+	ammLog::Dbg "Executing yum with args: $act $opts $@"
 	yum $act $opts "$@"
 }
 
-function _ammPkgYumRepoquery {
+function _ammPkgYum::Repoquery {
 
-	ammExecExists "repoquery" >/dev/null || return 1
+	ammExec::Exists "repoquery" >/dev/null || return 1
 
 	typeset opts=""
 
 	# Check if input contains options
 	while [[ -n "${1:-}" ]]; do
-		if ammStringIsOption "$1"; then
+		if ammString::IsOption "$1"; then
 			opts+=" $1"
 			shift
 		else
@@ -68,52 +68,52 @@ function _ammPkgYumRepoquery {
 		fi
 	done
 
-	ammLogDbg "Executing repoquery with args: $opts $@"
+	ammLog::Dbg "Executing repoquery with args: $opts $@"
 	repoquery $opts "$@" 2>/dev/null
 }
 
-function ammPkgYumInstall {
+function ammPkgYum::Install {
 	# TODO: Make more checks for "upgrade" or "downgrade" if version provided
-	_ammPkgYum "install" "$@"
+	_ammPkgYum:: "install" "$@"
 }
 
-function ammPkgYumRemove {
-	_ammPkgYum "remove" "$@"
+function ammPkgYum::Remove {
+	_ammPkgYum:: "remove" "$@"
 }
 
-function ammPkgYumSearch {
-	_ammPkgYum "info" "$@"
+function ammPkgYum::Search {
+	_ammPkgYum:: "info" "$@"
 }
 
 
-function ammPkgYumInfoRequiredBy {
-	_ammPkgYum "deplist" "$@" | awk '
+function ammPkgYum::InfoRequiredBy {
+	_ammPkgYum:: "deplist" "$@" | awk '
 		$1 == "package:" { printf "\n"$2; }
 		$1 == "provider:" { printf " $2"; }
 	'
 }
 
-function ammPkgYumInfoWhatProvides {
+function ammPkgYum::InfoWhatProvides {
 
 	# Check for all input
 	typeset element
 	for element in "$@"; do
 		# If it's a file already installed, use rpm (faster)
 		if [[ -e "$element" ]]; then
-			ammPkgRpmInfoWhatProvides "$element"
+			ammPkgRpm::InfoWhatProvides "$element"
 
 		# Else, query all repordata
 		else
 			# If repoquery is available, use it
-			if ammExecExists repoquery >/dev/null; then
-				_ammPkgYumRepoquery --queryformat="%{name}.%{arch}" --whatprovides "$element"
+			if ammExec::Exists repoquery >/dev/null; then
+				_ammPkgYum::Repoquery --queryformat="%{name}.%{arch}" --whatprovides "$element"
 
 			# Else, fallback to yum + parsing
 			else
 				typeset key val pkg=""
-				_ammPkgYum "provides" "$element" 2>/dev/null | while IFS=: read key val; do
-					key="$(ammStringTrim "$key")"
-					val="$(ammStringTrim "$val")"
+				_ammPkgYum:: "provides" "$element" 2>/dev/null | while IFS=: read key val; do
+					key="$(ammString::Trim "$key")"
+					val="$(ammString::Trim "$val")"
 
 					# if we are within a finding block, print the package and reset it to avoid double print
 					if [[ "$key" == "Filename" ]]; then
@@ -133,18 +133,18 @@ function ammPkgYumInfoWhatProvides {
 	done
 }
 
-function ammPkgYumInfoContents {
+function ammPkgYum::InfoContents {
 	# Check for all input
 	for pkg in "$@"; do
 		# For each pkg, list content
-		_ammPkgYumRepoquery "--provides" "$pkg"
+		_ammPkgYum::Repoquery "--provides" "$pkg"
 	done
 }
 
 # What versions are available for a package
-function ammPkgYumInfoVersions {
+function ammPkgYum::InfoVersions {
 	typeset pkg="$1"
-	_ammPkgYum info $pkg
+	_ammPkgYum:: info $pkg
 }
 
 
@@ -158,12 +158,12 @@ function ammPkgYumInfoVersions {
 # @arg $@  (string[]) Packages to download
 #
 # @stdout  (path[]) List of archives downloaded
-function ammPkgYumDownloadRecursive {
+function ammPkgYum::DownloadRecursive {
 	typeset outdir="$1"; shift
 
 	[[ -d "$outdir" ]] || mkdir -p "$outdir"
 
-	ammLogDbg "Downloading into '$outdir' packages: $@"
+	ammLog::Dbg "Downloading into '$outdir' packages: $@"
 
 	typeset tag pkg _junk
 	typeset -i ret=1
@@ -172,7 +172,7 @@ function ammPkgYumDownloadRecursive {
 	# Messages: 
 	# [SKIPPED] bash-4.4.23-6.fc29.x86_64.rpm: Already downloaded
 	# (6/16): fedora-gpg-keys-29-5.noarch.rpm       1.3 MB/s | 102 kB     00:00
-	if ammExecExists repotrack >/dev/null; then
+	if ammExec::Exists repotrack >/dev/null; then
 		typeset opts="--download_path='$outdir'"
 		# For dnf, download_path does not exists. Use destdir, like yumdownloader
 		[[ "$(readlink -f $(type -P repotrack))" == "/usr/libexec/dnf-utils" ]] && opts="--destdir='$outdir'"
@@ -196,7 +196,7 @@ function ammPkgYumDownloadRecursive {
 
 		done
 	else
-		ammLogErr "Unable to find repotrack"
+		ammLog::Err "Unable to find repotrack"
 		return 1
 	fi
 
@@ -208,26 +208,26 @@ function ammPkgYumDownloadRecursive {
 # @arg $@  (string[]) Packages to download
 #
 # @stdout  (path[]) List of archives downloaded
-function ammPkgYumDownload {
+function ammPkgYum::Download {
 	typeset outdir="$1"; shift
 
 	[[ -d "$outdir" ]] || mkdir -p "$outdir"
 
-	ammLogDbg "Downloading into '$outdir' packages: $@"
+	ammLog::Dbg "Downloading into '$outdir' packages: $@"
 
 	typeset f1 f2 f3 f4 _junk
 	typeset -i ret=1
 	typeset -a dlcmd=""
 
 	# Select the best available command
-	if ammExecExists yumdownloader >/dev/null; then
-		ammLogDbg "Using yumdownloader to download '$@'"
+	if ammExec::Exists yumdownloader >/dev/null; then
+		ammLog::Dbg "Using yumdownloader to download '$@'"
 		dlcmd=(yumdownloader --destdir "$outdir" "$@")
 
 	# Need to do some checks due to yum being lazy
 	else
-		ammLogDbg "Failback to yum to download '$@'"
-		typeset cmdbase="_ammPkgYum --downloadonly --downloaddir=\"$outdir\""
+		ammLog::Dbg "Failback to yum to download '$@'"
+		typeset cmdbase="_ammPkgYum:: --downloadonly --downloaddir=\"$outdir\""
 		dlcmd=(eval "(" $cmdbase install "$@" ";" $cmdbase reinstall "$@" ")")
 	fi
 
@@ -258,25 +258,25 @@ function ammPkgYumDownload {
 #
 # @arg $1  (path)     Where to extract the archives
 # @arg $@  (string[]) Archives or package names to be extracted
-function ammPkgYumExtract {
+function ammPkgYum::Extract {
 	typeset dst="$1"; shift
 
-	ammLogDbg "Extracting into '$dst' packages: $@"
+	ammLog::Dbg "Extracting into '$dst' packages: $@"
 
 	typeset pkgs="" pkgname pkgfile file
 	for pkgfile in "$@"; do
 		# if it's a file, just extract it from rpm
 		if [[ -e "$pkgfile" ]]; then
-			#pkgname="$(ammPkgRpmInfo "$pkgfile")"
+			#pkgname="$(ammPkgRpm::Info "$pkgfile")"
 			:
 
 		# The file does not exists, download it
 		else
 			pkgname="$pkgfile"
-			pkgfile="$(ammPkgYumDownload "$__AMMLIB_DATA/pkgRpm/Packages" "$pkgname")"
+			pkgfile="$(ammPkgYum::Download "$__AMMLIB_DATA/pkgRpm/Packages" "$pkgname")"
 
 			if [[ -z "$pkgfile" ]]; then
-				ammLogErr "Unable to download package '$pkgname'. Out: '$pkgfile'"
+				ammLog::Err "Unable to download package '$pkgname'. Out: '$pkgfile'"
 				continue
 			fi
 
@@ -284,7 +284,7 @@ function ammPkgYumExtract {
 
 		# extract the package (maybe multiple due to dependencies)
 		for file in $pkgfile; do
-			ammPkgRpmExtract "$dst" "$file"
+			ammPkgRpm::Extract "$dst" "$file"
 		done
 	done
 
@@ -295,7 +295,7 @@ function ammPkgYumExtract {
 # Yum emulation
 # -----------------------------------------------------------------------------
 
-function _ammPkgYumRepodataCache {
+function _ammPkgYum::RepodataCache {
 	typeset cks="$(echo "$1"|cksum)"; cks="${cks// /_}"
 	typeset t="$__AMMLIB_DATATMP/pkgyum.repodata.$cks"
 
@@ -304,19 +304,19 @@ function _ammPkgYumRepodataCache {
 }
 
 # Basic yum emulation
-function ammPkgYumRepodataGet {
+function ammPkgYum::RepodataGet {
 	typeset url="$1"
 
 	# We need http tools for this
-	if ! ammLibLoad http ; then
-		ammLogErr "Unable to load http library."
+	if ! ammLib::Load http ; then
+		ammLog::Err "Unable to load http library."
 		return 99
 	fi
 
 	# Download the file listing
-	typeset cache="$(_ammPkgYumRepodataCache "$url")"
+	typeset cache="$(_ammPkgYum::RepodataCache "$url")"
 	typeset repomd="$cache/repomd.xml"
-	ammHttpFetch "$url/repodata/repomd.xml" "$repomd"
+	ammHttp::Fetch "$url/repodata/repomd.xml" "$repomd"
 
 	# Download each xml file
 	typeset xmls="$(grep 'location href=' "$repomd"|grep -o '".*\.xml.gz"' | tr -d '"')"
@@ -326,7 +326,7 @@ function ammPkgYumRepodataGet {
 		# Skip if cache already here
 		[[ -s "$dstfile" ]] && continue
 
-		ammHttpFetch "$url/$xml" "$dstfile"
+		ammHttp::Fetch "$url/$xml" "$dstfile"
 
 		# Check and unzip
 		[[ -e "$dstfile" ]] && gzip -kdf "$dstfile"
@@ -336,7 +336,7 @@ function ammPkgYumRepodataGet {
 	echo "$cache"
 }
 
-function _ammPkgYumRepodataParseFilelist {
+function _ammPkgYum::RepodataParseFilelist {
 	typeset repodata="$1"; shift
 
 	# Parse all search
@@ -400,11 +400,11 @@ function _ammPkgYumRepodataParseFilelist {
 }
 
 # Emulate the "yum provides" feature
-function ammPkgYumRepodataWhatProvides {
+function ammPkgYum::RepodataWhatProvides {
 	typeset url="$1"; shift
 	typeset pkgs=""
 
-	typeset repodata="$(ammPkgYumRepodataGet "$url")"
+	typeset repodata="$(ammPkgYum::RepodataGet "$url")"
 
-	_ammPkgYumRepodataParseFilelist "$repodata" "$@" | sort | uniq
+	_ammPkgYum::RepodataParseFilelist "$repodata" "$@" | sort | uniq
 }

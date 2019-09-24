@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -9,8 +9,8 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammInputMetaInit {
-	ammLibRequire string
+function ammInput::MetaInit {
+	ammLib::Require string
 }
 
 # Prefix to look for
@@ -33,7 +33,7 @@ typeset -g __ammInputBatchSilentOk=false
 # -----------------------------------------------------------------------------
 # Registration
 # -----------------------------------------------------------------------------
-function ammInputRegister {
+function ammInput::Register {
 	typeset id="$1"
 	typeset helptext="${2:-}"
 	typeset default="${3:-}"
@@ -42,18 +42,18 @@ function ammInputRegister {
 	#typeset caller="${BASH_SOURCE[1]}:${FUNCNAME[1]}"
 
 	# Fill registration values
-	#__ammInputIds[$id]="$caller"
+	#__ammInput::Ids[$id]="$caller"
 	__ammInputIds[$id]=""
 	__ammInputDefaults[$id]="$default"
 	__ammInputHelp[$id]="$helptext"
 
 	# Only call if internal function
-	if [[ -n "$validcb" ]] && ammIsFunc "$validcb"; then
+	if [[ -n "$validcb" ]] && amm::IsFunc "$validcb"; then
 		__ammInputValidationCB[$id]="$validcb"
 	fi
 }
 
-function ammInputBatch {
+function ammInput::Batch {
 
 	typeset arg
 	typeset resetDone=false
@@ -81,7 +81,7 @@ function ammInputBatch {
 		fi
 
 		# Check if the feature exists
-		ammIsVar "__ammInputBatch${var}" && {
+		amm::IsVar "__ammInputBatch${var}" && {
 			eval "__ammInputBatch${var}=$val"
 		}
 	done
@@ -94,7 +94,7 @@ function ammInputBatch {
 }
 
 
-function ammInputGet {
+function ammInput::Get {
 	typeset id="$1"
 	typeset prompt="${2:-}"
 	typeset default="${3:-}"
@@ -114,7 +114,7 @@ function ammInputGet {
 	fi
 
 	# Prettify the prompt
-	prompt="$(ammLogColor bold underline)${prompt}$(ammLogColor "reset"): "
+	prompt="$(ammLog::Color bold underline)${prompt}$(ammLog::Color "reset"): "
 
 	if [[ -z "$default" ]] && [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputDefaults[$id]}" ]] ); then
 		default="${__ammInputDefaults[$id]}"
@@ -138,7 +138,7 @@ function ammInputGet {
 			default="${__ammInputReplies[$id]}"
 			unset __ammInputReplies[$id]
 
-			ammLogDbg "Getting reply from filled list __ammInputReplies[$id] => '$reply'"
+			ammLog::Dbg "Getting reply from filled list __ammInputReplies[$id] => '$reply'"
 		fi
 
 
@@ -152,7 +152,7 @@ function ammInputGet {
 
 			# If we are not in silent mode, display the prompt nonetheless
 			if ! $__ammInputBatchSilentOk; then
-				ammLogWriteTerm "${prompt}${reply}"
+				ammLog::WriteTerm "${prompt}${reply}"
 			fi
 		# Read from user input
 		else
@@ -161,7 +161,7 @@ function ammInputGet {
 			else
 				read -e $readopts -p "$prompt" reply
 			fi
-			ammLogDbg "Got input from user question. Id:$id Caller:$caller"
+			ammLog::Dbg "Got input from user question. Id:$id Caller:$caller"
 		fi
 
 		#
@@ -171,47 +171,47 @@ function ammInputGet {
 		# Validation (locally supplied)
 		if [[ -n "$validcb" ]]; then
 			# I expect it to be a simple function, not a binary
-			if ammIsFunc "$validcb"; then
+			if amm::IsFunc "$validcb"; then
 				if ! $validcb "$reply"; then
-					ammLogWrn "Reply '$reply' is invalid (callback '$validcb')"
+					ammLog::Wrn "Reply '$reply' is invalid (callback '$validcb')"
 
 					# If we are in silent ok, and had error, display it now
-					$__ammInputBatchSilentOk && ammLogWriteTerm "${prompt}${reply}"
+					$__ammInputBatchSilentOk && ammLog::WriteTerm "${prompt}${reply}"
 
 					if $__ammInputBatchDieOnErr; then
-						ammLogDie "Dying due to DieOnErr requested"
+						ammLog::Die "Dying due to DieOnErr requested"
 					fi
 				else
-					ammLogDbg "Input validated by arg provided callback '$validcb'"
+					ammLog::Dbg "Input validated by arg provided callback '$validcb'"
 					break
 				fi
 			else
-				ammLogErr "Validation callback '$validcb' is not a function. Please retry"
+				ammLog::Err "Validation callback '$validcb' is not a function. Please retry"
 				unset validcb
 			fi
 
 		# Validation (registration)
 		elif [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputValidationCB[$id]}" ]] ); then
 			typeset func="${__ammInputValidationCB[$id]}"
-			if ammIsFunc "$func"; then
+			if amm::IsFunc "$func"; then
 				if ! $func "$reply"; then
 
 					# If we are in silent ok, and had error, display it now
-					$__ammInputBatchSilentOk && ammLogWriteTerm "${prompt}${reply}"
+					$__ammInputBatchSilentOk && ammLog::WriteTerm "${prompt}${reply}"
 
-					ammLogWrn "Reply '$reply' is invalid (callback '$func')"
+					ammLog::Wrn "Reply '$reply' is invalid (callback '$func')"
 				else
-					ammLogDbg "Input validated by registered '$validcb'"
+					ammLog::Dbg "Input validated by registered '$validcb'"
 					break
 				fi
 			else
-				ammLogErr "Validation callback '$func' is not a function. Please retry"
+				ammLog::Err "Validation callback '$func' is not a function. Please retry"
 				unset __ammInputValidationCB[$id]
 			fi
 
 		# No validation requested
 		else
-			ammLogDbg "No validation requested."
+			ammLog::Dbg "No validation requested."
 			break
 		fi
 
@@ -232,19 +232,19 @@ function ammInputGet {
 	return 0
 }
 
-function ammInputSetPrefix {
+function ammInput::SetPrefix {
 	typeset pref="${1:-}"
 
 	if [[ -z "$pref" ]]; then
-		ammLogErr "Prefix for input parsing cannot be empty"
+		ammLog::Err "Prefix for input parsing cannot be empty"
 		return 1
 	fi
 
-	__ammInputPrefix="$pref"
+	__ammInput::Prefix="$pref"
 }
 
 # Populate the reply values from file, environment, options
-function ammInputPopulate {
+function ammInput::Populate {
 	typeset srcs="${1:-environment,options}"
 	typeset prefix="${2-$__ammInputPrefix}"
 
@@ -330,14 +330,14 @@ function ammInputPopulate {
 				;;
 
 			*)
-				ammLogErr "Unknown source type: '$src'"
+				ammLog::Err "Unknown source type: '$src'"
 				;;
 		esac
 	done
 
 }
 
-function ammInputBlueprint {
+function ammInput::Blueprint {
 
 	typeset file="$__AMMLIB_DATATMP/input.blueprint"
 	[[ -s "$file" ]] || return 0
@@ -351,23 +351,23 @@ function ammInputBlueprint {
 # Validation callbacks
 # -----------------------------------------------------------------------------
 
-function ammInputValidateNotEmpty {
+function ammInput::ValidateNotEmpty {
 	typeset str="${1:-}"
 	[[ -n "$str" ]]
 }
 
-function ammInputValidateInteger {
+function ammInput::ValidateInteger {
 	typeset str="${1:-}"
 	[[ -z "$str" ]] && return 1
 	[[ -z "${str//[0-9]/}" ]]
 }
 
-function ammInputValidateYN {
+function ammInput::ValidateYN {
 	typeset str="${1:-}"
-	ammStringIsYes "$str" || ammStringIsNo "$str"
+	ammString::IsYes "$str" || ammStringIsNo "$str"
 }
 
-function ammInputValidateHost {
+function ammInput::ValidateHost {
 	typeset str="${1:-}"
 
 	[[ -z "$str" ]] && return 1
@@ -386,7 +386,7 @@ function ammInputValidateHost {
 # Getters with complex types
 # -----------------------------------------------------------------------------
 
-function ammInputGetYN {
+function ammInput::GetYN {
 	typeset id="$1"
 	typeset prompt="$2"
 	typeset default="${3:-no}"
@@ -394,21 +394,21 @@ function ammInputGetYN {
 
 	# If a default value has been proposed, check it
 	if [[ -n "$default" ]]; then
-		if ammInputValidateYN "$default"; then
-			ammLogDbg "Default input '$default' validated"
+		if ammInput::ValidateYN "$default"; then
+			ammLog::Dbg "Default input '$default' validated"
 		else
-			ammLogWrn "Invalid yes/no default input: '$default'"
+			ammLog::Wrn "Invalid yes/no default input: '$default'"
 			default=""
 		fi
 	fi
 
-	typeset reply="$(ammInputGet "$id" "$prompt [yes/no]" "$default" "$readopts" "ammInputValidateYN")"
+	typeset reply="$(ammInput::Get "$id" "$prompt [yes/no]" "$default" "$readopts" "ammInput::ValidateYN")"
 	# check input
-	ammStringIsYes "$reply"
+	ammString::IsYes "$reply"
 	return $?
 }
 
-function ammInputGetPassword {
+function ammInput::GetPassword {
 	typeset id="$1"
 	typeset prompt="${2:-Password (not displayed): }"
 	typeset default="${3:-}"
@@ -418,7 +418,7 @@ function ammInputGetPassword {
 		prompt+="(empty for default)"
 	}
 
-	typeset password="$(ammInputGet "$id" "$prompt" "" "-s")"
+	typeset password="$(ammInput::Get "$id" "$prompt" "" "-s")"
 	typeset -i ret=0
 
 	# As the text will be silent, we need to manage default by ourself
@@ -438,26 +438,26 @@ function ammInputGetPassword {
 		case $chkkey in
 			minsize)
 				[[ ${#password} -ge $chkval ]] || {
-					ammLogErr "Password validation: Must be at least $chkval chars long (got ${#password})"
+					ammLog::Err "Password validation: Must be at least $chkval chars long (got ${#password})"
 					ret+=1
 				}
 				;;
 			maxsize)
 				[[ ${#password} -le $chkval ]] || {
-					ammLogErr "Password validation: Must be at most $chkval chars long (got ${#password})"
+					ammLog::Err "Password validation: Must be at most $chkval chars long (got ${#password})"
 					ret+=1
 				}
 				;;
 			cracklib)
-				if ammExecExists cracklib-check; then
+				if ammExec::Exists cracklib-check; then
 					echo "$password" | cracklib-check >/dev/null
 					ret+=$?
 				else
-					ammLogWrn "Cracklib check required, but no cracklib-check exec available. Skipping"
+					ammLog::Wrn "Cracklib check required, but no cracklib-check exec available. Skipping"
 				fi
 				;;
 			*)
-				ammLogWrn "Unknown check: $chkkey ($chkval)"
+				ammLog::Wrn "Unknown check: $chkkey ($chkval)"
 				;;
 		esac
 	done

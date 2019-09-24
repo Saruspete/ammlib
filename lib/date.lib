@@ -1,15 +1,15 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
-function ammDateMetaInit {
-	ammExecRequires date
+function ammDate::MetaInit {
+	ammExec::Requires date
 }
 
-function ammDateParseInt {
+function ammDate::ParseInt {
 	typeset int="${1:-}"
 
 	# Remove leading 0 (octal)
@@ -26,26 +26,26 @@ function ammDateParseInt {
 # Simple dates. Just beware of leading 0 (octal notation)
 typeset -gi __ammDateCurrYear="$(date +%Y)"
 typeset -gi __ammDateNextYear="$(( $__ammDateCurrYear + 1 ))"
-typeset -gi __ammDateCurrMonth="$(ammDateParseInt $(date +%m) )"
+typeset -gi __ammDateCurrMonth="$(ammDate::ParseInt $(date +%m) )"
 typeset -gi __ammDateNextMonth="$(( ($__ammDateCurrMonth % 12) + 1 ))"
-typeset -gi __ammDateCurrDayOfMonth="$(ammDateParseInt $( date +%d) )"
+typeset -gi __ammDateCurrDayOfMonth="$(ammDate::ParseInt $( date +%d) )"
 typeset -gi __ammDateCurrDayOfWeek="$(date +%u)"
 
 # -----------------------------------------------------------------------------
 # Date calculation
 # -----------------------------------------------------------------------------
 
-function ammDateToEpoch {
+function ammDate::ToEpoch {
 	typeset time="$1"
 	date +%s -d "$time"
 }
 
-function ammDateToday {
+function ammDate::Today {
 	echo "${__ammDateCurrYear}-${__ammDateCurrMonth}-${__ammDateCurrDayOfMonth}"
 }
 
 
-function ammDateCalculate {
+function ammDate::Calculate {
 	typeset year="${1:-$__ammDateCurrYear}"
 	typeset month="${2:-$__ammDateCurrMonth}"
 	typeset day="${3:-$__ammDateCurrDayOfMonth}"
@@ -96,12 +96,12 @@ function ammDateCalculate {
 	echo "$year-$month-$day"
 }
 
-function ammDateFirstDayOfMonth {
+function ammDate::FirstDayOfMonth {
 	typeset month="${1:-$__ammDateCurrMonth}"
 	typeset year="${2:-$__ammDateCurrYear}"
 	typeset format="${3:-%u}"
 
-	typeset date="$(ammDateCalculate "$year" "$month" "01")"
+	typeset date="$(ammDate::Calculate "$year" "$month" "01")"
 
 	date +"$format" -d "$date 12:00:00"
 }
@@ -114,7 +114,7 @@ function ammDateFirstDayOfMonth {
 # -----------------------------------------------------------------------------
 # Date related to business
 # -----------------------------------------------------------------------------
-function ammDateIsBusinessRunning {
+function ammDate::IsBusinessRunning {
 	typeset timeCurr="$(date "+%H:%M")"
 
 	for timerange in "$@"; do
@@ -122,13 +122,13 @@ function ammDateIsBusinessRunning {
 		typeset bizStop="${timerange##*-}"
 
 		# If we are in range, it's business time!
-		ammDateIsInRange "$timeCurr" "$bizStart" "$bizStop" && return 0
+		ammDate::IsInRange "$timeCurr" "$bizStart" "$bizStop" && return 0
 	done
 
 	return 1
 }
 
-function ammDateIsBusinessTimeFair {
+function ammDate::IsBusinessTimeFair {
 
 	# Setup the avail minutes array
 	typeset -a avail
@@ -139,8 +139,8 @@ function ammDateIsBusinessTimeFair {
 	# Check registered time-ranges
 	typeset timerange
 	for timerange in "$@"; do
-		typeset minStart="$(ammDateToMin "${timerange%%-*}")"
-		typeset minStop="$(ammDateToMin "${timerange##*-}")"
+		typeset minStart="$(ammDate::ToMin "${timerange%%-*}")"
+		typeset minStop="$(ammDate::ToMin "${timerange##*-}")"
 
 		# Prepare loop minstop => minstart (decrement) to ease overnight
 		typeset -i i=$minStop

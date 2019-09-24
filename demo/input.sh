@@ -11,21 +11,21 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibRequire input
+ammLib::Require input
 
-ammInputRegister "toto"
-ammInputRegister "hostname" "Hostname of target machine" "localhost" "ammInputValidateHost"
-ammInputRegister "age" "Whats the age of the captain" "666" "ammInputValidateInt"
+ammInput::Register "toto"
+ammInput::Register "hostname" "Hostname of target machine" "localhost" "ammInputValidateHost"
+ammInput::Register "age" "Whats the age of the captain" "666" "ammInputValidateInt"
 
-ammInputPopulate
-ammInputPopulate cmdline ""
+ammInput::Populate
+ammInput::Populate cmdline ""
 
-ammInputBatch AutoTry
-#ammInputBatch +DieOnErr
+ammInput::Batch AutoTry
+#ammInput::Batch +DieOnErr
 
-echo toto = $(ammInputGet "toto")
-echo titi = $(ammInputGet "titi" "Any non empty value" "" "" "ammInputValidateNotEmpty")
-echo host = $(ammInputGet "hostname")
-echo lvm  = $(ammInputGet "rd.lvm.lv" "LVM LV To activate" "" "" "ammInputValidateNotEmpty")
+echo toto = $(ammInput::Get "toto")
+echo titi = $(ammInput::Get "titi" "Any non empty value" "" "" "ammInputValidateNotEmpty")
+echo host = $(ammInput::Get "hostname")
+echo lvm  = $(ammInput::Get "rd.lvm.lv" "LVM LV To activate" "" "" "ammInputValidateNotEmpty")
 
-ammInputBlueprint
+ammInput::Blueprint

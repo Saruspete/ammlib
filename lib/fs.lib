@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -9,21 +9,25 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-#function ammFsMetaInit {
-#	ammExecRequires awk
+#function ammFs::MetaInit {
+#	ammExec::Requires awk
 #}
 
 # -----------------------------------------------------------------------------
 # Filesystem mount management
 # -----------------------------------------------------------------------------
 
-function ammFsMounted {
+function ammFs::Mounted {
 	typeset mnt="$1"
 
 	typeset mntpath="$(readlink -f $mnt)"
+
+	# TODO
+	
+
 }
 
-function ammFsMount {
+function ammFs::Mount {
 	typeset mntsrc="$2"
 	typeset mntdst="$3"
 	typeset mntopts="${4:-}"
@@ -38,12 +42,12 @@ function ammFsMount {
 
 	# Mount the target
 	[[ -d "$mntdst" ]] || {
-		ammLogInf "Target mount '$mntdst' does not exists. Creating"
+		ammLog::Inf "Target mount '$mntdst' does not exists. Creating"
 		mkdir -p "$mntdst"
 	}
 
-	ammFsMounted "$mntdst" && {
-		ammLogInf "Mountpoint '$mntdst' already mounted"
+	ammFs::Mounted "$mntdst" && {
+		ammLog::Inf "Mountpoint '$mntdst' already mounted"
 		return 0
 	}
 

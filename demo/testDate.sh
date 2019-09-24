@@ -11,21 +11,21 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLibRequire test date
+ammLib::Require test date
 
 #echo ${!__ammDate*}
 #echo ${!__AMMLIB*}
 
-ammTestGroup "Date Calculation: First day of.."
-ammTestFunction ammDateFirstDayOfMonth 
-ammTestFunction ammDateFirstDayOfMonth 01
-ammTestFunction ammDateFirstDayOfMonth 01 2018
-ammTestFunction ammDateFirstDayOfMonth +1
+ammTest::Group "Date Calculation: First day of.."
+ammTest::Function ammDate::FirstDayOfMonth 
+ammTest::Function ammDate::FirstDayOfMonth 01
+ammTest::Function ammDate::FirstDayOfMonth 01 2018
+ammTest::Function ammDate::FirstDayOfMonth +1
 
-ammTestGroup "Date calculation: Free timediff"
-ammTestFunction ammDateCalculate "" +7 +1
-ammTestFunction ammDateCalculate "" -20 +1
-ammTestFunction ammDateCalculate "" -12
-ammTestFunction ammDateCalculate "" -24
-ammTestFunction ammDateCalculate "" -25
+ammTest::Group "Date calculation: Free timediff"
+ammTest::Function ammDate::Calculate "" +7 +1
+ammTest::Function ammDate::Calculate "" -20 +1
+ammTest::Function ammDate::Calculate "" -12
+ammTest::Function ammDate::Calculate "" -24
+ammTest::Function ammDate::Calculate "" -25
 

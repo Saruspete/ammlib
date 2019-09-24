@@ -1,7 +1,7 @@
 # vim: ft=sh ts=4
 
-if ! [[ "${FUNCNAME[1]}" = ammLibLoad* ]]; then
-	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLibLoad"
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
 	exit 1
 fi
 
@@ -10,20 +10,20 @@ fi
 # -----------------------------------------------------------------------------
 
 # Some tools are required for this module to work
-function ammPkgRpmMetaInit {
-	ammExecRequires rpm rpm2cpio cpio
+function ammPkgRpm::MetaInit {
+	ammExec::Requires rpm rpm2cpio cpio
 }
 
 # -----------------------------------------------------------------------------
 # Extract data
 # -----------------------------------------------------------------------------
 
-function ammPkgRpmExtract {
+function ammPkgRpm::Extract {
 	typeset    dst="$1"; shift
 	typeset -i ret=0
 
 	for file in "$@"; do
-		ammLogDbg "Extracting package '$file' into '$dst'"
+		ammLog::Dbg "Extracting package '$file' into '$dst'"
 		# Exec in subshell to avoid changing script cwd
 		(
 			cd "$dst"
@@ -38,11 +38,11 @@ function ammPkgRpmExtract {
 # Queries
 # -----------------------------------------------------------------------------
 
-function _ammPkgRpm {
+function _ammPkgRpm:: {
 
 	typeset opts=""
 	while [[ -n "${1:-}" ]]; do
-		if ammStringIsOption "$1"; then
+		if ammString::IsOption "$1"; then
 			opts+=" $1"
 			shift
 
@@ -60,33 +60,33 @@ function _ammPkgRpm {
 	done
 
 	# Exec the query + opts
-	ammLogDbg "Executing rpm with args: $opts $@"
+	ammLog::Dbg "Executing rpm with args: $opts $@"
 	rpm $opts "$@"
 }
 
 # What does a package requires
-function ammPkgRpmInfoRequires {
+function ammPkgRpm::InfoRequires {
 	for file in "$@"; do
-		_ammPkgRpm --query  --queryformat="%{name}.%{arch}" --requires "$file"
+		_ammPkgRpm:: --query  --queryformat="%{name}.%{arch}" --requires "$file"
 	done
 }
 
 # What does a package provides
-function ammPkgRpmInfoProvides {
-	_ammPkgRpm --query --queryformat="%{name}.%{arch}" --fileprovide "$@"
+function ammPkgRpm::InfoProvides {
+	_ammPkgRpm:: --query --queryformat="%{name}.%{arch}" --fileprovide "$@"
 }
 
 # What package provides a given element
-function ammPkgRpmInfoWhatProvides {
+function ammPkgRpm::InfoWhatProvides {
 
 	typeset element
 	for element in "$@"; do
-		_ammPkgRpm --query  --queryformat="%{name}.%{arch}" --file "$element"
+		_ammPkgRpm:: --query  --queryformat="%{name}.%{arch}" --file "$element"
 	done
 }
 
 # 
-function ammPkgRpmInfoRequiresToPkg {
+function ammPkgRpm::InfoRequiresToPkg {
 	[[ -z "${1:-}" ]] && return 0
 
 	typeset rpmopts=""
@@ -98,7 +98,7 @@ function ammPkgRpmInfoRequiresToPkg {
 
 	# Process all packages
 	for pkg in "$@"; do
-		ammPkgInfoRequires $pkg
+		ammPkg::InfoRequires $pkg
 	done
 
 }
@@ -106,14 +106,14 @@ function ammPkgRpmInfoRequiresToPkg {
 # -----------------------------------------------------------------------------
 # RPM DB Helper
 # -----------------------------------------------------------------------------
-function ammPkgRpmDbInit {
+function ammPkgRpm::DbInit {
 	typeset prefix="${1:-}"
 
 	mkdir -p "$root"
 	rpm --root="$root" --initdb
 }
 
-function ammPkgRpmDbKeyImport {
+function ammPkgRpm::DbKeyImport {
 	typeset prefix="${1:-}"; shift;
 
 	typeset rpmopts=""
@@ -123,7 +123,7 @@ function ammPkgRpmDbKeyImport {
 	done
 }
 
-function ammPkgRpmDbExport {
+function ammPkgRpm::DbExport {
 	typeset prefix="${1:-}"
 	typeset exportdir="$2"
 
@@ -132,19 +132,19 @@ function ammPkgRpmDbExport {
 		[[ "$(file "$dbfile"|awk '{print $2,$3}')" == "BerkeleyDB" ]] || continue
 
 		# Dump the file to target
-		ammLogInf "Dumping '$dbfile' to '$exportdir'"
+		ammLog::Inf "Dumping '$dbfile' to '$exportdir'"
 		/usr/lib/rpm/rpmdb_dump "$dbfile" > "$exportdir/${dbfile##*/}.dmp"
 	done
 }
 
-function ammPkgRpmDbImport {
+function ammPkgRpm::DbImport {
 	typeset rpmdb="$1"
 	typeset import="$2"
 
 	
 }
 
-function ammPkgRpmDbRecover {
+function ammPkgRpm::DbRecover {
 	typeset prefix="${1:-}"
 
 	# First, try a simple recover
@@ -153,7 +153,7 @@ function ammPkgRpmDbRecover {
 
 }
 
-function ammPkgRpmDbMigrate {
+function ammPkgRpm::DbMigrate {
 	typeset prefix="${1:-}"
 
 	# 

@@ -12,7 +12,7 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-#function amm##NAME##MetaInit {
+#function amm##NAME##::MetaInit {
 #	ammExec::Requires awk
 #}
 

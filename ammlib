@@ -226,7 +226,7 @@ function ammLib::Loadable {
 			echo "$libfile"
 
 			# check for features starting from bash 4.2 (typeset -g)
-			if [[ "${BASH_VERSINFO[1]:-0}" -lt 2 ]]; then
+			if [[ "${BASH_VERSINFO[0]:-0}" -eq "4" ]] && [[ "${BASH_VERSINFO[1]:-0}" -lt 2 ]]; then
 				if grep -P '(typeset|declare) -[a-zA-Z]*g[a-zA-Z]* ' $libfile >/dev/null 2>&1; then
 					ammLog::Dbg "Library '$libfile' needs bash >= 4.2"
 					r+=1

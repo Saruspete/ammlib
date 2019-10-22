@@ -51,7 +51,7 @@ For general ideas on how to write shell scripts, please [have a look to my guide
 
 Functions must be :
 - Declared by the `function` keyword (and not suffixed by `()`)
-- Prefixed by `amm` + the capitalized module name: eg `ammString` for module "string.lib"
+- Prefixed by `amm` + the capitalized module name + `::`: eg `ammString::myfunc` for function `myfunc` in  module `string.lib`
 - have a descriptive header in the Doxygen format
 
 
@@ -221,12 +221,9 @@ This generates an output like this :
 
 For process wrappers, we split the tasks in 3 different functions.
 Take the example of a network traceroute: `ammNetworkTraceroute`
-- `ammNetworkTracerouteCmd` returns the command line to be used 
-- `ammNetworkTracerouteParse` parses the output of the command and returns variables, usable from `eval`
-- `ammNetworkTraceroute` is a helper using the Parse function and returns a quick and usable result 
+- `ammNetwork::TracerouteCmd` returns the command line to be used
+- `ammNetwork::TracerouteParse` parses the output of the command and returns variables, usable from `eval`
+- `ammNetwork::Traceroute` is a helper using the Parse function and returns a quick and usable result
 
 This split allows to extend process execution with process library, that provides timeout, parallelism, multi-users and other features...
-
-### Ideas / Research
-Research: using `::` as class separator: `ammNetwork::Traceroute`
 

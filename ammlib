@@ -232,7 +232,7 @@ function _ammLib::TrapHandler {
 # Module loading
 # -----------------------------------------------------------------------------
 typeset __AMMLIB_SEARCHPATH="${__AMMLIB_ROOT}/lib"
-typeset __AMMLIB_LOADED="ammlib"
+typeset __AMMLIB_LOADED="ammlib lib"
 
 # @description  Locate the library file matching given name
 # @arg $1  (string) Name of the library to be loaded (eg, process)
@@ -711,7 +711,7 @@ function ammLog::MissingBin {
 	fi
 	ammLib::Load pkg
 
-	typeset binlist
+	typeset binlist bin
 	for binlist in "$@"; do
 		for bin in $binlist; do
 			ammPkg::InfoWhatProvides $bin
@@ -883,7 +883,7 @@ function ammExec::Exists {
 
 	typeset bin
 	for bin in "$@"; do
-		typeset binfound=""
+		typeset binfound="" p
 		for p in ${PATH//:/ }; do
 			[[ -x "$p/$bin" ]] && {
 				binfound="$p/$bin"

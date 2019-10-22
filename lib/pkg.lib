@@ -226,7 +226,7 @@ function ammPkg::FindDeps {
 			typeset destfile="$tmpdir/${elements##*/}"
 
 			# Download the uri
-			if ! ammHttp::FetchAuto "$element" "$destfile"; then
+			if ! ammHttp::FetchSmart "$element" "$destfile"; then
 				ammLog::Err "Unable to fetch uri '$element' as '$destfile'"
 				continue
 			fi

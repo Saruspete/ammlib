@@ -9,7 +9,7 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function amm##NAME##MetaInit {
+function ammHttp::MetaInit {
 	ammExec::RequiresOne curl wget
 	ammLib::Require "exec"
 
@@ -19,6 +19,13 @@ function amm##NAME##MetaInit {
 # Generic HTTP features
 # -----------------------------------------------------------------------------
 
+# @description  Fetch an url
+# @arg $1 
+# @arg $2 (path)  Directory
+# @arg $3 (string) Options to change function behavir. Default: "follow silent"
+#   follow: Follow redirections
+#   nofollow: Don't follow redirections
+#   silent: Don't show messages, only errors
 function ammHttp::Fetch {
 	typeset src="$1"
 	typeset dst="$2"
@@ -79,7 +86,7 @@ function ammHttp::Fetch {
 	fi
 }
 
-function ammHttp::FetchAuto {
+function ammHttp::FetchSmart {
 	typeset src="$1"
 	typeset dst="${2:-$TMP_BASE/${src##*/}}"
 	typeset opt="${3:-}"

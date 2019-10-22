@@ -86,24 +86,147 @@ typeset __AMMLIB_DATATMP="/tmp/.ammlib.${UID:-$(id -u)}/${__AMMLIB_CALLNAME##*/}
 typeset __AMMLIB_DATA="$HOME/.ammlib/data/"
 [[ -d "$__AMMLIB_DATA" ]] || mkdir -p "$__AMMLIB_DATA"
 
-trap _ammClean EXIT INT TERM QUIT ILL ABRT
 
-# @description  (private) TRAP handler to clean
-# @noarg
-function _ammClean {
-	# wait for any process in background
-	wait
+# -----------------------------------------------------------------------------
+# Exit code and trap management
+# -----------------------------------------------------------------------------
+typeset -A __AMMLIB_SIGNALS
+typeset -A __AMMLIB_TRAP_CALLBACKS
+typeset -A __AMMLIB_TRAP_REGISTERED
+typeset -i __AMMLIB_TRAP_WAITMAX=30
+typeset    __AMMLIB_TRAP_WAITSTEP=1
 
-	# TODO: Clean all libraries
-	:
+function _ammLib::TrapInit {
 
+	# Populate avaialble signals array from "trap -l" output
+	if (set +u; [[ ${#__AMMLIB_SIGNALS[@]} -eq 0 ]]); then
+		typeset s signum
+		for s in "0)" "SIGEXIT" $(trap -l); do
+			[[ "${s%)}" != "$s" ]] && signum="${s%)}"
+			if [[ "${s#SIG}" != "$s" ]]; then
+				__AMMLIB_SIGNALS[$signum]="${s#SIG}"
+				__AMMLIB_SIGNALS[${s#SIG}]="$signum"
+			fi
+		done
+	fi
+
+	# Register trap with the signals as argument
+	for s in "$@"; do
+		trap "_ammLib::TrapHandler $s" "$s"
+		__AMMLIB_TRAP_REGISTERED[$s]="ok"
+	done
+}
+
+# @description:  Registers a callback
+# @arg $1  The callback to call upon trap
+# @arg $@  The signals to register on. Can be alises: EXITALL or EXITERR
+function ammLib::TrapRegister {
+	typeset callback="$1"; shift
+
+	typeset signame
+	for signame in "$@"; do
+		case $signame in
+			# Special alises
+			EXITALL) ammLib::TrapRegister "$callback" EXIT HUP INT TERM QUIT ILL ABRT ;;
+			EXITERR) ammLib::TrapRegister "$callback"      HUP INT TERM QUIT ILL ABRT ;;
+			# Check for signal validity
+			*)
+				if (set -u; [[ -n "${__AMMLIB_SIGNALS[$signame]}" ]] ); then
+					__AMMLIB_TRAP_CALLBACKS[$signame]+="$callback "
+					if ! ( set +u; [[ -n "${__AMMLIB_TRAP_REGISTERED[$signame]}" ]] ); then
+						ammLog::Dbg "Registered callback with uninit signal. Registering signal:$signame for callback:$callback"
+						_ammLib::TrapInit "$signame"
+					fi
+				else
+					ammLog::Wrn "Invalid signal to register callback: signal:$signame callback:$callback"
+				fi
+				;;
+		esac
+	done
+
+}
+
+function ammLib::TrapClean {
 	# clean global temp vars
 	if [[ -n ${AMMLIB_DEBUG:-} ]]; then
-		ammLog::Inf "Keeping temporary path '$__AMMLIB_DATATMP'"
+		ammLog::Inf "Debug enabled: Keeping temporary path '$__AMMLIB_DATATMP'"
 	else
 		[[ -d "$__AMMLIB_DATATMP" ]] && rm -fr "$__AMMLIB_DATATMP"
 	fi
 }
+
+# Can't catch KILL CONT STOP
+_ammLib::TrapInit EXIT HUP INT TERM QUIT ILL ABRT TSTP USR1 USR2
+ammLib::TrapRegister "ammLib::TrapClean" EXITALL
+
+# EXIT: Pseudo signal, standard exit of bash
+# INT : Interrupt, Ctrl + C
+# TERM: Default kill signal, graceful shutdown
+# QUIT: Key "QUIT" (or Ctrl \) not on all keyboards
+# ABRT: Call of abort(), usually by libc for ptmalloc errors
+# TSTP: Stopped (Ctrl + Z)
+
+# @description  (private) TRAP handler to clean
+# @arg $1  Name of the signal
+function _ammLib::TrapHandler {
+	typeset retcode=$?
+	typeset signame="$1"
+	typeset sigtype=""
+
+	ammLog::Dbg "Caught signal $signame with retcode $retcode"
+	case $signame in
+		# Standard shutdown
+		EXIT)
+			sigtype="EXITOK"
+
+			# Wait for unfinished jobs
+			if [[ -n "$(jobs)" ]] && [[ $__AMMLIB_TRAP_WAITMAX -gt 0 ]]; then
+				ammLog::Inf "Waiting unfinished jobs in background for $__AMMLIB_TRAP_WAITMAX checks every $__AMMLIB_TRAP_WAITSTEP sec"
+				typeset num pid state cmd
+				typeset -i waitjob=0
+				while [[ $waitjob -lt $__AMMLIB_TRAP_WAITUPTO ]]; do
+					ammLog::Inf "== Check $waitjob $(ammLog::Time)"
+					while read num pid state cmd; do
+						ammLog::Inf "PID:$pid State:$state Command:$cmd"
+					done < <(jobs -l)
+					waitjob+=1
+					sleep $__AMMLIB_TRAP_WAITSTEP
+				done
+
+				if [[ $waitjob -eq $__AMMLIB_TRAP_WAITUPTO ]]; then
+					ammLog::Wrn "Hit timeout before all background jobs finished. Remains:"
+					jobs -l | ammLog::Wrn -
+				fi
+			fi
+			;;
+
+		# Manual stop
+		INT|HUP|TERM|QUIT)
+			sigtype="EXITERR"
+			ammLogWrn "Caught graceful interruption $signame. Cleaning"
+			;;
+
+		# Unamanged return code
+		'')
+			ammLog::Wrn "Called with empty signal name..."
+			;;
+
+		*)
+			;;
+	esac
+
+	# Execute Callbacks for signame
+	if ( set +u; [[ -n "${__AMMLIB_TRAP_CALLBACKS[$signame]}" ]] ); then
+		typeset callback
+		for callback in ${__AMMLIB_TRAP_CALLBACKS[$signame]}; do
+			ammLog::Dbg "Calling callback $callback"
+			$callback "$signame"
+			ammLog::Dbg "Callback done. Retcode: $?"
+		done
+	fi
+
+}
+
 
 # -----------------------------------------------------------------------------
 # Module loading

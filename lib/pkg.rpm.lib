@@ -65,7 +65,7 @@ function _ammPkgRpm:: {
 }
 
 # What does a package requires
-function ammPkgRpm::InfoRequires {
+function ammPkgRpm::InfoRequirements {
 	for file in "$@"; do
 		_ammPkgRpm:: --query  --queryformat="%{name}.%{arch}" --requires "$file"
 	done

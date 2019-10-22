@@ -86,10 +86,10 @@ function ammPkgYum::Search {
 }
 
 
-function ammPkgYum::InfoRequiredBy {
-	_ammPkgYum:: "deplist" "$@" | awk '
-		$1 == "package:" { printf "\n"$2; }
-		$1 == "provider:" { printf " $2"; }
+function ammPkgYum::InfoRequirements {
+	_ammPkgYum::Yum "deplist" "$@" | awk '
+		$1 == "package:" { printf "\n"$2; delete a; }
+		$1 == "provider:" { if (!a[$2]) { printf " "$2; a[$2]=1; } }
 	'
 }
 

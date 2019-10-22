@@ -28,6 +28,10 @@ if [[ "${BASH_VERSINFO[0]:-0}" -lt 4 ]]; then
 	exit 1
 fi
 
+if [[ -n "${AMMLIB_DEBUG:-}" ]]; then
+	shopt -s extdebug
+fi
+
 #
 # Interactive and other calling methods specifics
 #
@@ -96,6 +100,8 @@ typeset -A __AMMLIB_TRAP_REGISTERED
 typeset -i __AMMLIB_TRAP_WAITMAX=30
 typeset    __AMMLIB_TRAP_WAITSTEP=1
 
+# @description:  Initialize and registers the signal handling trap
+# @arg $@  Signals to be traped
 function _ammLib::TrapInit {
 
 	# Populate avaialble signals array from "trap -l" output
@@ -681,7 +687,7 @@ function ammLog::Dbg {
 	# Only send to log on verbose level
 	if [[ -n "${AMMLIB_DEBUG:-}" ]] || [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
 		# Get the caller
-		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}"
+		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}::${BASH_LINENO[1]}"
 
 		_ammLog::Log "DBG" "bold blue" "[$callerdbg] $@"
 
@@ -701,9 +707,37 @@ function ammLog::Dbg {
 }
 
 
-# TODO: Dump currnet script state
+# @description:  Display the stackdump of current script
+# @arg $1  (int) Stack levels to skip. Default 1 (= skip this function)
+# @arg $2  (int) Max levels to return. Default 255
 function ammLog::Stackdump {
-	:
+	typeset -i skip=${1:-1}
+	typeset -i max=${2:-255}
+
+	# Required for BASH_ARGV
+	typeset    extdbg="$(shopt extdebug)"
+	extdbg="${extdbg##*$'\t'}"
+
+	typeset -i i j argoff=0
+	for i in ${!BASH_SOURCE[@]}; do
+		if [[ $i -lt $skip ]]; then
+			argoff+=${BASH_ARGC[$i]:-0}
+			continue
+		fi
+		[[ $i -gt $max ]] && break
+
+		echo -n "${BASH_SOURCE[$i]##*/}::${FUNCNAME[$i]}::${BASH_LINENO[$i]} "
+		if [[ "$extdbg" == "on" ]]; then
+			j=$(($argoff + ${BASH_ARGC[$i]} -1))
+			while [[ $j -ge $argoff ]]; do
+				#echo "j=$j argoff=$argoff ARGV=${BASH_ARGV[@]}"
+				echo -n "'${BASH_ARGV[$j]}' "
+				j+=-1
+			done
+		fi
+		echo
+		argoff+=${BASH_ARGC[$i]:-0}
+	done
 }
 
 # @description  Log for a missing binary, and try to find the packages providing them

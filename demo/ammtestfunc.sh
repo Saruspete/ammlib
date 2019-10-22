@@ -24,11 +24,28 @@ typeset libname=""
 libname="${func##*_}"
 # Remove the prefix
 libname="${libname#amm}"
-# Lowercase the first char (should be package name)
 libname="${libname,}"
+
 # And remove all trailing element from the first uppercase
 libname="${libname%%::*}"
 
-ammLib::Require "$libname"
+
+# If it's a sublib, we have one or more uppercase chars
+if [[ "$libname" != "${libname,,}" ]]; then
+	# Translates uppercase "C" chars by ".c"
+	libname="$(echo "$libname"|sed -Ee 's/([A-Z])/.\L\1/g')"
+
+	typeset libpref=""
+	for parent in ${libname//./ }; do
+		libpref+="$parent"
+		ammLib::Require $libpref
+		libpref+="."
+	done
+fi
+
+# If the function is not declared, try to require it
+if [[ "$(type -t $func 2>/dev/null)" != "function" ]]; then
+	ammLib::Require "$libname"
+fi
 
 $func "$@"

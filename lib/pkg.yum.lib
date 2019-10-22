@@ -25,6 +25,12 @@ function ammPkgYum::IsAvailable {
 	[[ -x "$rootpath/usr/bin/yum" ]]
 }
 
+function ammPkgYum::IsDnf {
+	typeset rootpath="${1:-}"
+
+	[[ -x "$rootpath/usr/bin/dnf" ]]
+}
+
 # -----------------------------------------------------------------------------
 # Standard operations
 # -----------------------------------------------------------------------------
@@ -32,7 +38,7 @@ function ammPkgYum::IsAvailable {
 # @description  (private) proxy for rpm executable
 #
 # @arg $1  (string) Action for RPM to exec
-function _ammPkgYum:: {
+function _ammPkgYum::Yum {
 	typeset act="$1"; shift
 
 	typeset opts=""
@@ -49,7 +55,7 @@ function _ammPkgYum:: {
 	done
 
 	ammLog::Dbg "Executing yum with args: $act $opts $@"
-	yum $act $opts "$@"
+	yum --quiet $act $opts "$@"
 }
 
 function _ammPkgYum::Repoquery {
@@ -74,15 +80,15 @@ function _ammPkgYum::Repoquery {
 
 function ammPkgYum::Install {
 	# TODO: Make more checks for "upgrade" or "downgrade" if version provided
-	_ammPkgYum:: "install" "$@"
+	_ammPkgYum::Yum "install" "$@"
 }
 
 function ammPkgYum::Remove {
-	_ammPkgYum:: "remove" "$@"
+	_ammPkgYum::Yum "remove" "$@"
 }
 
 function ammPkgYum::Search {
-	_ammPkgYum:: "info" "$@"
+	_ammPkgYum::Yum "info" "$@"
 }
 
 
@@ -111,7 +117,7 @@ function ammPkgYum::InfoWhatProvides {
 			# Else, fallback to yum + parsing
 			else
 				typeset key val pkg=""
-				_ammPkgYum:: "provides" "$element" 2>/dev/null | while IFS=: read key val; do
+				_ammPkgYum::Yum "provides" "$element" 2>/dev/null | while IFS=: read key val; do
 					key="$(ammString::Trim "$key")"
 					val="$(ammString::Trim "$val")"
 
@@ -144,7 +150,7 @@ function ammPkgYum::InfoContents {
 # What versions are available for a package
 function ammPkgYum::InfoVersions {
 	typeset pkg="$1"
-	_ammPkgYum:: info $pkg
+	_ammPkgYum::Yum info $pkg
 }
 
 
@@ -227,7 +233,7 @@ function ammPkgYum::Download {
 	# Need to do some checks due to yum being lazy
 	else
 		ammLog::Dbg "Failback to yum to download '$@'"
-		typeset cmdbase="_ammPkgYum:: --downloadonly --downloaddir=\"$outdir\""
+		typeset cmdbase="_ammPkgYum::Yum --downloadonly --downloaddir=\"$outdir\""
 		dlcmd=(eval "(" $cmdbase install "$@" ";" $cmdbase reinstall "$@" ")")
 	fi
 

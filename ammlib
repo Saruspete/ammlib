@@ -700,6 +700,12 @@ function ammLog::Dbg {
 	$redbg
 }
 
+
+# TODO: Dump currnet script state
+function ammLog::Stackdump {
+	:
+}
+
 # @description  Log for a missing binary, and try to find the packages providing them
 # @arg $@  List of missing binaries to search for
 function ammLog::MissingBin {
@@ -948,6 +954,9 @@ function amm::IsFunc {
 	[[ "$(type -t "$1")" == "function" ]]
 }
 
+function amm::IsAlias {
+	[[ "$(type -t "$1")" == "alias" ]]
+}
 
 # @description  Check if name if a variable
 # @exitcode 0  is a defined variable

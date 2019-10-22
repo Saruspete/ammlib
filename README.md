@@ -130,7 +130,19 @@ Examples:
 
 ## Extra: Pitfals and how to avoid them
 
-### Variable visibility leak when vars are not typeset'd
+### Variable scope leak when vars are not typeset'd
+
+By default, variables are global. You must use a keyword like `typeset`, `declare`, `local` or `readonly` to declare
+its scope to be limited within the defining function.
+
+```bash
+var1="global"
+var2="global"
+function f1 { var1="local"; }
+function f2 { typeset var2="local"; }
+f1 ; f2
+echo "var1=$var1 var2=$var2"
+```
 
 Even when using loops, you must declare the variables before:
 ```bash
@@ -190,7 +202,7 @@ $ ls /usr/bin/[G-H]*
 
 ### Good use of PS4 for tracing
 
-When you do a `set -x`, the shell uses the value of PS4. the main library enforces this variable to  
+When you do a `set -x`, the shell uses the value of PS4. the main library enforces this variable to
 `PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '`
 
 This generates an output like this :

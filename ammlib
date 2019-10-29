@@ -712,7 +712,7 @@ function ammLog::Dbg {
 # @arg $2  (int) Max levels to return. Default 255
 function ammLog::Stackdump {
 	typeset -i skip=${1:-1}
-	typeset -i max=${2:-255}
+	typeset -i cnt=${2:-255}
 
 	# Required for BASH_ARGV
 	typeset    extdbg="$(shopt extdebug)"
@@ -724,9 +724,9 @@ function ammLog::Stackdump {
 			argoff+=${BASH_ARGC[$i]:-0}
 			continue
 		fi
-		[[ $i -gt $max ]] && break
+		[[ $i -ge $(($skip + $cnt)) ]] && break
 
-		echo -n "${BASH_SOURCE[$i]##*/}::${FUNCNAME[$i]}::${BASH_LINENO[$i]} "
+		echo -n "${BASH_SOURCE[$i]##*/}::${FUNCNAME[$i]}::${BASH_LINENO[$(($i-1))]} "
 		if [[ "$extdbg" == "on" ]]; then
 			j=$(($argoff + ${BASH_ARGC[$i]} -1))
 			while [[ $j -ge $argoff ]]; do

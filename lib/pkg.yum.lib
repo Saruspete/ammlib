@@ -91,6 +91,9 @@ function ammPkgYum::Search {
 	_ammPkgYum::Yum "info" "$@"
 }
 
+function ammPkgYum::Installed {
+	ammPkgRpm::Installed "$@"
+}
 
 function ammPkgYum::InfoRequirements {
 	_ammPkgYum::Yum "deplist" "$@" | awk '

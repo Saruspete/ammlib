@@ -38,7 +38,7 @@ function ammPkgRpm::Extract {
 # Queries
 # -----------------------------------------------------------------------------
 
-function _ammPkgRpm:: {
+function _ammPkgRpm::Rpm {
 
 	typeset opts=""
 	while [[ -n "${1:-}" ]]; do
@@ -64,16 +64,61 @@ function _ammPkgRpm:: {
 	rpm $opts "$@"
 }
 
+function ammPkgRpm::Installed {
+	typeset pkgs="$@"
+	typeset -i ret=0
+
+	# Standard chars in package name (- is special and must be last)
+	typeset stdchrs="0-9a-zA-Z+_.-" pkg=""
+	# If we have special chars, query all then grep
+	if ! [[ "${pkgs// /}" =~ ^([$stdchrs]+)$ ]]; then
+		typeset specialchrs="${pkgs//[\ $stdchrs]/}"
+		typeset allpkgs="$(_ammPkgRpm::Rpm --query --all 2>/dev/null)"
+
+		for pkg in "$@"; do
+			typeset pkgtogrep="$pkg"
+			# Replace simple globs by their regex equivalent
+			if [[ "$specialchrs" == "*" ]]; then
+				pkgtogrep="${pkgtogrep//\*/.*}"
+				pkgtogrep="${pkgtogrep//\?/.}"
+			fi
+
+			echo "$pkg: $(echo "$allpkgs"| grep -P -- "^$pkgtogrep"|tr '\n' ' ')"
+		done
+
+	# Standard listing, direct query
+	else
+		typeset f1 f2 f3
+		typeset -A out=()
+		_ammPkgRpm::Rpm --query --queryformat "%{NAME}: %{NEVRA}\n" "$@"  2>/dev/null| while read f1 f2 f3; do
+			# From output
+			if [[ "$f1" == "package" ]] && [[ "$f3" == "is not installed" ]]; then
+				echo "$f2:"
+				ret+=1
+			else
+				out[$f1]="${out[$f1]:-} $f2"
+			fi
+		done
+
+		# Final output (to have one line per package (eg multiple like kernel)
+		for f1 in ${!out[@]}; do
+			echo "$f1: ${out[$f1]}"
+		done
+	fi
+
+	return $ret
+}
+
 # What does a package requires
 function ammPkgRpm::InfoRequirements {
 	for file in "$@"; do
-		_ammPkgRpm:: --query  --queryformat="%{name}.%{arch}" --requires "$file"
+		_ammPkgRpm::Rpm --query  --queryformat="%{name}.%{arch}" --requires "$file"
 	done
 }
 
 # What does a package provides
 function ammPkgRpm::InfoProvides {
-	_ammPkgRpm:: --query --queryformat="%{name}.%{arch}" --fileprovide "$@"
+	_ammPkgRpm::Rpm --query --queryformat="%{name}.%{arch}" --fileprovide "$@"
 }
 
 # What package provides a given element
@@ -81,7 +126,7 @@ function ammPkgRpm::InfoWhatProvides {
 
 	typeset element
 	for element in "$@"; do
-		_ammPkgRpm:: --query  --queryformat="%{name}.%{arch}" --file "$element"
+		_ammPkgRpm::Rpm --query  --queryformat="%{name}.%{arch}" --file "$element"
 	done
 }
 

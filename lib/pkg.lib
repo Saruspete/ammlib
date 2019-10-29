@@ -137,6 +137,13 @@ function ammPkg::Remove {
 	_ammPkg::Proxy "Remove" "$@"
 }
 
+# @description: Check if a given package is installed
+# @arg $@  (string) Package or string to be checked against
+# @stdout  List of given string and the matching packages
+function ammPkg::Installed {
+	_ammPkg::Proxy "Installed" "$@"
+}
+
 # What files or requirements does a pkg need
 function ammPkg::InfoRequirements {
 	_ammPkg::Proxy "InfoRequirements" "$@"

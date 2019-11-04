@@ -1,0 +1,361 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammOptparse::MetaInit {
+	ammExec::Requires awk
+	_ammOptparse::Expand
+}
+
+function ammOptparse::MetaCheck {
+	ammExec::Requires awk
+}
+
+# -----------------------------------------------------------------------------
+# Options processing initialization
+# -----------------------------------------------------------------------------
+
+# Mapping Option => ID
+typeset -gA  _AMMOPTPARSE_OPTLONG
+typeset -gA  _AMMOPTPARSE_OPTSHORT
+# Raw options
+typeset -gA  _AMMOPTPARSE_OPTALL
+
+# Options value, description and backtrace
+typeset -gA  _AMMOPTPARSE_VALUE
+typeset -gA  _AMMOPTPARSE_DESCRIPTION
+typeset -gA  _AMMOPTPARSE_REGISTRANTS
+
+# Callbacks for validation and expected type (and number)
+typeset -gA  _AMMOPTPARSE_VALIDATOR
+typeset -gA  _AMMOPTPARSE_VALTYPE
+
+function _ammOptparse::OptClean {
+	typeset opt="$1"
+
+	# Remove leading -
+	opt="${opt#-}"
+	opt="${opt#-}"
+
+	# Remove training non-var elements
+	opt="${opt%%[^a-zA-Z0-9_]*}"
+
+	echo "$opt"
+}
+
+function _ammOptparse::OptToId {
+	typeset opt="$1"
+
+	typeset id=""
+
+	opt="$(_ammOptparse::OptClean "$opt")"
+
+	# Long option
+	if [[ "${opt:0:2}" == "--" ]] || [[ "${#opt}" -gt 1 ]]; then
+		if (set +u; [[ -n "${_AMMOPTPARSE_OPTLONG[$opt]}" ]] ); then
+			id="${_AMMOPTPARSE_OPTLONG[$opt]}"
+		fi
+
+	# Short option
+	elif [[ "${opt:0:1}" == "-" ]] || [[ "${#opt}" -eq 1 ]]; then
+		if (set +u; [[ -n "${_AMMOPTPARSE_OPTSHORT[$opt]}" ]] ); then
+			id="${_AMMOPTPARSE_OPTSHORT[$opt]}"
+		fi
+	fi
+
+	if [[ -n "$id" ]]; then
+		echo "$id"
+		return 0
+	else
+		ammLog::Dbg "Unregistered option '$opt'"
+		return 1
+	fi
+}
+
+
+# @description: Expand short options and var=val to independant elements
+function _ammOptparse::Expand {
+
+	typeset optid
+	typeset -a options
+	for (( optid=0; optid < ${#__AMMLIB_CALLOPTS[@]}; optid+=1 )); do
+		typeset opt="${__AMMLIB_CALLOPTS[$optid]}"
+		typeset val=""
+
+		# Check if we have a joined value var=val (can be -abc=def${#__AMMLIB_CALLOPTS[@]} or --abc=def)
+		if [[ "${opt#*=}" != "$opt" ]]; then
+			val="${opt#*=}"
+			opt="${opt%%=*}"
+		fi
+
+		# long option
+		if [[ ${opt:0:2} == "--" ]]; then
+			options+="$opt"
+			ammLog::Dbg "Long option '$opt'"
+
+		# Short option
+		elif [[ "${opt:0:1}" == "-" ]]; then
+			opt="${opt#-}"
+
+			# Concatenated short options
+			if [[ "${#opt}" -gt 1 ]]; then
+				typeset cid="0"
+				ammLog::Dbg "Concatenated short opt '$opt'"
+				for (( c=0; c < ${#opt}; c+=1 )); do
+					options+=("-${opt:$c:1}")
+				done
+			else
+				ammLog::Dbg "Short opt: '$opt'"
+				options+=("-$opt")
+			fi
+		# Plain value
+		else
+			ammLog::Dbg "Plain value option: '$opt'"
+			options+=("$opt")
+		fi
+
+		if [[ -n "$val" ]]; then
+			ammLog::Dbg "Adding embedded value '$val'"
+			options+=("$val")
+		fi
+	done
+
+	# Replace original value
+	ammLog::Dbg "Expanded '${__AMMLIB_CALLOPTS[@]}' to '${options[@]}'"
+	__AMMLIB_CALLOPTS=("${options[@]}")
+}
+
+
+
+
+# @description  Add an option to the listing
+# @arg $1  (string) Options to handle, separated by '|'
+# @arg $2  (string) Description for the help
+# @arg $3  (string) Default value. Can be made from another option as "%{optname}"
+# @arg $4  (string) Validation function
+function ammOptparse::AddOpt {
+	typeset options="$1"
+	typeset description="${2:-}"
+	typeset default="${3:-}"
+	typeset validation="${4:-}"
+
+	typeset opt id
+	# Get the first long-name
+	for opt in ${options//|/ }; do
+		if [[ "${opt#--}" != "$opt" ]]; then
+			id="$(_ammOptparse::OptClean "$opt")"
+			ammLog::Dbg "Using '$id' (from $opt) as ID for '$options'"
+			break
+		fi
+	done
+
+	# Validate the ID found
+	if [[ -z "$id" ]]; then
+		ammLog::Err "You must at least provide one long option"
+		return 1
+	fi
+	if (set +u; [[ -n "${_AMMOPTPARSE_REGISTRANTS[$id]}" ]] ); then
+		ammLog::Err "The ID '$id' is already registered by ${_AMMOPTPARSE_REGISTRANTS[$id]}"
+		return 1
+	fi
+
+	# Register the provided values
+	typeset registrant="$(ammLog::Stackdump 2 1)"
+	_AMMOPTPARSE_REGISTRANTS[$id]="$registrant"
+	_AMMOPTPARSE_OPTALL[$id]="$options"
+	_AMMOPTPARSE_VALUE[$id]="$default"
+	_AMMOPTPARSE_DESCRIPTION[$id]="$description"
+	_AMMOPTPARSE_VALIDATOR[$id]="$validation"
+
+	# Parse the options
+	for opt in ${options//|/ }; do
+		if [[ "$opt" =~ (--?)([-_a-zA-Z0-9]+)([!=@].*)? ]]; then
+			typeset var="${BASH_REMATCH[2]}"
+			typeset valreq="${BASH_REMATCH[3]}"
+
+			# Short option
+			if [[ ${BASH_REMATCH[1]} == "-" ]]; then
+				if [[ "${#var}" -gt 1 ]]; then
+					ammLog::Wrn "Short option '$opt' is more than 1 char. Skipping"
+					continue
+				fi
+				_AMMOPTPARSE_OPTSHORT[$var]="$id"
+
+			# Long option
+			else
+				if (set +u; [[ -n "${_AMMOPTPARSE_OPTLONG[$var]}" ]] ); then
+					typeset longid="${_AMMOPTPARSE_OPTLONG[$var]}"
+					ammLog::Wrn "Long option '$opt' is already registed as '$longid'"
+				fi
+				_AMMOPTPARSE_OPTLONG[$var]="$id"
+
+				# Check for value to set
+				if [[ -n "$valreq" ]]; then
+					typeset valtyp="${valreq:0:1}"
+
+# TODO: Process VALTYPE
+					case ${valreq:0:1} in
+						# Required value
+						=)
+							_AMMOPTPARSE_VALTYPE[$id]="$valreq"
+							;;
+						# An array
+						@)
+							;;
+						# Boolean
+						!)
+							# TODO: Check for existing option collision
+							_AMMOPTPARSE_OPTLONG["no$var"]="$id"
+							;;
+						*)
+							ammLog::Wrn "Unhandled requirement char '${valreq:0:1}'"
+						;;
+					esac
+				fi
+			fi
+		else
+			ammLog::Wrn "The registered option '$opt' is invalid"
+			continue
+		fi
+	done
+}
+
+
+
+
+# @description  Parse the options, optionnally only those matching the prefix $1
+# @arg $1  (string) Prefix
+function ammOptparse::Parse {
+	typeset prefix="${1:-}"
+
+	ammLog::Dbg "Parsing options with prefix '$prefix'"
+
+	typeset -i optid
+	# For loop with number so keep at the same place for short options concatenated
+	for (( optid=0; optid < ${#__AMMLIB_CALLOPTS[@]}; optid+=1 )); do
+		typeset -i optextra=0
+		typeset var="${__AMMLIB_CALLOPTS[$optid]}"
+		typeset val=""
+		typeset id=""
+
+		# Skip emptied variables (not consumed by previous options)
+		[[ -z "$var" ]] && continue
+
+		# Special case: -- to stop processing
+		if [[ "$var" == "--" ]]; then
+			ammLog::Dbg "Found '--' at position '$optid'. Stopping processing"
+			return 0
+		fi
+
+		ammLog::Dbg "Processing option '$var' (pos: $optid)"
+
+		id="$(_ammOptparse::OptToId "$var")"
+		# Remove leading -
+		var="${var#-}"
+		var="${var#-}"
+
+		# If the option is not registered
+		if [[ -z "$id" ]]; then
+			ammLog::Dbg "Skipping unregistered option '$var'"
+			continue
+		fi
+
+		# Chcek if we are expecting one or more options
+		if ( set +u; [[ -n "${_AMMOPTPARSE_VALTYPE[$id]}" ]] ); then
+			typeset valtyp="${_AMMOPTPARSE_VALTYPE[$id]}"
+			typeset nwant="${valtyp:1}"
+			case $valtyp in
+				# Multiple required values
+				=[0-9]*)
+					typeset -i nused=0
+					while [[ $nused -lt $nwant ]]; do
+						# try to get next value and check
+						typeset -i nextid="$(($optid+$nused))"
+						if [[ $nextid -ge ${#__AMMLIB_CALLOPTS[@]} ]]; then
+							ammLog::Err "Option '$var' wants '$nwant' parameters but $nused found '$val'. Stop parsing"
+							return 1
+						fi
+
+						# Add next value to the list
+						ammLog::Dbg "Option '$var' consumed var '${__AMMLIB_CALLOPTS[$nextid]}' (pos $nextid)"
+						val="${val:+$val }${__AMMLIB_CALLOPTS[$nextid]}"
+						nused+=1
+					done
+					optextra+=$nwant
+					;;
+
+				# Single require value
+				=)
+					if (set +u; [[ -n "${__AMMLIB_CALLOPTS[$optid+1]}" ]] ); then
+						val="${__AMMLIB_CALLOPTS[$optid+1]}"
+						ammLog::Dbg "Option '$var' consumed var '$val' (pos $(($optid+1)))"
+						optextra+=1
+					else
+						ammLog::Err "Option '$var' wants 1 parameter, but none found. Stop parsing"
+						return 1
+					fi
+					;;
+
+				# Unmanaged format
+				*)
+					ammLog::Err "Unknown required format '$valtyp'. How was it registered ?!"
+					return 1
+					;;
+			esac
+		fi
+
+		if [[ -n "$prefix" ]] && ! [[ "${var#$prefix}" != "$var" ]]; then
+			ammLog::Dbg "Skipping option '$var' not matching prefix '$prefix'"
+			continue
+		fi
+
+		# Register the value
+		ammLog::Dbg "Setting '$id' value to '$val'"
+		_AMMOPTPARSE_VALUE[$id]="$val"
+
+
+		# Unset parsed element
+		#newargs+=("$var")
+		for (( i=0; i <= $optextra; i+=1 )); do
+			__AMMLIB_CALLOPTS[$(($optid + $i))]=""
+		done
+		optid+=$optextra
+	done
+
+	# Update global args
+	#__AMMLIB_CALLOPTS=("${newargs[@]}")
+}
+
+# @description: Get value for a parameter that was parsed
+# @arg $1  (string) A short, long or id option value
+function ammOptparse::Get {
+	typeset elem="$1"
+	typeset id="$(_ammOptparse::OptToId "$elem")"
+
+	ammLog::Dbg "Requested elem '$elem' mapped to '$id'"
+
+	typeset val=""
+	if ( set +u; [[ -n "${_AMMOPTPARSE_VALUE[$id]}" ]] ); then
+		val="${_AMMOPTPARSE_VALUE[$id]}"
+
+		# Special format
+		while [[ "$val" =~ %\{([a-zA-Z0-9_:]+)\} ]]; do
+			# Fetch the referenced var
+			typeset subvarname="${BASH_REMATCH[1]}"
+			typeset subvarval="$(ammOptparse::Get "$subvarname")"
+
+			# Replace it in the current variable
+			val="${val//%\{$subvarname\}/$subvarval}"
+		done
+	fi
+
+	echo "$val"
+}

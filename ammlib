@@ -63,17 +63,17 @@ if type -t readlink >/dev/null; then
 fi
 
 # @description  How the script was called ($0)
-typeset    __AMMLIB_CALLNAME="$0"
+typeset -r  __AMMLIB_CALLNAME="$0"
 # @description  Options passed to the script ($@)
-typeset -a __AMMLIB_CALLOPTS=("$@")
+typeset -a  __AMMLIB_CALLOPTS=("$@")
+typeset -ra __AMMLIB_CALLOPTS_ORIG=("$@")
 # @description  The file that loaded ammlib
-typeset    __AMMLIB_CALLFILE="$(readlink -f ${BASH_SOURCE[1]})"
+typeset -r  __AMMLIB_CALLFILE="$(readlink -f ${BASH_SOURCE[1]})"
 # @description  Path of the file that loaded ammlib
-typeset    __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
+typeset -r  __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
 
-
-typeset __AMMLIB_USERNAME="$(\id -nu)"
-typeset __AMMLIB_USERID="$(\id -u)"
+typeset -r  __AMMLIB_USERNAME="$(\id -nu)"
+typeset -r  __AMMLIB_USERID="$(\id -u)"
 
 #
 # Set and create base folders to be used by library

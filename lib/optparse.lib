@@ -98,7 +98,7 @@ function _ammOptparse::Expand {
 
 		# long option
 		if [[ ${opt:0:2} == "--" ]]; then
-			options+="$opt"
+			options+=("$opt")
 			ammLog::Dbg "Long option '$opt'"
 
 		# Short option

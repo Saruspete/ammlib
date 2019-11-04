@@ -57,7 +57,7 @@ Functions must be :
 
 ### Variables
 
-The general shell convention is to write global variables in UPPERCASE and 
+The general shell convention is to write global variables in UPPERCASE and
 local variables (in functions) in lower or CamelCase.
 
 - Library's internal global variables must be prefixed by `__AMM` + the module
@@ -70,7 +70,7 @@ Example: For a variable keeping track of logs, set in logs.lib
 
 ### Tests
 
-All tests must be done using `[[` operator.  
+All tests must be done using `[[` operator.
 Do not use the old idiom `[ x$var = x ]`, prefer the more readable `[[ -n "$var" ]]` (non empty) or its counterpart `[[ -z "$var" ]]` (empty)
 
 ### Strings
@@ -104,7 +104,7 @@ The `-` before `EOT` signifiy "Remove all leading tabs when using the code block
 That allows to keep a correct indentation in the code, without having to output them or using parsing hacks.
 
 
-Examples: 
+Examples:
 ``` bash
 	case $var in
 		val1)   doit     ;;
@@ -179,7 +179,7 @@ typeset -A array=([banana]="yellow", [apple]="red")
 # this will fail due to "set -o nounset", even with a default value
 [[ -n "${array[pear]}" ]]
 # So disable it in a subshell
-( set +u; [[ -n "${array[pear]}" ]] ) && echo "I know color of pear";
+( set +u; [[ -n "${array[pear]}" ]] )
 ```
 
 ### Locale impact character expansion and sorting results
@@ -203,7 +203,14 @@ $ ls /usr/bin/[G-H]*
 ### Good use of PS4 for tracing
 
 When you do a `set -x`, the shell uses the value of PS4. the main library enforces this variable to
+
 `PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '`
+
+- The first char of PS4 (default `+`) will be repeated to the current call depth. A space makes a clean visual indent
+- `${BASH_SOURCE##*/}` is the file name of the currently processed file (leading folders being removed for conciseness)
+- `${FUNCNAME[0]:-main}` is the current function name, or `main` if not in a function
+- `$LINENO` is the current line number. Use `$BASH_LINENO` if you want to get the caller line
+- `  ` 2 space to make a visual separation between this header and the code being executed
 
 This generates an output like this :
 ```

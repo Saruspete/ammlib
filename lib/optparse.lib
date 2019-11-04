@@ -201,7 +201,6 @@ function ammOptparse::AddOpt {
 				if [[ -n "$valreq" ]]; then
 					typeset valtyp="${valreq:0:1}"
 
-# TODO: Process VALTYPE
 					case ${valreq:0:1} in
 						# Required value
 						=)
@@ -214,6 +213,7 @@ function ammOptparse::AddOpt {
 						!)
 							# TODO: Check for existing option collision
 							_AMMOPTPARSE_OPTLONG["no$var"]="$id"
+							_AMMOPTPARSE_VALTYPE[$id]='!'
 							;;
 						*)
 							ammLog::Wrn "Unhandled requirement char '${valreq:0:1}'"
@@ -301,6 +301,18 @@ function ammOptparse::Parse {
 					else
 						ammLog::Err "Option '$var' wants 1 parameter, but none found. Stop parsing"
 						return 1
+					fi
+					;;
+
+				# Boolean + negation
+				!)
+					# Check if the option without "no" is registered to the same ID
+					if [[ "${var:0:2}" == "no" ]] && ( set +u; [[ "${_AMMOPTPARSE_OPTLONG[${var:2}]}" == "$id" ]] ); then
+						ammLog::Dbg "Option '$var' is the negation of '${var:2}' for ID '$id'"
+						val="false"
+					else
+						ammLog::Dbg "Option '$val' set to true for ID '$id'"
+						val="true"
 					fi
 					;;
 

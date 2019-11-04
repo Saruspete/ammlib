@@ -687,7 +687,7 @@ function ammLog::Dbg {
 	# Only send to log on verbose level
 	if [[ -n "${AMMLIB_DEBUG:-}" ]] || [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
 		# Get the caller
-		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}::${BASH_LINENO[1]}"
+		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}::${BASH_LINENO[0]}"
 
 		_ammLog::Log "DBG" "bold blue" "[$callerdbg] $@"
 

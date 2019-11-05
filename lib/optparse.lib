@@ -187,7 +187,12 @@ function ammOptparse::AddOpt {
 					ammLog::Wrn "Short option '$opt' is more than 1 char. Skipping"
 					continue
 				fi
-				_AMMOPTPARSE_OPTSHORT[$var]="$id"
+				if (set +u; [[ -n "${_AMMOPTPARSE_OPTSHORT[$var]}" ]] ); then
+					typeset conflictid="${_AMMOPTPARSE_OPTSHORT[$var]}"
+					ammLog::Wrn "Short option '$var' (ID '$id') already registered for ID '$conflictid' at ${_AMMOPTPARSE_REGISTRANTS[$conflictid]}"
+				else
+					_AMMOPTPARSE_OPTSHORT[$var]="$id"
+				fi
 
 			# Long option
 			else

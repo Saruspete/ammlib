@@ -42,7 +42,7 @@ function ammInput::Register {
 	#typeset caller="${BASH_SOURCE[1]}:${FUNCNAME[1]}"
 
 	# Fill registration values
-	#__ammInput::Ids[$id]="$caller"
+	#__ammInputIds[$id]="$caller"
 	__ammInputIds[$id]=""
 	__ammInputDefaults[$id]="$default"
 	__ammInputHelp[$id]="$helptext"
@@ -232,15 +232,16 @@ function ammInput::Get {
 	return 0
 }
 
+# @description: 
 function ammInput::SetPrefix {
 	typeset pref="${1:-}"
 
-	if [[ -z "$pref" ]]; then
-		ammLog::Err "Prefix for input parsing cannot be empty"
-		return 1
-	fi
+#	if [[ -z "$pref" ]]; then
+#		ammLog::Err "Prefix for input parsing cannot be empty"
+#		return 1
+#	fi
 
-	__ammInput::Prefix="$pref"
+	__ammInputPrefix="$pref"
 }
 
 # Populate the reply values from file, environment, options

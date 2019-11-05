@@ -209,7 +209,7 @@ function _ammLib::TrapHandler {
 		# Manual stop
 		INT|HUP|TERM|QUIT)
 			sigtype="EXITERR"
-			ammLogWrn "Caught graceful interruption $signame. Cleaning"
+			ammLog::Wrn "Caught graceful interruption $signame. Cleaning"
 			;;
 
 		# Unamanged return code

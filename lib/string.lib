@@ -89,6 +89,11 @@ function ammString::IsNo {
 	[[ $str =~ ^[nN][oO]?$ ]]
 }
 
+function ammString::IsYesNo {
+	typeset str="$1"
+	ammString::IsYes "$str" || ammString::IsNo "$str"
+}
+
 function ammString::IsTrue {
 	typeset -l str="$1"
 

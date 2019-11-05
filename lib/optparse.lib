@@ -335,26 +335,6 @@ function ammOptparse::Parse {
 		fi
 
 
-		# Validation
-		if (set +u; [[ -n "${_AMMOPTPARSE_VALIDATOR[$id]}" ]] ); then
-			typeset validator="${_AMMOPTPARSE_VALIDATOR[$id]}"
-
-			# Don't use quotes to avoid composite values to be used in name
-			if amm::IsFunc $validator; then
-				# TODO: Clean this function call
-				#typeset valcall="${validator//%
-				if ! "${validator%% *}" "$val" "${validator#* }"; then
-					ammLog::Err "Option '$var' refused value '$val' by validator '$validator'"
-					return 1
-				fi
-				ammLog::Dbg "Option '$var' accepted value '$val' by validator '$validator'"
-			else
-				ammLog::Err "Validation function '$validator' is not defined as function"
-				return 1
-			fi
-		fi
-
-
 		# Register the value
 		ammLog::Dbg "Setting '$id' value to '$val'"
 		_AMMOPTPARSE_VALUE[$id]="$val"
@@ -367,8 +347,34 @@ function ammOptparse::Parse {
 		optid+=$optextra
 	done
 
-	# Update global args
-	#__AMMLIB_CALLOPTS=("${newargs[@]}")
+
+	# Validation must be done after due to default values
+	typeset -i r=0
+	for id in ${!_AMMOPTPARSE_VALUE[@]}; do
+		#typeset val="${_AMMOPTPARSE_VALUE[$id]}"
+		# If we have a validator, we should test it
+		if (set +u; [[ -n "${_AMMOPTPARSE_VALIDATOR[$id]}" ]] ); then
+			typeset validator="${_AMMOPTPARSE_VALIDATOR[$id]}"
+			# Use parse for %{} format dereference
+			typeset val="$(ammOptparse::Get "$id")"
+
+			# Don't use quotes to avoid composite values to be used in name
+			if amm::IsFunc $validator; then
+				# TODO: Clean this function call
+				#typeset valcall="${validator//%
+				if ! "${validator%% *}" "$val" "${validator#* }"; then
+					ammLog::Err "Option ID '$id' refused value '$val' by validator '$validator'"
+					r+=1
+				fi
+				ammLog::Dbg "Option ID '$id' accepted value '$val' by validator '$validator'"
+			else
+				ammLog::Err "Validation function '$validator' is not defined as function"
+				r+=1
+			fi
+		fi
+	done
+
+	return $r
 }
 
 # @description: Get value for a parameter that was parsed
@@ -396,3 +402,4 @@ function ammOptparse::Get {
 
 	echo "$val"
 }
+

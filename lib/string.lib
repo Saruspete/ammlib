@@ -49,13 +49,23 @@ function ammString::IsFile {
 	[[ -f "$file" ]]
 }
 
+# @description: Check if the string is an integer. Optionnaly, check its value
+# @arg $1  (string) The string to check if it's an int
+# @arg $2  (int) The minimal value of the integer
+# @arg $3  (int) The maximal value of the integer
 function ammString::IsInteger {
 	typeset str="$1"
+	typeset min="${2:-}"
+	typeset max="${3:-}"
 
-	# Remove leading minus
+	# R emove leading minus
 	str="${str#-}"
 	# Remove all numbers. Nothing should be left
-	[[ -z "${str//[0-9]/}" ]]
+	[[ -z "${str//[0-9]/}" ]] || return 1
+
+	[[ -n "$min" ]] && [[ $str -lt $min ]] && return 1
+	[[ -n "$max" ]] && [[ $str -gt $max ]] && return 1
+	return 0
 }
 
 function ammString::IsHex {

@@ -18,13 +18,42 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammFs::Mounted {
-	typeset mnt="$1"
+	typeset mntdst="$1"
+	typeset mntsrc="${2:-}"
+	typeset mnttype="${3:-}"
+	typeset mntopts="${4:-}"
 
-	typeset mntpath="$(readlink -f $mnt)"
+	typeset mntdstabs="$(readlink -f $mntdst)"
 
-	# TODO
-	
+	# Scan currently mounted elements
+	typeset src mnt typ opts i1 i2 _junk
+	while read src mnt typ opts i1 i2 _junk; do
+		if [[ -n "$_junk" ]]; then
+			ammLog::Wrn "Found junk value while reading /proc/mounts: '$_junk'"
+		fi
 
+		# Check if destination path is mounted
+		if [[ "$mnt" == "$mntdstabs" ]]; then
+			typeset r=0
+			if [[ -n "$mntsrc" ]] && [[ "$src" != "$mntsrc" ]]; then
+				ammLog::Wrn "Mnt '$mntdst' mounted with src '$src' instead of '$mntsrc'"
+				r+=1
+			fi
+			if [[ -n "$mnttype" ]] && [[ "$typ" != "$mnttype" ]]; then
+				ammLog::Wrn "Mnt '$mntdst' mounted with type '$typ' instead of '$mnttype'"
+				r+=1
+			fi
+			if [[ -n "$mntopts" ]] && [[ "$opts" != "$mntopts" ]]; then
+				ammLog::Wrn "Mnt '$mntdst' mounted with opts '$opts' instead of '$mntopts'"
+				r+=1
+			fi
+
+			# return $r
+			return 0
+		fi
+	done < /proc/mounts
+
+	return 1
 }
 
 function ammFs::Mount {

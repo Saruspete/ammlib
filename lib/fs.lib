@@ -48,8 +48,7 @@ function ammFs::Mounted {
 				r+=1
 			fi
 
-			# return $r
-			return 0
+			return $r
 		fi
 	done < /proc/mounts
 

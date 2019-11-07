@@ -365,7 +365,7 @@ function ammInput::ValidateInteger {
 
 function ammInput::ValidateYN {
 	typeset str="${1:-}"
-	ammString::IsYes "$str" || ammStringIsNo "$str"
+	ammString::IsYes "$str" || ammString::IsNo "$str"
 }
 
 function ammInput::ValidateHost {

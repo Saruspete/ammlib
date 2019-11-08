@@ -27,11 +27,14 @@ if ! ammOptparse::Parse; then
 fi
 
 typeset    val="$(ammOptparse::Get "add")"
-typeset -a arr="$(ammOptparse::Get "A")"
+typeset -a arr=$(ammOptparse::Get "A")
 typeset    dbg="$(ammOptparse::Get "debug")"
 typeset    mrv="$(ammOptparse::Get "marvelous")"
 
 echo "Val = '$val'"
-echo "Arr = '${arr[@]}'"
 echo "Dbg = '$dbg'"
 echo "Mrv = '$mrv'"
+
+echo -n "Arr = ("
+for i in "${!arr[@]}"; do echo -n "$i='${arr[$i]}'  "; done
+echo ")"

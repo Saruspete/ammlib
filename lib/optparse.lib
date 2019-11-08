@@ -38,6 +38,8 @@ typeset -gA  _AMMOPTPARSE_REGISTRANTS
 typeset -gA  _AMMOPTPARSE_VALIDATOR
 typeset -gA  _AMMOPTPARSE_VALTYPE
 
+typeset -g   _AMMOPTPARSE_ARRSEP='§§'
+
 function _ammOptparse::OptClean {
 	typeset opt="$1"
 
@@ -213,6 +215,7 @@ function ammOptparse::AddOpt {
 							;;
 						# An array
 						@)
+							_AMMOPTPARSE_VALTYPE[$id]="$valreq"
 							;;
 						# Boolean
 						!)
@@ -309,6 +312,22 @@ function ammOptparse::Parse {
 					fi
 					;;
 
+				@)
+					if (set +u; [[ -n "${__AMMLIB_CALLOPTS[$optid+1]}" ]] ); then
+						# Append previously set
+						if (set +u; [[ -n "${_AMMOPTPARSE_VALUE[$id]}" ]] ); then
+							val="${_AMMOPTPARSE_VALUE[$id]}"
+							val+="$_AMMOPTPARSE_ARRSEP"
+						fi
+						val+="${__AMMLIB_CALLOPTS[$optid+1]}"
+						ammLog::Dbg "Option '$var' consumed var '$val' (pos $(($optid+1)))"
+						optextra+=1
+					else
+						ammLog::Err "Option '$var' wants 1 parameter, but none found. Stop parsing"
+						return 1
+					fi
+					;;
+
 				# Boolean + negation
 				!)
 					# Check if the option without "no" is registered to the same ID
@@ -386,20 +405,33 @@ function ammOptparse::Get {
 	ammLog::Dbg "Requested elem '$elem' mapped to '$id'"
 
 	typeset val=""
-	if ( set +u; [[ -n "${_AMMOPTPARSE_VALUE[$id]}" ]] ); then
+	if (set +u; [[ -n "${_AMMOPTPARSE_VALUE[$id]}" ]] ); then
 		val="${_AMMOPTPARSE_VALUE[$id]}"
 
-		# Special format
-		while [[ "$val" =~ %\{([a-zA-Z0-9_:]+)\} ]]; do
-			# Fetch the referenced var
-			typeset subvarname="${BASH_REMATCH[1]}"
-			typeset subvarval="$(ammOptparse::Get "$subvarname")"
+		# Array to be returned
+		if (set +u; [[ "${_AMMOPTPARSE_VALTYPE[$id]}" == "@" ]] ); then
+			# Split var with separator
+			echo '('
+			while [[ "${val##*$_AMMOPTPARSE_ARRSEP}" != "$val" ]]; do
+				typeset arrv="${val%%$_AMMOPTPARSE_ARRSEP*}"
+				echo "'$arrv'"
+				val="${val#*$_AMMOPTPARSE_ARRSEP}"
+			done
+			echo "'$val' )"
 
-			# Replace it in the current variable
-			val="${val//%\{$subvarname\}/$subvarval}"
-		done
+		# Standard variable
+		else
+			# Special format to refer to another variable
+			while [[ "$val" =~ %\{([a-zA-Z0-9_:]+)\} ]]; do
+				# Fetch the referenced var
+				typeset subvarname="${BASH_REMATCH[1]}"
+				typeset subvarval="$(ammOptparse::Get "$subvarname")"
+
+				# Replace it in the current variable
+				val="${val//%\{$subvarname\}/$subvarval}"
+			done
+			echo "$val"
+		fi
 	fi
-
-	echo "$val"
 }
 

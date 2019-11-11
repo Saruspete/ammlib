@@ -8,14 +8,15 @@ export PATH="/bin:/sbin:/usr/bin:/usr/sbin:$PATH"
 
 readonly MYSELF="$(readlink -f $0)"
 readonly MYPATH="${MYSELF%/*}"
+readonly MYNAME="${MYSELF##*/}"
 
 
 . $MYPATH/../ammlib
 
 ammLib::Require test string
 
-typeset file1="$__AMMLIB_DATATMP/$0.data1"
-typeset file2="$__AMMLIB_DATATMP/$0.data2"
+typeset file1="$__AMMLIB_DATATMP/$MYNAME.data1"
+typeset file2="$__AMMLIB_DATATMP/$MYNAME.data2"
 cat >| $file1 <<-EOT
 	Hello there
 	This a sample output with of letters, numbers and special-chars!

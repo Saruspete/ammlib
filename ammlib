@@ -577,7 +577,7 @@ function ammLog::Color {
 		shift
 	done
 
-	echo -e "${esc}$(_ammLog::ColorJoin ";" ${codes[@]})m"
+	echo -e "${esc}$(_ammLog::ColorJoin ";" ${codes+codes[@]})m"
 }
 
 # @description  Returns the Time for the logs

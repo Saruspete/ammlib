@@ -182,8 +182,9 @@ function _ammLib::TrapHandler {
 	typeset retcode=$?
 	typeset signame="$1"
 	typeset sigtype=""
+	typeset retaction="return"
 
-	ammLog::Dbg "Caught signal $signame with retcode $retcode"
+	ammLog::Dbg "Caught signal '$signame' with retcode $retcode"
 	case $signame in
 		# Standard shutdown
 		EXIT)
@@ -214,6 +215,7 @@ function _ammLib::TrapHandler {
 		INT|HUP|TERM|QUIT)
 			sigtype="EXITERR"
 			ammLog::Wrn "Caught graceful interruption $signame. Cleaning"
+			retaction="exit"
 			;;
 
 		# Unamanged return code
@@ -222,6 +224,7 @@ function _ammLib::TrapHandler {
 			;;
 
 		*)
+			ammLog::Wrn "Unhandled signal name '$signame'"
 			;;
 	esac
 
@@ -235,6 +238,8 @@ function _ammLib::TrapHandler {
 		done
 	fi
 
+	# Do the exit or return
+	$retaction $retcode
 }
 
 

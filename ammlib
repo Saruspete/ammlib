@@ -196,10 +196,14 @@ function _ammLib::TrapHandler {
 				typeset num pid state cmd
 				typeset -i waitjob=0
 				while [[ $waitjob -lt $__AMMLIB_TRAP_WAITMAX ]]; do
+					typeset -i jobcnt=0
 					ammLog::Inf "== Check $waitjob $(ammLog::Time)"
 					while read num pid state cmd; do
+						[[ "$pid" == "$$" ]] && continue
 						ammLog::Inf "PID:$pid State:$state Command:$cmd"
-					done < <(jobs -l)
+						jobcnt+=1
+					done < <(jobs -lr)
+					[[ $jobcnt -eq 0 ]] && break
 					waitjob+=1
 					sleep $__AMMLIB_TRAP_WAITSTEP
 				done

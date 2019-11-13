@@ -195,7 +195,7 @@ function _ammLib::TrapHandler {
 				ammLog::Inf "Waiting unfinished jobs in background for $__AMMLIB_TRAP_WAITMAX checks every $__AMMLIB_TRAP_WAITSTEP sec"
 				typeset num pid state cmd
 				typeset -i waitjob=0
-				while [[ $waitjob -lt $__AMMLIB_TRAP_WAITUPTO ]]; do
+				while [[ $waitjob -lt $__AMMLIB_TRAP_WAITMAX ]]; do
 					ammLog::Inf "== Check $waitjob $(ammLog::Time)"
 					while read num pid state cmd; do
 						ammLog::Inf "PID:$pid State:$state Command:$cmd"
@@ -204,7 +204,7 @@ function _ammLib::TrapHandler {
 					sleep $__AMMLIB_TRAP_WAITSTEP
 				done
 
-				if [[ $waitjob -eq $__AMMLIB_TRAP_WAITUPTO ]]; then
+				if [[ $waitjob -eq $__AMMLIB_TRAP_WAITMAX ]]; then
 					ammLog::Wrn "Hit timeout before all background jobs finished. Remains:"
 					jobs -l | ammLog::Wrn -
 				fi

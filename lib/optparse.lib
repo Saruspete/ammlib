@@ -240,13 +240,38 @@ function ammOptparse::AddOpt {
 
 
 # @description  Parse the options, optionnally only those matching the prefix $1
-# @arg $1  (string) Prefix
+# @arg $@  (string) Prefix
 function ammOptparse::Parse {
-	typeset prefix="${1:-}"
+	typeset opts="${1:-}"
 
-	ammLog::Dbg "Parsing options with prefix '$prefix'"
+	typeset -i r=0
+	typeset nounknown=false
+	typeset prefix=""
+
+	# Special options parsing
+	typeset opt
+	for opt in $opts; do
+		case $opt in
+			--no-unknown)
+				nounknown=true
+				;;
+			--*)
+				ammLog::Wrn "Unknown ammOptparse::Parse() option '$opt'"
+				;;
+			*)
+				if [[ -z "$prefix" ]]; then
+					ammLog::Dbg "Parsing options with prefix '$opt'"
+					prefix="$opt"
+				else
+					ammLog::Wrn "prefix already set ($prefix) in ammOptparse::Parse(). Cannot add '$opt'"
+					r+=1
+				fi
+				;;
+		esac
+	done
 
 	typeset -i optid
+	typeset lastvar=""
 	# For loop with number so keep at the same place for short options concatenated
 	for (( optid=0; optid < ${#__AMMLIB_CALLOPTS[@]}; optid+=1 )); do
 		typeset -i optextra=0
@@ -260,15 +285,26 @@ function ammOptparse::Parse {
 		# Special case: -- to stop processing
 		if [[ "$var" == "--" ]]; then
 			ammLog::Dbg "Found '--' at position '$optid'. Stopping processing"
-			return 0
+			return $r
+		fi
+
+		# Check if we accept unparsed options
+		if $nounknown && [[ -n "$lastvar" ]]; then
+			ammLog::Err "Invalid unknown option '$lastvar'"
+			lastvar=""
+			r+=1
 		fi
 
 		ammLog::Dbg "Processing option '$var' (pos: $optid)"
+
+		# Set lastvar
+		lastvar="$var"
 
 		id="$(_ammOptparse::OptToId "$var")"
 		# Remove leading -
 		var="${var#-}"
 		var="${var#-}"
+
 
 		# If the option is not registered
 		if [[ -z "$id" ]]; then
@@ -364,11 +400,19 @@ function ammOptparse::Parse {
 			__AMMLIB_CALLOPTS[$(($optid + $i))]=""
 		done
 		optid+=$optextra
+
+		# Reset the lastvar, as we parsed it correctly
+		lastvar=""
 	done
 
+	# Redo the lastvar test for last option
+	if $nounknown && [[ -n "$lastvar" ]]; then
+		ammLog::Err "Invalid unknown option '$lastvar'"
+		lastvar=""
+		r+=1
+	fi
 
 	# Validation must be done after due to default values
-	typeset -i r=0
 	for id in ${!_AMMOPTPARSE_VALUE[@]}; do
 		#typeset val="${_AMMOPTPARSE_VALUE[$id]}"
 		# If we have a validator, we should test it
@@ -435,3 +479,7 @@ function ammOptparse::Get {
 	fi
 }
 
+function ammOptparse::Help {
+	
+	:
+}

@@ -613,6 +613,10 @@ typeset __AMMLOG_LOGFILE=""
 typeset __AMMLOG_LOGTERM=""
 typeset __AMMLOG_SILENT="0"
 
+typeset -i __AMMLOG_STEPDEPTH=0
+typeset -a __AMMLOG_STEPTIME
+typeset -a __AMMLOG_STEPNAME
+
 # @description  (private) Generic log function for logging
 # @arg $1  (string) tag
 # @arg $2  (string) format, passed to ammLog::Color, thus keys of $__AMMLOG_TERMCODES
@@ -629,16 +633,18 @@ function _ammLog::Log {
 	typeset color="$(ammLog::Color $fmt)"
 	typeset colorrst="$(ammLog::Color reset)"
 	typeset date="$(ammLog::Time)"
+	typeset pad="$(_ammLog::StepPad)"
+
 
 	# Read stdin
 	if [[ "$@" = "-" ]]; then
 		while read line; do
 			# Silent mode doesn't write any log
 			if [[ "$__AMMLOG_SILENT" == "0" ]]; then
-				echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$] $line${colorrst}"
+				echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $line${colorrst}"
 			# Special case: only error on stdout
 			elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
-				echo "[$date][$tag][$$] $line"
+				echo "[$date][$tag][$$]$pad $line"
 			fi
 		done
 
@@ -646,9 +652,9 @@ function _ammLog::Log {
 	else
 		# Silent mode doesn't display any log
 		if [[ "$__AMMLOG_SILENT" == "0" ]]; then
-			echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$] $@${colorrst}"
+			echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $@${colorrst}"
 		elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
-			echo "[$date][$tag][$$] $@"
+			echo "[$date][$tag][$$]$pad $@"
 		fi
 	fi
 
@@ -719,6 +725,62 @@ function ammLog::Dbg {
 	$redbg
 }
 
+function _ammLog::StepPad {
+	typeset step="${1:-$__AMMLOG_STEPDEPTH}"
+
+	typeset i
+	for (( i=0; i < $step; i++ )); do
+		echo -n "  "
+	done
+}
+
+# @description  Mark a new step in the actions
+# @args $1  (string) The name of the step to be displayed
+function ammLog::StepBegin {
+	typeset name="$1"
+
+	typeset txt="=> StepBegin: $name"
+
+	__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]="$name"
+	__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]="$(date +%s)"
+
+	ammLog::Inf "$txt"
+
+	__AMMLOG_STEPDEPTH+=1
+}
+
+# @description  Mark the end of a started step
+# @arg $1  (int) return code
+# @arg $2  (string) Message to be displayed
+function ammLog::StepEnd {
+	typeset -i ret="${1:-}"
+	typeset    msg="${2:-}"
+
+	if [[ $__AMMLOG_STEPDEPTH -le 0 ]]; then
+		ammLog::Err "Cannot call ammLog::StepEnd while no step in progress. Callstack:"
+		ammLog::Stackdump | ammLog::Err "-"
+		return 1
+	fi
+
+	__AMMLOG_STEPDEPTH+=-1
+
+	#typeset txt="$(_ammLog::StepPrefix $__AMMLOG_STEPDEPTH"
+	typeset -i time="$(($(date +%s) - ${__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]} ))"
+	typeset txt="<= StepEnd: ${__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]}. Took:${time}s"
+	[[ -n "$ret" ]] && txt+=" Ret:'$ret'"
+	[[ -n "$msg" ]] && txt+=" Msg:'$msg'"
+
+	if [[ -z "$ret" ]]; then
+		ammLog::Inf "$txt"
+	elif [[ $ret -eq 0 ]]; then
+		ammLog::Inf "$txt"
+	else
+		ammLog::Wrn "$txt"
+	fi
+
+	__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]=""
+	__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]=0
+}
 
 # @description:  Display the stackdump of current script
 # @arg $1  (int) Stack levels to skip. Default 1 (= skip this function)

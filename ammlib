@@ -734,6 +734,24 @@ function _ammLog::StepPad {
 	done
 }
 
+# @description  Show a visible step separator
+function ammLog::Step {
+	typeset name="$1"
+
+	typeset cols="${COLUMNS:-80}"
+	typeset -i size="$(( $cols - ${#name} - 2 ))"
+	[[ $size -lt 0 ]] && $size = 10
+
+	typeset -i i=0
+	typeset bars=""
+	for (( i=0; i < $(($size / 2)); i++ )); do
+		bars+="="
+	done
+
+	echo "$bars $name $bars"
+
+}
+
 # @description  Mark a new step in the actions
 # @args $1  (string) The name of the step to be displayed
 function ammLog::StepBegin {

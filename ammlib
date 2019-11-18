@@ -672,7 +672,7 @@ function _ammLog::Write {
 # @description  Log a fatal error and terminate script
 # @arg $@  Log text for fatal error. If "-", text is read from stdin
 function ammLog::Die {
-	_ammLog::Log "ERR" "bold red" "$@"
+	_ammLog::Log "DIE" "bold red reverse" "$@"
 	exit 255
 }
 

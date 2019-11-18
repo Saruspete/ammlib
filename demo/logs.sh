@@ -19,6 +19,9 @@ ammLog::Err "And this is an error..."
 ammLog::Inf "You can also log output"
 tail -n 3 /etc/passwd | ammLog::Wrn '-'
 
+ammLog::Step "kewkew"
+ammLog::Step "With color if you pipe it as stdout" | ammLog::Inf "-"
+
 ammLog::StepBegin "This is a step separator"
 ammLog::StepBegin "And a new step within"
 ammLog::StepBegin "And again one within"

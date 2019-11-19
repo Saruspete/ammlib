@@ -738,9 +738,12 @@ function _ammLog::StepPad {
 function ammLog::Step {
 	typeset name="$1"
 
-	typeset cols="${COLUMNS:-80}"
-	typeset -i size="$(( $cols - ${#name} - 2 ))"
-	[[ $size -lt 0 ]] && $size = 10
+	typeset cols="${COLUMNS:-$(tput cols)}"
+	[[ -z "$cols" ]] && cols="100"
+
+	# Remove 2 + 23 chars to accomodate the ammLib::Log header
+	typeset -i size="$(( $cols - ${#name} - 26 ))"
+	[[ $size -lt 0 ]] && size=20
 
 	typeset -i i=0
 	typeset bars=""

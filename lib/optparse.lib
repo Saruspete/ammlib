@@ -23,6 +23,9 @@ function ammOptparse::MetaCheck {
 # Options processing initialization
 # -----------------------------------------------------------------------------
 
+typeset -ga  _AMMOPTPARSE_ORDER
+typeset -ga  _AMMOPTPARSE_DESCRIPTIONGROUP
+
 # Mapping Option => ID
 typeset -gA  _AMMOPTPARSE_OPTLONG
 typeset -gA  _AMMOPTPARSE_OPTSHORT
@@ -135,7 +138,13 @@ function _ammOptparse::Expand {
 	__AMMLIB_CALLOPTS=("${options[@]}")
 }
 
+# @description  Set the description group for the options added next
+function ammOptparse::AddOptGroupDesc {
+	typeset desc="$1"
 
+	typeset -i nextid="${_AMMOPTPARSE_ORDER+${#_AMMOPTPARSE_ORDER[@]}}"
+	_AMMOPTPARSE_DESCRIPTIONGROUP[$nextid]="$desc"
+}
 
 
 # @description  Add an option to the listing
@@ -507,7 +516,40 @@ function ammOptparse::Get {
 	fi
 }
 
+# @description: Generate the help from registered options
+# @noarg
 function ammOptparse::Help {
-	
-	:
+
+	typeset optid
+	typeset -i optSize=10 descSize
+
+	# Search the longest group
+	for optid in ${_AMMOPTPARSE_OPTALL[@]}; do
+		[[ ${#optid} -gt ${optSize} ]] && optSize=${#optid}
+	done
+
+	# Columns of the output
+	typeset -i termSize="${COLUMNS:-$(tput cols 2>/dev/null)}"
+	[[ "$termSize" == "0" ]] && termSize=80
+	descSize="$(( $termSize - 2 - $optSize - 4 ))"
+
+	# Display
+	for optidnum in ${!_AMMOPTPARSE_ORDER[@]}; do
+		typeset optid="${_AMMOPTPARSE_ORDER[$optidnum]}"
+
+		# Check and display new description group
+		if (set +u; [[ -n "${_AMMOPTPARSE_DESCRIPTIONGROUP[$optidnum]}" ]] ); then
+			echo
+			echo "${_AMMOPTPARSE_DESCRIPTIONGROUP[$optidnum]}"
+		fi
+
+		typeset opts="${_AMMOPTPARSE_OPTALL[$optid]}"
+		typeset desc="${_AMMOPTPARSE_DESCRIPTION[$optid]:-}"
+
+		while [[ -n "$desc" ]]; do
+			printf "  %-${optSize}.${optSize}s    %.${descSize}s\n" "$opts" "$desc"
+			desc="${desc:$descSize}"
+			opts="${opts:$optSize}"
+		done
+	done
 }

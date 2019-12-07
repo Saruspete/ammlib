@@ -184,8 +184,19 @@ function _ammPkg::DepsFindBin {
 	typeset file
 	for file in "$@"; do
 
-		typeset lib _arrow file address _junk
-		while read lib _arrow file address _junk; do
+		typeset lib arrow file address _junk
+		while read lib arrow file address _junk; do
+
+			# When there is no arrow, either lib is abs, either it's name matches
+			if [[ "$arrow" != "=>" ]]; then
+				# Absolute or relative to PWD
+				if [[ "${lib:0:1}" == "/" ]]; then
+					echo "$lib"
+				else
+					echo "$(pwd -P)/$lib"
+				fi
+			fi
+
 			# Empty file: maybe vdso or ld-linux or error msg "not a dynamic executable"
 			[[ -n "$file" ]] || continue
 			#[[ "$lib" == "libc.so.6" ]] || continue

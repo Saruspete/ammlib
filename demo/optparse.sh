@@ -14,17 +14,27 @@ source "$MYPATH/../ammlib"
 
 ammLib::Require optparse string
 
+ammOptparse::AddOptGroupDesc "Generic options"
 ammOptparse::AddOpt "-v|--version"  "Show the version and exits"
+ammOptparse::AddOpt "-h|--help"     "Show the help"
+
+ammOptparse::AddOptGroupDesc "Simple values"
 ammOptparse::AddOpt "-d|--default=" "Default value"                "HelloThere"
 ammOptparse::AddOpt "-a|--add="     "Option that must be set once" "%{default}" "ammString::IsYesNo"
-ammOptparse::AddOpt "-A|--arr@"     "Push values into an array"
-ammOptparse::AddOpt "-D|--debug!"   "Set or unset the debug mode"
 ammOptparse::AddOpt "--marvelous="  "Are you fucking marvelous ?" "Dunno" "ammString::IsYesNo"
 
-if ! ammOptparse::Parse; then
+ammOptparse::AddOptGroupDesc "Complex values (array and boolean)"
+ammOptparse::AddOpt "-A|--arr@"     "Push values into an array"
+ammOptparse::AddOpt "-D|--debug!"   "Set or unset the debug mode"
+
+
+if ! ammOptparse::Parse --no-unknown; then
 	ammLog::Err "Parsing error. Please check"
+	ammOptparse::Help
 	exit 1
 fi
+
+
 
 typeset    val="$(ammOptparse::Get "add")"
 typeset -a arr=$(ammOptparse::Get "A")

@@ -169,13 +169,8 @@ function ammOptparse::AddOpt {
 		return 1
 	fi
 
-	# Register the provided values
-	typeset registrant="$(ammLog::Stackdump 2 1)"
-	_AMMOPTPARSE_REGISTRANTS[$id]="$registrant"
-	_AMMOPTPARSE_OPTALL[$id]="$options"
-	_AMMOPTPARSE_VALUE[$id]="$default"
-	_AMMOPTPARSE_DESCRIPTION[$id]="$description"
-	_AMMOPTPARSE_VALIDATOR[$id]="$validation"
+	typeset -i parseErr=0
+	typeset    registeredVars=""
 
 	# Parse the options
 	for opt in ${options//|/ }; do
@@ -187,13 +182,17 @@ function ammOptparse::AddOpt {
 			if [[ ${BASH_REMATCH[1]} == "-" ]]; then
 				if [[ "${#var}" -gt 1 ]]; then
 					ammLog::Wrn "Short option '$opt' is more than 1 char. Skipping"
+					parseErr+=1
 					continue
 				fi
 				if (set +u; [[ -n "${_AMMOPTPARSE_OPTSHORT[$var]}" ]] ); then
 					typeset conflictid="${_AMMOPTPARSE_OPTSHORT[$var]}"
 					ammLog::Wrn "Short option '$var' (ID '$id') already registered for ID '$conflictid' at ${_AMMOPTPARSE_REGISTRANTS[$conflictid]}"
+					parseErr+=1
+					continue
 				else
 					_AMMOPTPARSE_OPTSHORT[$var]="$id"
+					registeredVars+="$var "
 				fi
 
 			# Long option
@@ -201,8 +200,11 @@ function ammOptparse::AddOpt {
 				if (set +u; [[ -n "${_AMMOPTPARSE_OPTLONG[$var]}" ]] ); then
 					typeset longid="${_AMMOPTPARSE_OPTLONG[$var]}"
 					ammLog::Wrn "Long option '$opt' is already registed as '$longid'"
+					parseErr+=1
+					continue
 				fi
 				_AMMOPTPARSE_OPTLONG[$var]="$id"
+				registeredVars+="$var "
 
 				# Check for value to set
 				if [[ -n "$valreq" ]]; then
@@ -225,15 +227,41 @@ function ammOptparse::AddOpt {
 							;;
 						*)
 							ammLog::Wrn "Unhandled requirement char '${valreq:0:1}'"
+							parseErr+=1
+							continue
 						;;
 					esac
 				fi
 			fi
 		else
 			ammLog::Wrn "The registered option '$opt' is invalid"
+			parseErr+=1
 			continue
 		fi
 	done
+
+	if [[ "$parseErr" != 0 ]]; then
+		ammLog::Wrn "$parseErr error occurred. Skipping option '$options'"
+
+		# Unregister variables. Note: I'll miss the _AMMOPTPARSE_OPTLONG["no$var"]
+		unset _AMMOPTPARSE_VALTYPE[$id]
+		for opt in $registeredVars; do
+			unset _AMMOPTPARSE_OPTLONG[$opt] _AMMOPTPARSE_OPTSHORT[$opt]
+		done
+		return 1
+	fi
+
+	# Register the provided values
+	typeset registrant="$(ammLog::Stackdump 2 1)"
+	_AMMOPTPARSE_REGISTRANTS[$id]="$registrant"
+	_AMMOPTPARSE_OPTALL[$id]="$options"
+	_AMMOPTPARSE_VALUE[$id]="$default"
+	_AMMOPTPARSE_DESCRIPTION[$id]="$description"
+	_AMMOPTPARSE_VALIDATOR[$id]="$validation"
+
+	# Add the ID to the ordered listing
+	_AMMOPTPARSE_ORDER+=("$id")
+
 }
 
 

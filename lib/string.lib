@@ -275,6 +275,91 @@ function ammString::ToUpper {
 	fi
 }
 
+function ammString::UnitToPow {
+	typeset unitsrc="$1"
+	typeset unitdst="${2:-}"
+
+	if [[ "${#unitsrc}" != "1" ]]; then
+		ammLog::Err "$FUNCNAME units are single char from SI unit"
+	fi
+
+	# For Exa, Zetta, Yotta, don't care about Zepto/Yocto. However, I hope you'll use bc instead of pure bash
+	typeset -i pow=0 powdiv=0
+
+
+	# Defualt output in bytes
+	if [[ -n "$unitdst" ]]; then
+		powdiv="$($FUNCNAME "$unitdst")"
+	fi
+
+	# Units to be used
+	typeset units="bkmgtpezy"
+	typeset -i i=0
+	for (( i=0; i<${#units}; i++ )); do
+		typeset -l unitTest="${units:$i:1}"
+		typeset -l unitTestSrc="$unitsrc"
+
+		# test if the SI Unit is the same
+		if [[ "$unitTestSrc" == "$unitTest" ]]; then
+			pow=$i
+		fi
+	done
+
+	echo "$(( $pow-$powdiv ))"
+}
+
+# @description  Convert an unit
+function ammString::UnitConvert {
+	typeset value="$1"
+	typeset unitsrc="${2:-}"
+	typeset unitdst="${3:-}"
+
+
+	typeset -i base=1024 coef=1 mult=1 div=1
+	typeset useBc=false
+	typeset out=""
+
+	# Compound unit
+	typeset basesrc="${unitsrc:(-1)}"
+	typeset basedst="${unitdst:(-1)}"
+
+	# If we have a different base...
+	if [[ "$basesrc" != "$basedst" ]]; then
+		# bit to byte: /8
+		if [[ "$basesrc" == "b" ]]; then
+			div=8
+		# byte to bit: *8
+		else
+			mult=8
+		fi
+	fi
+
+	typeset -i pow=$(ammString::UnitToPow "${unitsrc:0:1}" "${unitdst:0:1}" )
+
+	# For very high values, bash will overflow
+	if [[ $pow -gt 6 ]] || [[ $pow -lt 0 ]]; then
+		useBc=true
+		ammLog::Dbg "Exponant '$pow' is > 6 or < 0, using bc for calculation"
+	fi
+
+	ammLog::Dbg "Converting $unitsrc to $unitdst: $base**$pow * $mult / $div"
+
+	# Using bc for high values
+	if $useBc; then
+		out="$(echo "$value * $base^$pow * $mult / $div" | bc)"
+	# or just plain bash
+	else
+		out="$(( $value * $base**($pow) * $mult / $div))"
+	fi
+
+	echo "$out"
+
+	if [[ -z "$out" ]] || [[ "$out" == "0" ]]; then
+		return 1
+	fi
+	return 0
+}
+
 # @description  Clean a multi-line cmd (with \ at the end)
 #
 # @arg $1  (string) The string to extract cmdline from

@@ -1,0 +1,240 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammStorage::MetaInit {
+	# Should be in util-linux
+	ammExec::RequiresOne lsblk blkid
+}
+
+# -----------------------------------------------------------------------------
+# Listing devices and discovery
+# -----------------------------------------------------------------------------
+
+function ammStorage::_GetFromSysfs {
+	typeset blockdev="$1"
+	typeset part="$2"
+
+	if [[ -r "/sys/class/block/$dev/$part" ]]; then
+		echo $(</sys/class/block/$dev/$part)
+		return 0
+	else
+		ammLog::Dbg "Invalid requested sysfs '$dev' / '$part'"
+		return 1
+	fi
+}
+
+function ammStorage::GetRealName {
+	typeset name="$1"
+
+	typeset realpath=""
+
+	# Shortname
+	if [[ "${name:0:1}" != "/" ]]; then
+		# Simple case: already real name with dev (maj:min) file
+		if [[ -e "/sys/class/block/$name/dev" ]]; then
+			echo "$name"
+			return 0
+
+		# Not real name, try with usual path
+		else
+			if [[ -e "/dev/$name" ]]; then
+				realpath="$(readlink -f "/dev/$name")"
+			elif [[ -e "/dev/mapper/$name" ]]; then
+				realpath="$(readlink -f "/dev/mapper/$name")"
+			fi
+		fi
+	else
+		# Need real block device (dm-X instead of lvm "vgname-lvname" symlink)
+		realpath="$(readlink -f $name)"
+
+		if [[ -e "/sys/class/block/${realpath##*/}/dev" ]]; then
+			echo "${realpath##*/}"
+			return 0
+		fi
+	fi
+
+	# Blockdevice exists (but can be an mknod' alias name
+	if [[ -b "$realpath" ]]; then
+
+		# If there is an entry in /sys for this disk/virt/part... got real
+		typeset devname="${realpath##*/}"
+		if [[ -d "/sys/class/block/$devname" ]]; then
+			echo "$devname"
+			return 0
+
+		# Not real name (eg mknod toto). Resolution through MAJ:MIN
+		else
+			typeset maj min btest
+			read maj min < <(ammStorage::GetMajorMinor "$realpath")
+
+			# There should be only 1 *direct* listing with this maj/min
+			for btest in /sys/class/block/*/dev; do
+				if [[ "$(<$btest)" == "$maj:$min" ]]; then
+					echo "$btest"
+					return 0
+				fi
+			done
+		fi
+	fi
+
+	ammLog::Err "Unable to get real name for device '$name'"
+	return 1
+}
+
+function ammStorage::GetMajorMinor {
+	typeset blockdev="$1"
+
+	if ! ammStorage::Exists "$blockdev"; then
+		ammLog::Err "Invalid blockdev '$blockdev'. Cannot get Major/minor"
+		return 1
+	fi
+
+	typeset blockname="$(ammStorage::GetRealName "$blockdev")"
+
+	typeset majmin=$(</sys/class/block/$blockname/dev)
+	echo "${majmin%%:*} ${majmin##*:}"
+}
+
+
+function ammStorage::GetType {
+	typeset dev="$(ammStorage::GetRealName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+# TODO: return a type like "nvme" "hdd" "ssd" "mdraid" "multipath" "luks" ..
+	
+}
+
+
+function ammStorage::GetSize {
+	typeset dev="$(ammStorage::GetRealName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	typeset -i nblocks blocksize
+	# each blockdev has a size
+	nblocks="$(ammStorage::_GetFromSysfs "$dev" "size")"
+
+	# But only the parent block has physical size
+	blocksize="$(ammStorage::GetBlockSize "$dev")"
+
+	echo $(($nblocks * $blocksize))
+}
+
+function ammStorage::GetBlockSize {
+	typeset dev="$(ammStorage::GetRealName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	ammStorage::_GetFromSysfs "$dev" "queue/physical_block_size"
+}
+
+function ammStorage::GetSerial {
+	typeset dev="$(ammStorage::GetRealName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	ammStorage::_GetFromSysfs "$dev" "device/serial"
+}
+
+function ammStorage::GetFirmware {
+	typeset dev="$(ammStorage::GetRealName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	ammStorage::_GetFromSysfs "$dev" "device/firmware_rev"
+}
+
+
+function ammStorage::Exists {
+	typeset blockdev="$1"
+
+	# absolute path
+	if [[ "${blockdev:0:1}" == "/" ]]; then
+		[[ -b "$blockdev" ]] && return 0
+
+	# Short name, try in usual folders
+	else
+		# Direct blockdev in /dev
+		[[ -b "/dev/$blockdev" ]] && return 0
+
+		# Folder in /sys
+		[[ -d "/sys/class/block/$blockdev" ]] && return 0
+	fi
+	# No standard path found, invalid blockdev
+	ammLog::Dbg "Invalid blockdev '$blockdev'"
+	return 1
+}
+
+function ammStorage::ListChildren {
+	typeset blockdev="$1"
+
+}
+
+function ammStorage::ListParents {
+	typeset blockdev="$1"
+
+	typeset blockname="$(ammStorage::GetRealName "$blockdev")"
+	typeset slave
+	for slave in /sys/class/block/$blockname/slaves/*; do
+		echo ${slave##*/}
+		ammStorage::ListParents "$slave"
+	done
+}
+
+function ammStorage::ListAvail {
+	
+	typeset bdpath
+	for bdpath in /sys/class/block/*; do
+		echo "${bdpath##*/}"
+	done
+}
+
+# -----------------------------------------------------------------------------
+# Devices state check
+# -----------------------------------------------------------------------------
+
+function ammStorage::IsPartition {
+	typeset blockdev="$1"
+
+	ammStorage::_GetFromSysfs "$dev" "partition" >/dev/null
+}
+
+function ammStorage::IsHealthy {
+	typeset blockdev="$1"
+}
+
+function ammStorage::IsComposite {
+	:
+}
+function ammStorage::IsFlashDrive {
+	typeset blockdev="$1"
+
+	if ! ammStorage::Exists "$blockdev"; then
+		ammLog::Err "Invalid block device '$blockdev'"
+		return 1
+	fi
+
+	typeset blockname="$(ammStorage::GetRealName)"
+	typeset -i rotational=0
+
+	typeset dev
+	#for dev in $(ammStorage::ListParent
+
+	# Get all underlying real block devices for the current one
+	[[ "$(</sys/block/$blockname/queue/rotational)" == "1" ]]
+}
+
+
+# -----------------------------------------------------------------------------
+# Secure operations
+# -----------------------------------------------------------------------------
+
+function ammStorage::SecureErase {
+	:
+	# --trim-sector-ranges
+}
+

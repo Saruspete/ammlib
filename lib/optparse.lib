@@ -543,8 +543,14 @@ function ammOptparse::Help {
 			echo "${_AMMOPTPARSE_DESCRIPTIONGROUP[$optidnum]}"
 		fi
 
+		# TODO: Parse opt to remove special chars like = @ !
 		typeset opts="${_AMMOPTPARSE_OPTALL[$optid]}"
 		typeset desc="${_AMMOPTPARSE_DESCRIPTION[$optid]:-}"
+
+		# Append current value to the end
+		if (set +u; [[ -n "${_AMMOPTPARSE_VALUE[$optid]}" ]] ); then
+			desc+=". Current value: '${_AMMOPTPARSE_VALUE[$optid]}'"
+		fi
 
 		while [[ -n "$desc" ]]; do
 			printf "  %-${optSize}.${optSize}s    %.${descSize}s\n" "$opts" "$desc"

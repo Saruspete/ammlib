@@ -316,7 +316,7 @@ function ammString::UnitConvert {
 
 
 	typeset -i base=1024 coef=1 mult=1 div=1
-	typeset useBc=false
+	typeset useBc=false powOp="*"
 	typeset out=""
 
 	# Compound unit
@@ -337,19 +337,25 @@ function ammString::UnitConvert {
 	typeset -i pow=$(ammString::UnitToPow "${unitsrc:0:1}" "${unitdst:0:1}" )
 
 	# For very high values, bash will overflow
-	if [[ $pow -gt 6 ]] || [[ $pow -lt 0 ]]; then
+	if [[ $pow -gt 6 ]]; then
 		useBc=true
-		ammLog::Dbg "Exponant '$pow' is > 6 or < 0, using bc for calculation"
+		ammLog::Dbg "Exponant '$pow' is > 6, using bc for calculation"
+	fi
+
+	# Negative power, division
+	if [[ $pow -lt 0 ]]; then
+		powOp="/"
+		pow="$(( $pow * -1 ))"
 	fi
 
 	ammLog::Dbg "Converting $unitsrc to $unitdst: $base**$pow * $mult / $div"
 
 	# Using bc for high values
 	if $useBc; then
-		out="$(echo "$value * $base^$pow * $mult / $div" | bc)"
+		out="$(echo "$value $powOp $base^$pow * $mult / $div" | bc)"
 	# or just plain bash
 	else
-		out="$(( $value * $base**($pow) * $mult / $div))"
+		out="$(( $value $powOp $base**$pow * $mult / $div))"
 	fi
 
 	echo "$out"

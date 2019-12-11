@@ -483,6 +483,10 @@ function ammOptparse::Get {
 	typeset elem="$1"
 	typeset id="$(_ammOptparse::OptToId "$elem")"
 
+	if [[ -z "$id" ]]; then
+		ammLog::Wrn "Requesting non-registered option '$elem'"
+		return 1
+	fi
 	ammLog::Dbg "Requested elem '$elem' mapped to '$id'"
 
 	typeset val=""

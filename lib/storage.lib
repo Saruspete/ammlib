@@ -22,11 +22,11 @@ function ammStorage::_GetFromSysfs {
 	typeset blockdev="$1"
 	typeset part="$2"
 
-	if [[ -r "/sys/class/block/$dev/$part" ]]; then
-		echo $(</sys/class/block/$dev/$part)
+	if [[ -r "/sys/class/block/$blockdev/$part" ]]; then
+		echo $(</sys/class/block/$blockdev/$part)
 		return 0
 	else
-		ammLog::Dbg "Invalid requested sysfs '$dev' / '$part'"
+		ammLog::Dbg "Invalid requested sysfs '$blockdev' / '$part'"
 		return 1
 	fi
 }
@@ -51,6 +51,7 @@ function ammStorage::GetRealName {
 				realpath="$(readlink -f "/dev/mapper/$name")"
 			fi
 		fi
+	# Starts with / treat as absolute path
 	else
 		# Need real block device (dm-X instead of lvm "vgname-lvname" symlink)
 		realpath="$(readlink -f $name)"
@@ -131,7 +132,29 @@ function ammStorage::GetBlockSize {
 	typeset dev="$(ammStorage::GetRealName "$1")"
 	[[ -z "$dev" ]] && return 1
 
-	ammStorage::_GetFromSysfs "$dev" "queue/physical_block_size"
+	typeset bsize="$(ammStorage::_GetFromSysfs "$dev" "queue/physical_block_size")"
+	if [[ -z "$bsize" ]]; then
+		typeset bsizetmp=
+		typeset parent
+		for parent in $(ammStorage::ListParents "$dev"); do
+			bsizetmp="$($FUNCNAME "$parent")"
+			if [[ -n "$bsizetmp" ]] && [[ -n "$bsize" ]] && [[ "$bsizetmp" != "$bsize" ]]; then
+				ammLog::Wrn "Multiple parent devices reported different block-size"
+				break
+			fi
+
+			bsize="$bsizetmp"
+		done
+	fi
+
+	echo $bsize
+}
+
+function ammStorage::GetModel {
+	typeset dev="$(ammStorage::GetRealName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	ammStorage::_GetFromSysfs "$dev" "device/model"
 }
 
 function ammStorage::GetSerial {
@@ -178,10 +201,47 @@ function ammStorage::ListParents {
 	typeset blockdev="$1"
 
 	typeset blockname="$(ammStorage::GetRealName "$blockdev")"
+	[[ -z "$blockname" ]] && return 1
+
+
+	# For partitions, use the special name of the device
+	if ammStorage::IsPartition "$blockname"; then
+		typeset parent=""
+		case $blockname in
+			# SCSI disks: simple number appended
+			sd*[0-9])
+				parent="${blockname%[0-9]}" ;;
+			# NVMe: remove last part to get namespace
+			nvme*p[0-9])
+				parent="${blockname%p[0-9]*}" ;;
+			# Unknown scheme: use plain listing
+			*)
+				ammLog::Dbg "Unhandled partition naming '$blockname'. Doing listing"
+				typeset bpath=""
+				for bpath in /sys/class/block/*/$blockname; do
+					if [[ -d "$bpath" ]]; then
+						parent="${bpath#/sys/class/block/}"
+						parent="${parent%/*}"
+					fi
+				done
+				;;
+		esac
+
+		# Check if the parent blockdev is correct. Maybe check with maj/min ?
+		if [[ -d "/sys/class/block/$parent" ]]; then
+			echo "$parent"
+			blockname="$parent"
+		else
+			ammLog::Err "Found '$blockdev' is a partition, but unable to validate its parent '$parent'"
+			return 1
+		fi
+	fi
+
+	# Check for slaves registerd in /sys
 	typeset slave
-	for slave in /sys/class/block/$blockname/slaves/*; do
+	for slave in "/sys/class/block/$blockname/slaves/"*; do
+		[[ -d "$slave" ]] || break
 		echo ${slave##*/}
-		ammStorage::ListParents "$slave"
 	done
 }
 
@@ -200,7 +260,7 @@ function ammStorage::ListAvail {
 function ammStorage::IsPartition {
 	typeset blockdev="$1"
 
-	ammStorage::_GetFromSysfs "$dev" "partition" >/dev/null
+	ammStorage::_GetFromSysfs "$blockdev" "partition" >/dev/null
 }
 
 function ammStorage::IsHealthy {

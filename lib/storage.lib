@@ -110,9 +110,36 @@ function ammStorage::GetType {
 	[[ -z "$dev" ]] && return 1
 
 # TODO: return a type like "nvme" "hdd" "ssd" "mdraid" "multipath" "luks" ..
-	
+	typeset -l typ=""
+	typeset tmp=
+	# partition
+	if ammStorage::IsPartition "$dev"; then
+		typ="part"
+	# DeviceMapper
+	elif tmp=$(ammStorage::_GetFromSysfs "$dev" "dm/uuid"); then
+		typ="${tmp%%-*}"
+	# NVMe
+	elif [[ "${dev#nvme}" != "$dev" ]]; then
+		typ="nvme"
+	fi
+
+	if [[ -z "$typ" ]]; then
+		ammLog::Dbg "Unable to get the type of '$dev'"
+		return 1
+	fi
+
+	echo "$typ"
 }
 
+function ammStorage::GetName {
+	typeset dev="$(ammStorage::GetRealName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	typeset name="$(ammStorage::_GetFromSysfs "$dev" "dm/name")"
+	[[ -z "$name" ]] && name="$dev"
+
+	echo "$name"
+}
 
 function ammStorage::GetSize {
 	typeset dev="$(ammStorage::GetRealName "$1")"
@@ -171,6 +198,23 @@ function ammStorage::GetFirmware {
 	ammStorage::_GetFromSysfs "$dev" "device/firmware_rev"
 }
 
+function ammStorage::GetMountpoint {
+	typeset dev="$(ammStorage::GetRealName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	typeset bdev mntpnt fstyp mntopts _junk
+	while read bdev mntpnt fstyp mntopts _junk; do
+		# Skip non block-backed mounts
+		ammStorage::Exists $bdev || continue
+
+		bdev="$(ammStorage::GetRealName "$bdev")"
+		if [[ "$bdev" == "$dev" ]]; then
+			echo "$mntpnt"
+			return 0
+		fi
+	done < /proc/mounts
+	return 1
+}
 
 function ammStorage::Exists {
 	typeset blockdev="$1"

@@ -87,7 +87,7 @@ function ammHttp::Fetch {
 
 function ammHttp::FetchSmart {
 	typeset src="$1"
-	typeset dst="${2:-$TMP_BASE/${src##*/}}"
+	typeset dst="${2:-$__AMMLIB_DATATMP/${src##*/}}"
 	typeset opt="${3:-}"
 	typeset ret=0
 

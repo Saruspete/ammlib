@@ -109,7 +109,8 @@ function ammStorage::GetType {
 	typeset dev="$(ammStorage::GetRealName "$1")"
 	[[ -z "$dev" ]] && return 1
 
-# TODO: return a type like "nvme" "hdd" "ssd" "mdraid" "multipath" "luks" ..
+# TODO: return a type: "nvme" "hdd" "ssd" "mdraid" "multipath" "luks" ..
+# TODO: plus a subtype: crypt (luks aes-xts-plain64), part (nvme), lvm (meta), lvm (thin)
 	typeset -l typ=""
 	typeset tmp=
 	# partition
@@ -121,6 +122,9 @@ function ammStorage::GetType {
 	# NVMe
 	elif [[ "${dev#nvme}" != "$dev" ]]; then
 		typ="nvme"
+	# Scsi Disk (sd)
+	elif [[ "${dev#sd[a-z]}" != "$dev" ]]; then
+		typ="disk"
 	fi
 
 	if [[ -z "$typ" ]]; then
@@ -181,7 +185,29 @@ function ammStorage::GetModel {
 	typeset dev="$(ammStorage::GetRealName "$1")"
 	[[ -z "$dev" ]] && return 1
 
-	ammStorage::_GetFromSysfs "$dev" "device/model"
+	typeset model="$(ammStorage::_GetFromSysfs "$dev" "device/model")"
+	# No direct model, fallback depending on type
+	if [[ -z "$model" ]]; then
+		typeset typ="$(ammStorage::GetType "$dev")"
+		case "$typ" in
+			# Crypt: display type and encryption
+			crypt)
+				;;
+			# LVM: display LVM type
+			lvm)
+				;;
+			# partition: get from its parent
+			part)
+				typeset parent="$(ammStorage::ListParents "$dev")"
+				[[ -z "$parent" ]] && return 1
+				model="($(ammStorage::_GetFromSysfs "$parent" "device/model"))"
+				;;
+			*)
+				return 1
+		esac
+	fi
+
+	echo "$model"
 }
 
 function ammStorage::GetSerial {

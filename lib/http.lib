@@ -147,7 +147,7 @@ function ammHttp::FetchSmart {
 # Special sites (to be split into submodule ?
 # -----------------------------------------------------------------------------
 
-function ammHttp::GithubBranchGet {
+function ammHttp::GithubBranchGetLastCommit {
 	typeset projectpath="$1"
 	typeset branch="${2:-master}"
 
@@ -163,7 +163,8 @@ function ammHttp::GithubBranchGet {
 	[[ -n "$commitdate" ]]
 }
 
-function ammHttp::GithubReleaseGet {
+
+function ammHttp::GithubReleaseGetLastVersion {
 	typeset projectpath="$1"
 	typeset tag="${2:-latest}"
 
@@ -176,3 +177,12 @@ function ammHttp::GithubReleaseGet {
 	[[ -n "$vers" ]]
 }
 
+# Compat
+function ammHttp::GithubBranchGet {
+	ammLog::Deprecated "ammHttp::GithubBranchGetLastCommit"
+	ammHttp::GithubBranchGetLastCommit "$@"
+}
+function ammHttp::GithubReleaseGet {
+	ammLog::Deprecated "ammHttp::GithubReleaseGetLastVersion"
+	ammHttp::GithubReleaseGetLastVersion "$@"
+}

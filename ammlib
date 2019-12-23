@@ -725,6 +725,19 @@ function ammLog::Dbg {
 	$redbg
 }
 
+# @description  Log a warning about function deprecation
+function ammLog::Deprecated {
+	typeset replacement="$1"
+	typeset message="${2:-}"
+
+	typeset callee="$(ammLog::Stackdump 2 1)"
+	typeset callstack="$(ammLog::Stackdump 3 1)"
+
+	ammLog::Wrn "Function '$callee' (called from $callstack) is deprectated. Update your code to use '$replacement' instead"
+	[[ -n "$message" ]] && ammLog::Wrn "  $message"
+}
+
+
 function _ammLog::StepPad {
 	typeset step="${1:-$__AMMLOG_STEPDEPTH}"
 

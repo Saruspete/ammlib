@@ -183,7 +183,7 @@ function _ammLib::TrapInit {
 		for s in "0)" "SIGEXIT" $(trap -l); do
 			[[ "${s%)}" != "$s" ]] && signum="${s%)}"
 			# Register num=>name and name=>num but skip invalid sigs
-			if [[ "${s#SIG}" != "$s" ]] && [[ "${s#SIGRTM*}" != "$s" ]]; then
+			if [[ "${s#SIG}" != "$s" ]] && [[ "${s#SIGRTM*}" == "$s" ]]; then
 				__AMMLIB_SIGNALS[$signum]="${s#SIG}"
 				__AMMLIB_SIGNALS[${s#SIG}]="$signum"
 			fi

@@ -96,6 +96,75 @@ typeset __AMMLIB_DATA="$HOME/.ammlib/data/"
 
 
 # -----------------------------------------------------------------------------
+# Hooks and events
+# -----------------------------------------------------------------------------
+
+typeset -A __AMMLIB_HOOKLIST
+# This module will register dynamic arrays based on name + prefix __AMMHOOK_
+
+# @description  Will generate a variable ID from a given name
+function ammLib::HookNameToVarname {
+	typeset -u name="$1"
+
+	# Remove any non-alphanum char
+	name="${name//[^a-zA-Z0-9]/}"
+	echo "__AMMLIB_HOOK_$name"
+}
+
+function ammLib::HookExists {
+	typeset name="$1"
+
+	typeset id="$(ammLib::HookNameToVarname "$name")"
+	# Got to use eval, typeset -n is from bash 4.3
+	eval "(set +u; [[ -n \${__AMMHOOK_${id}[@]} ]] )"
+}
+
+# @description  Register a callback to a hook
+# @arg $1  (string) Name of the hook to register
+# @arg $2  (function) Callback
+function ammLib::HookRegister {
+	typeset name="$1"
+
+	typeset varname="$(ammLib::HookNameToVarname "$name")"
+	# Create the hook first if not existing
+	if ! ammLib::HookExists $name; then
+		eval "$varname=("$@")"
+	else
+		eval "$varname+=("$@")"
+	fi
+}
+
+# @description  List registered callbacks for an even
+# @arg $1  (string) name of the hook to list callbacks
+function ammLib::HookListCallbacks {
+	typeset name="$1"
+
+	typeset varname="$(ammLib::HookNameToVarname "$name")"
+	typeset callback callbackid
+	for callbackid in "$(eval 'echo ${!'$varname'[@]}')"; do
+		eval echo '${'${varname}'['${callbackid}']};'
+	done
+}
+
+# @description  Trigger a hook
+# @arg $1  (string) Name of the hook to trigger
+# @arg $@  (string) arguments to pass to the callbacks
+function ammLib::HookTrigger {
+	typeset name="$1"; shift
+
+	if ammLib::HookExists "$name"; then
+		typeset callback args
+		while read callback args; do
+			if ! amm::IsFunc "$callback"; then
+				ammLog::Wrn "Callback '$callback' is not a function. Skipping it"
+				continue
+			fi
+			$callback "$@"
+		done < <(ammLib::HookList "$name")
+	fi
+}
+
+# -----------------------------------------------------------------------------
 # Exit code and trap management
 # -----------------------------------------------------------------------------
 typeset -A __AMMLIB_SIGNALS

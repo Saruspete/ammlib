@@ -116,22 +116,30 @@ function ammLib::HookExists {
 
 	typeset id="$(ammLib::HookNameToVarname "$name")"
 	# Got to use eval, typeset -n is from bash 4.3
-	eval "(set +u; [[ -n \${__AMMHOOK_${id}[@]} ]] )"
+	eval "(set +u; [[ -n \${${id}} ]] )"
 }
 
 # @description  Register a callback to a hook
 # @arg $1  (string) Name of the hook to register
 # @arg $2  (function) Callback
 function ammLib::HookRegister {
-	typeset name="$1"
+	typeset name="$1"; shift
 
 	typeset varname="$(ammLib::HookNameToVarname "$name")"
 	# Create the hook first if not existing
 	if ! ammLib::HookExists $name; then
-		eval "$varname=("$@")"
+		ammLog::Dbg "Registering cb '$@' to new hook '$name'"
+		eval "$varname=('$@')"
+		__AMMLIB_HOOKLIST["$varname"]="$name"
 	else
-		eval "$varname+=("$@")"
+		ammLog::Dbg "Registering cb '$@' to existing hook '$name'"
+		eval "$varname+=('$@')"
+		__AMMLIB_HOOKLIST["$varname"]+=" $name"
 	fi
+}
+
+function ammLib::HookList {
+	echo "${!__AMMLIB_HOOKLIST[@]}"
 }
 
 # @description  List registered callbacks for an even
@@ -141,7 +149,7 @@ function ammLib::HookListCallbacks {
 
 	typeset varname="$(ammLib::HookNameToVarname "$name")"
 	typeset callback callbackid
-	for callbackid in "$(eval 'echo ${!'$varname'[@]}')"; do
+	for callbackid in $(eval 'echo ${!'$varname'[@]}'); do
 		eval echo '${'${varname}'['${callbackid}']};'
 	done
 }
@@ -152,16 +160,17 @@ function ammLib::HookListCallbacks {
 function ammLib::HookTrigger {
 	typeset name="$1"; shift
 
-	if ammLib::HookExists "$name"; then
-		typeset callback args
-		while read callback args; do
-			if ! amm::IsFunc "$callback"; then
-				ammLog::Wrn "Callback '$callback' is not a function. Skipping it"
-				continue
-			fi
-			$callback "$@"
-		done < <(ammLib::HookList "$name")
-	fi
+	ammLog::Dbg "Triggering callbacks for '$name'"
+
+	typeset callback args
+	while read callback args; do
+		if ! amm::IsFunc "$callback"; then
+			ammLog::Wrn "Callback '$callback' is not a function. Skipping it"
+			continue
+		fi
+		ammLog::Dbg "Calling callback '$callback $args' with '$@'"
+		$callback $args "$@"
+	done < <(ammLib::HookListCallbacks "$name")
 }
 
 # -----------------------------------------------------------------------------
@@ -473,6 +482,8 @@ function ammLib::Loadable {
 function ammLib::Load {
 	typeset -i r=0
 
+	ammLib::HookTrigger libload "$@"
+
 	typeset libfile="" libname= l=
 	for libname in "$@"; do
 
@@ -542,6 +553,8 @@ function ammLib::Load {
 # @arg $@   (string[]) List of modules to unload
 function ammLib::Unload {
 	typeset -i r=0
+
+	ammLib::HookTrigger libunload "$@"
 
 	# Find 
 	typeset libname
@@ -614,7 +627,7 @@ function ammLib::ListFunctions {
 }
 
 # -----------------------------------------------------------------------------
-# Logging
+# Embedded Logging
 # -----------------------------------------------------------------------------
 
 function _ammLog::ColorJoin {

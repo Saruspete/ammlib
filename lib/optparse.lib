@@ -13,6 +13,8 @@ fi
 function ammOptparse::MetaInit {
 	ammExec::Requires awk
 	_ammOptparse::Expand
+	ammOptparse::AddOpt "-h|--help" "Show this help"
+	#ammoptparse::AddOpt "--version" "Show script version" "unknown"
 }
 
 function ammOptparse::MetaCheck {
@@ -313,7 +315,7 @@ function ammOptparse::Parse {
 	for (( optid=0; optid < ${#__AMMLIB_CALLOPTS[@]}; optid+=1 )); do
 		typeset -i optextra=0
 		typeset var="${__AMMLIB_CALLOPTS[$optid]}"
-		typeset val=""
+		typeset val="true"
 		typeset id=""
 
 		# Skip emptied variables (not consumed by previous options)
@@ -353,6 +355,9 @@ function ammOptparse::Parse {
 		if ( set +u; [[ -n "${_AMMOPTPARSE_VALTYPE[$id]}" ]] ); then
 			typeset valtyp="${_AMMOPTPARSE_VALTYPE[$id]}"
 			typeset nwant="${valtyp:1}"
+
+			# Reset default value
+			val=""
 			case $valtyp in
 				# Multiple required values
 				=[0-9]*)
@@ -408,7 +413,7 @@ function ammOptparse::Parse {
 						ammLog::Dbg "Option '$var' is the negation of '${var:2}' for ID '$id'"
 						val="false"
 					else
-						ammLog::Dbg "Option '$val' set to true for ID '$id'"
+						ammLog::Dbg "Option '$var' set to true for ID '$id'"
 						val="true"
 					fi
 					;;
@@ -473,6 +478,11 @@ function ammOptparse::Parse {
 			fi
 		fi
 	done
+
+	if [[ -n "$(_ammOptparse::OptToId "help")" ]] && [[ "$(ammOptparse::Get "help")" == "true" ]]; then
+		ammOptparse::Help
+		exit 0
+	fi
 
 	return $r
 }

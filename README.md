@@ -15,8 +15,8 @@ This is an attempt to provide a quality common library, that can be :
 
 ## General Requirements and targeted environment
 
-### Target systems 
- - target shell: **bash4**
+### Target systems
+ - target shell: **bash4.1** ([see available features](https://wiki-dev.bash-hackers.org/scripting/bashchanges))
  - target Kernel: **Linux**
  - target Distribution (modular): RHEL 6+, Debian, Gentoo (and more )
 

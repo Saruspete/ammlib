@@ -275,6 +275,42 @@ function ammString::ToUpper {
 	fi
 }
 
+
+# @description  Clean a multi-line cmd (with \ at the end)
+#
+# @arg $1  (string) The string to extract cmdline from
+function ammString::ExtractCmdline {
+	typeset str="$1"
+	# Inspired from https://www.linuxquestions.org/questions/programming-9/merge-lines-in-a-file-using-sed-191121/
+	echo "$str" | grep -Pv '^\s*#' \
+	| sed -e :a -e N -Ee 's/\\\s*(#.*)?\n^\s*/ /' -e ta
+	# https://www.gnu.org/software/sed/manual/sed.html#Joining-lines
+	# | sed -e ':x /\\$/ { N; s/\\\n//g ; bx }'
+	# | sed -e ':x /\\$/ { N; s/\\\s*(#.*)?\n^\n//g ; bx }'
+}
+
+function ammString::InputToLines {
+	typeset input="$1"
+
+	# Read stdin
+	if [[ "$input" == "-" ]]; then
+		cat
+
+	# Read from file
+	elif ammString::IsFile "$input"; then
+		cat "$input"
+
+	# Just output input
+	else
+		echo "$input"
+	fi
+}
+
+
+# -----------------------------------------------------------------------------
+# Units and base conversion
+# -----------------------------------------------------------------------------
+
 function ammString::UnitToPow {
 	typeset unitsrc="$1"
 	typeset unitdst="${2:-}"
@@ -366,36 +402,60 @@ function ammString::UnitConvert {
 	return 0
 }
 
-# @description  Clean a multi-line cmd (with \ at the end)
-#
-# @arg $1  (string) The string to extract cmdline from
-function ammString::ExtractCmdline {
-	typeset str="$1"
-	# Inspired from https://www.linuxquestions.org/questions/programming-9/merge-lines-in-a-file-using-sed-191121/
-	echo "$str" | grep -Pv '^\s*#' \
-	| sed -e :a -e N -Ee 's/\\\s*(#.*)?\n^\s*/ /' -e ta
-	# https://www.gnu.org/software/sed/manual/sed.html#Joining-lines
-	# | sed -e ':x /\\$/ { N; s/\\\n//g ; bx }'
-	# | sed -e ':x /\\$/ { N; s/\\\s*(#.*)?\n^\n//g ; bx }'
-}
+function ammString::BaseConvert {
+	typeset -i basesrc=$1
+	typeset -i basedst=$2
+	typeset number=$3
 
-function ammString::InputToLines {
-	typeset input="$1"
+	# Stupid but quick
+	if [[ "$basesrc" == "$basedst" ]]; then
+		echo $number
 
-	# Read stdin
-	if [[ "$input" == "-" ]]; then
-		cat
-
-	# Read from file
-	elif ammString::IsFile "$input"; then
-		cat "$input"
-
-	# Just output input
+#	# (<=64) => 10 # commented as fuck up the vim parsing
+#	elif [[ $basedst == 10 ]] && [[ $basesrc -le 64 ]]; then
+#		echo $(( $basesrc#$number ))
+	# 16 => 10: pure bash
+	elif [[ $basesrc -le 16 ]]; then
+		# Beware to order of obase/ibase !
+		echo "obase=$basedst; ibase=$basesrc; $number" | bc
+		return $?
 	else
-		echo "$input"
+		ammLog::Err "Cannot convert from $basesrc to $basedst"
+		return 1
 	fi
 }
 
+function ammString::HexToDec {
+	ammString::BaseConvert 16 10 $1
+}
+function ammString::DecToHex {
+	ammString::BaseConvert 10 16 $1
+}
+
+function ammString::IPv4ToHex {
+	typeset ipv4str="$1"
+
+	typeset ipset strhex
+	for ipset in ${ipv4str//./ }; do
+		strhex+="$(ammString::DecToHex $ipset)"
+	done
+
+	echo $strhex
+}
+function ammString::HexToIPv4 {
+	typeset strhex="$1"
+	if [[ "${#strhex}" != 8 ]]; then
+		ammLog::Wrn "Calling $FUNCNAME with arg length != 8"
+		return 1
+	fi
+
+	typeset i ip4str=""
+	for ((i=0; i<8; i+=2)); do
+		ip4str+="${ip4str:+.}$(ammString::HexToDec ${strhex:$i:2})"
+	done
+
+	echo $ip4str
+}
 
 # -----------------------------------------------------------------------------
 # Search and filter

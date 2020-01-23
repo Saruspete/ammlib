@@ -1,0 +1,270 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammSyscfgNetwork::MetaCheck {
+	ammExec::Requires ip awk
+	ammLib::Require string
+}
+
+function ammSyscfgNetwork::MetaInit {
+	ammLib::Load string
+}
+
+# -----------------------------------------------------------------------------
+# Ifaces
+# -----------------------------------------------------------------------------
+function ammSyscfgNetwork::NicGet {
+	typeset i
+	for ifacepath in /sys/class/net/*; do
+		typeset iface="${ifacepath##*/}"
+		# Skip lo
+		[[ "$iface" == "lo" ]] && continue
+
+		echo "$iface"
+	done
+}
+
+function ammSyscfgNetwork::NicExists {
+	typeset iface="$1"
+	[[ -d "/sys/class/net/$iface" ]]
+}
+
+# @description: Display information about a given NIC
+# @arg $1  Name of the NIC
+function ammSyscfgNetwork::NicInfo {
+	typeset iface="$1"
+	typeset fields="carrier duplex speed type master mac ipv4"
+
+	if ! ammSyscfgNetwork::NicExists "$iface"; then
+		ammLog::Err "Iface '$iface' does not exists"
+		return 1
+	fi
+
+	typeset ifpath="/sys/class/net/$iface"
+	typeset field
+	for field in $fields; do
+		case $field in
+			carrier) echo "carrier=$(<$ifpath/carrier)"   ;;
+			duplex)  echo "duplex=$(cat $ifpath/duplex 2>/dev/null|| echo none)" ;;
+			speed)   echo "speed=$(cat $ifpath/speed 2>/dev/null || echo 0)" ;;
+			mac)     echo "mac=$(cat $ifpath/address)" ;;
+			#index)   echo "index=$(awk -F= '$1=="IFINDEX" {print $2}' $ifpath/uevent)" ;;
+			index)   echo "index=$(<$ifpath/iflink)" ;;
+			ipv4)    echo "ipv4=$(ip address show dev $iface|ammString::Filter "inet" "^inet$" "+1")" ;;
+			# More complex processing
+			type)    echo "type=$(awk -F= '$1=="DEVTYPE"{print $2}' $ifpath/uevent)" ;;
+			master)  echo "master=" ;;
+		esac
+	done
+
+	#ammSyscfgNetwork::CableInfo "$iface"
+
+}
+
+function ammSyscfgNetwork::CableInfo {
+	typeset iface="$1"
+
+	# Also try the connector link speed if any
+	if ammExec::Exists ethtool; then
+		# List of supported NICs is on ethtool source code:
+		# sourceforge.net/projects/gkernel/files/ethtool/
+		# Supported NICs as of v4.0 (their respective .c file in ethtool source)
+		#    amd811e at76c50x e100 e1000 et131x fec_8xx ibm_emac igb ixgb ixgbe ixgbevf marvell natsemi pcnet32
+		#    realtek sfc sfp smsc911x stmmac tg3 tse vioc
+		typeset eeprom="$(ethtool --dump-module-eeprom $iface 2>/dev/null)"
+		if [[ -n "$eeprom" ]]; then
+			typeset key val keylast sfpactive sfpmedium
+			while IFS=: read key val; do
+				key="$(ammString::Trim "$key")"
+				val="$(ammString::Trim "$val")"
+				case "$key" in
+					BR,\ Nominal)  echo "module-speed='${val%MBd}'" ;;
+					Connector)
+						# Only take parsed value
+						echo "module-connector-raw='$val'"
+						val="${val#*(}"
+						val="${val%)*}"
+						echo "module-connector-str='$val'"
+
+						if ammString::ContainsWord "$val" "Copper"; then
+							sfpmedium="Copper"
+						fi
+						;;
+
+					Transceiver\ type)
+						if ammString::ContainsWord "$val" "Passive"; then
+							sfpactive="Passive"
+						else
+							sfpactive="Active"
+						fi
+						if ammString::ContainsWord "$val" "Cable" && [[ -z "$sfpmedium" ]]; then
+							sfpmedium="Copper"
+						fi
+						;;
+
+					Length\ \($sfpmedium\))
+						echo "length='$val'"
+						echo "length-$sfpmedium='$val'"
+						;;
+
+					Length\ *)
+						typeset typ="${key##*(}"
+						typ="${typ%)}"
+						echo "length-$typ='$val'"
+						;;
+
+					# For vendor-{Name,OUI,PN,SN,rev}
+					Vendor*)
+						typeset -l vendor="${key// /-}"
+						echo "$vendor='$val'"
+						;;
+
+					# Format fix for Ethtool 3.5 in Centos6
+					'')
+						case "$keylast" in
+							Transceiver\ codes)
+								# Will be the equivalent of Transciever type"
+								if [[ "${val:0:2}" == "=>" ]]; then
+									val="${val:3}"
+									if ammString::ContainsWord "$val" "Passive"; then
+										sfpactive=false
+									fi
+
+								fi
+								;;
+						esac
+						;;
+				esac
+				keylast="$key"
+			done < <(echo "$eeprom")
+		fi
+	fi
+}
+
+# Get the nic that has a IP addr registered to it
+function ammSyscfgNetwork::NicWithIp {
+	typeset ip="$1"
+	ip address show | awk -v ip="$ip"  '
+		# New nic
+		$1 ~/^[0-9]+:$/ {
+			nic=$2
+		}
+		$1 ~ /inet6?/ {
+			gsub("/[0-9]+", "", $2)
+			if ($2 == ip)
+				print nic
+		}
+		'
+}
+
+# -----------------------------------------------------------------------------
+# IP Network management
+# -----------------------------------------------------------------------------
+
+# Return all IP adress of an iface
+function ammSyscfgNetwork::IpAddrGetMain {
+	# By default, ipv4. can be 4, 6, any or all
+	typeset ipfamily="${1:-4}"
+
+	# Multiple IPs, get the one that resolves to the hostname
+	typeset myname="$(uname -n)"
+	while read ip type _junk; do
+		# Only select TCP
+		[[ $type == "STREAM" ]] || continue
+
+		# Selec the requested format
+		case $ipfamily in
+			4)    ammString::IsIPv4 "$ip" && echo "$ip" ;;
+			6)    ammString::IsIPv6 "$ip" && echo "$ip" ;;
+			both) ammString::IsIP   "$ip" && echo "$ip" ;;
+			any)  ammString::IsIP   "$ip" && echo "$ip"; break ;;
+			*)
+				ammLog::Err "Unknown ipfamily '$ipfamily'. Want one of: 4, 6, any, both"
+				break
+				;;
+		esac
+
+	done < <(getent ahosts $myname)
+
+}
+
+# Return the main IP address: the Ip 
+function ammSyscfgNetwork::IpAddrGet {
+	typeset ipfamily="${2:-4}"
+	typeset ifaces="${2:-}"
+
+	[[ -z "$ifaces" ]] && ifaces="$(ammSyscfgNetwork::NicGet)"
+
+	typeset iface
+	for iface in $ifaces; do
+		if ! ammSyscfgNetwork::NicExists "$iface"; then
+			ammLog::Wrn "Non existant iface '$iface'"
+			continue
+		fi
+
+		typeset ipfilter=""
+		case $ipfamily in
+			4)   ipfilter="^inet$" ;;
+			6)   ipfilter="^inet6$" ;;
+			any) ipfilter="^inet6?$" ;;
+			*)
+				ammLog::Wrn "Unknown ipfamily: '$ipfamily'. Must be one of: 4, 6, any"
+				return 1
+				;;
+		esac
+
+		ip addr show dev $iface | ammString::Filter "$ipfilter" "$ipfilter" "+1"
+
+	done
+}
+
+# -----------------------------------------------------------------------------
+# Namespace
+# -----------------------------------------------------------------------------
+
+function _ammSyscfgNetwork::NSInit {
+	[[ -d "/var/run/netns" ]] || mkdir -p /var/run/netns
+
+	# TODO: lookup /proc/*/ns/netns as a symink to /var/run/netns/
+	typeset nsinode
+	for nsinode in /proc/*/ns/net; do
+		[[ -r $nsinode ]] || continue
+
+	done
+}
+
+function ammSyscfgNetwork::NSExec {
+	typeset ns="$1"
+	typeset cmd="$2"
+
+	ip netns exec "$ns" "$cmd"
+}
+
+# -----------------------------------------------------------------------------
+# Bridge management
+# -----------------------------------------------------------------------------
+
+function ammSyscfgNetwork::BridgeVlanGet { :; }
+function ammSyscfgNetwork::BridgeVlanSet { :; }
+function ammSyscfgNetwork::BridgeVlanAdd {
+	typeset iface="$1"
+	typeset vlanid="$2"
+
+	# Set the guest as vlan
+	bridge vlan add dev "$iface" vid "$vlan" pvid untagged master
+	# Push the vlan id to the host
+	# /sys/class/net/$iface/bridge/vlan_filtering = 1
+	# /sys/class/net/$iface/bridge/vlan_filtering = 1
+	#bridge vlan add dev 
+	#bridge vlan add vid "$vlan" dev "$bridge" master
+}
+
+function ammSyscfgNetwork::BridgeVlanDel { :; }

@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 # Some tools are required for this module to work
-function ammPkgRpm::MetaInit {
+function ammPkgRpm::MetaCheck {
 	ammExec::Requires rpm rpm2cpio cpio
 }
 

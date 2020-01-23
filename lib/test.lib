@@ -9,7 +9,7 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-#function ammTest::MetaInit {
+#function ammTest::MetaCheck {
 #	ammExec::Requires awk
 #}
 

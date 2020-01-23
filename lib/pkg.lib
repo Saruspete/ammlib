@@ -9,10 +9,12 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammPkg::MetaInit {
+function ammPkg::MetaCheck {
 	ammLib::Require string
 	ammExec::Requires ldd
+}
 
+function ammPkg::MetaInit {
 	# Try to load the local package manager to avoid redundancy
 	typeset localpkgmgr="$(ammPkg::ManagerDetect)"
 	if [[ -n "$localpkgmgr" ]]; then

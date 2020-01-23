@@ -9,6 +9,9 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+function ammIso::MetaCheck {
+	ammLib::Require string
+}
 function ammIso::MetaInit {
 	ammLib::Require string
 }

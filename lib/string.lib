@@ -5,7 +5,7 @@ if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
 	exit 1
 fi
 
-function ammString::MetaInit {
+function ammString::MetaCheck {
 	# try to keep to coreutils
 	ammExec::Requires sed seq tr
 }

@@ -9,7 +9,7 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammStorage::MetaInit {
+function ammStorage::MetaCheck {
 	# Should be in util-linux
 	ammExec::RequiresOne lsblk blkid
 }

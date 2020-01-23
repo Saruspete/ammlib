@@ -9,9 +9,13 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammKernel::MetaInit {
+function ammKernel::MetaCheck {
 	ammLib::Require string
 	ammExec::Requires wc
+}
+
+function ammKernel::MetaInit {
+	ammLib::Load string
 }
 
 # -----------------------------------------------------------------------------

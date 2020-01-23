@@ -9,7 +9,7 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammHttp::MetaInit {
+function ammHttp::MetaCheck {
 	ammExec::RequiresOne curl wget
 
 }

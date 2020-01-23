@@ -5,7 +5,7 @@ if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
 	exit 1
 fi
 
-function ammDate::MetaInit {
+function ammDate::MetaCheck {
 	ammExec::Requires date
 }
 

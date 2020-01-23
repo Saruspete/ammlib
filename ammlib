@@ -395,7 +395,7 @@ function ammLib::IsSublib {
 
 # @description  Get the function name for the library' constructor
 # @arg $1  (string) library name
-function ammLib::MetaInitGetName {
+function ammLib::MetaGetPrefix {
 	typeset libname="$1"
 
 	# Input name is lowercase. Up only first char: main => Main
@@ -410,7 +410,7 @@ function ammLib::MetaInitGetName {
 		done
 	fi
 
-	echo "amm${funcpref}::MetaInit"
+	echo "amm${funcpref}::Meta"
 }
 
 
@@ -439,9 +439,8 @@ function ammLib::Loadable {
 		if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
 
 			# try to load it in a subshell to check init
-			typeset initfunc="$(ammLib::MetaInitGetName "$libname")"
-			typeset inittext=""
-
+			typeset metapref="$(ammLib::MetaGetPrefix "$libname")"
+			typeset metatext=""
 
 			# Display the lib file
 			echo "$libfile"
@@ -456,11 +455,11 @@ function ammLib::Loadable {
 			fi
 
 			# Code 98 = fail during the load (parsing error ?)
-			inittext="$(ammLog::Silence onlyerr; . $libfile || exit 98; if \type $initfunc >/dev/null 2>&1; then $initfunc; exit $?; else exit 0; fi;)"
+			metatext="$(ammLog::Silence onlyerr; . $libfile || exit 98; if \type ${metapref}Check >/dev/null 2>&1; then ${metapref}Check; exit $?; else exit 0; fi;)"
 
 			# Dont stop loading, just log error and increase return
 			if [[ $? -ne 0 ]]; then
-				ammLog::Dbg "Unable to load lib '$libname' (file '$libfile'). Init check failed: '$inittext'"
+				ammLog::Dbg "Unable to load lib '$libname' (file '$libfile'). Init check failed: '$metatext'"
 				r=r+1
 				continue
 			fi
@@ -530,8 +529,8 @@ function ammLib::Load {
 			. $libfile
 
 			# Call init
-			typeset metainit="$(ammLib::MetaInitGetName $libname)"
-			amm::IsFunc $metainit && $metainit
+			typeset metapref="$(ammLib::MetaGetPrefix "$libname")"
+			amm::IsFunc ${metapref}Init && ${metapref}Init
 
 			continue
 

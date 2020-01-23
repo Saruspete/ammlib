@@ -12,11 +12,13 @@ fi
 #typeset -g AMMPKGYUM_AVAIL_
 
 # Some tools are required for this module to work
-function ammPkgYum::MetaInit {
+function ammPkgYum::MetaCheck {
 	ammLib::Require pkg.rpm string
 	ammExec::Requires cksum gzip awk
-
 	#ammExec::Requires "repoquery"
+}
+function ammPkgYum::MetaInit {
+	ammLib::Require pkg.rpm string
 }
 
 function ammPkgYum::IsAvailable {

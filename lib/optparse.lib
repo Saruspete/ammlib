@@ -10,15 +10,14 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammOptparse::MetaInit {
+function ammOptparse::MetaCheck {
 	ammExec::Requires awk
+}
+
+function ammOptparse::MetaInit {
 	_ammOptparse::Expand
 	ammOptparse::AddOpt "-h|--help" "Show this help"
 	#ammoptparse::AddOpt "--version" "Show script version" "unknown"
-}
-
-function ammOptparse::MetaCheck {
-	ammExec::Requires awk
 }
 
 # -----------------------------------------------------------------------------

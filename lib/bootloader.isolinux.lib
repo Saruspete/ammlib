@@ -9,10 +9,14 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammBootloaderIsolinux::MetaInit {
+function ammBootloaderIsolinux::MetaCheck {
 	ammLib::Require string
-
 }
+
+function ammBootloaderIsolinux::MetaInit {
+	ammLib::Load string
+}
+
 
 
 typeset -ga __ammBootloaderIsolinuxEntries=()

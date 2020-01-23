@@ -9,13 +9,15 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammProcess::MetaInit {
+function ammProcess::MetaCheck {
 	# Stick with coreutils
 	ammExec::Requires tr head
 	ammLib::Require string
-	:
 }
 
+function ammProcess::MetaInit {
+	ammLib::Require string
+}
 # -----------------------------------------------------------------------------
 # Basic process state
 # -----------------------------------------------------------------------------

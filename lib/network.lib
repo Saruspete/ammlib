@@ -9,8 +9,12 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-function ammNetwork::MetaInit {
+function ammNetwork::MetaCheck {
 	ammLib::Require process string
+}
+
+function ammNetwork::MetaInit {
+	ammLib::Load process string
 }
 
 # -----------------------------------------------------------------------------

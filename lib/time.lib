@@ -5,10 +5,17 @@ if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
 	exit 1
 fi
 
+# -----------------------------------------------------------------------------
+# Meta check
+# -----------------------------------------------------------------------------
 
-function ammTime::MetaInit {
+function ammTime::MetaCheck {
 	ammExec::Requires date
 }
+
+# -----------------------------------------------------------------------------
+# Parsing
+# -----------------------------------------------------------------------------
 
 # Trim leading 0 and special hex date
 function ammTime::ParseInt {

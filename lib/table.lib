@@ -1,0 +1,321 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# Template: REPLACE
+# s/Table/libname/g
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+#function ammTable::MetaCheck {
+#	ammExec::Requires awk
+#}
+#function ammTable::MetaInit {
+#}
+
+# -----------------------------------------------------------------------------
+# Generate tables display
+# -----------------------------------------------------------------------------
+
+# Features:
+# - Create new table
+# - Set structure: name, size (fixed / % / fill)
+# - Set content:
+#   - add then print full or block
+#   - stream
+# - repeat header
+# - table format seperator...
+# - table row seperator callback
+#
+# Optionnal / later:
+# - create multiple tables ?
+
+
+typeset -g  __AMMTABLE_NAME=""
+
+# Columns name and state
+typeset -ga __AMMTABLE_COLUMNS
+typeset -gA __AMMTABLE_COLNAME2ID
+typeset -ga __AMMTABLE_COLCFG_SIZE
+typeset -ga __AMMTABLE_COLCFG_FORMAT
+typeset -ga __AMMTABLE_COLCFG_OVERFLOW
+
+# Rows content
+typeset -ga __AMMTABLE_ROWS
+typeset -g  __AMMTABLE_ROWSEP=$'\n'
+typeset -ga __AMMTABLE_ROWLAST
+
+# Display mode
+typeset -g  __AMMTABLE_DISPLAYMODE=""
+typeset -gi __AMMTABLE_DISPLAYPOS=0
+typeset -g  __AMMTABLE_DISPLAYSEP="|"
+
+# Used as cache for column size
+typeset -g  __AMMTABLE_CACHE_TERMSIZE=0
+typeset -ga __AMMTABLE_CACHE_COLSIZE
+
+function _ammTable::TermCols {
+	echo "${COLUMNS:-$(tput cols)}"
+}
+
+function _ammTable::DataMaxSize {
+	typeset column
+}
+
+function _ammTable::ColGetSize {
+	typeset colid="$1"
+
+	typeset termsize="$(_ammTable::TermCols)"
+	ammLog::Dbg "Getting colsize for column id '$colid' (term=$termsize)"
+
+	# try cache
+	if (set +u; [[ -n "${__AMMTABLE_CACHE_COLSIZE[$colid]}" ]] && [[ $__AMMTABLE_CACHE_TERMSIZE == "$termsize" ]] ); then
+		echo "${__AMMTABLE_CACHE_COLSIZE[$colid]}"
+		return 0
+	fi
+
+	# Set cache witness
+	__AMMTABLE_CACHE_TERMSIZE="$termsize"
+
+	# Loop on all columns to get dynamic values, and pre-compute them
+
+	# Step 1: check what we have
+	typeset -i colidloop=0
+	typeset -i sumfill=0 sumpct=0 sumfixed=0
+	for colidloop in ${!__AMMTABLE_COLUMNS[@]}; do
+		typeset cfgsize="${__AMMTABLE_COLCFG_SIZE[$colidloop]}"
+		case $cfgsize in
+			[0-9]|[0-9]*[0-9]) sumfixed+=$cfgsize      ;;
+			[0-9]*%)           sumpct+="${cfgsize%\%}" ;;
+			fill)              sumfill+=1              ;;
+		esac
+	done
+
+	ammLog::Dbg "We got: $sumfill fixed, $sumpct %, $sumfill filled"
+
+	# Step 2: Compute all columns size
+	typeset -i totalsize=0
+	for colidloop in ${!__AMMTABLE_COLUMNS[@]}; do
+		typeset colsize="${__AMMTABLE_COLCFG_SIZE[$colidloop]}"
+		case $colsize in
+			[0-9]|[0-9]*[0-9])
+				;;
+
+			[0-9]*%)
+				colsize="${colsize%\%}"
+				# if the total pct is greather than 100, rescale it
+				[[ "$sumpct" -gt 100 ]] && colsize="$(( $colsize * 100 / $sumpct ))"
+
+				colsize=$(( $colsize * $termsize / 100 ))
+				;;
+
+			fill)
+				# (Total - deadsize - fixed - pct) /  nb "fill" fields 
+				colsize=$(( ( $termsize - (3*${#__AMMTABLE_COLUMNS[@]}) - $sumfixed - $(( $sumpct * $termsize / 100 )) ) / $sumfill -1 ))
+				;;
+		esac
+
+		# Store the result as the cache
+		__AMMTABLE_CACHE_COLSIZE[$colidloop]="$colsize"
+		totalsize+=$colsize
+	done
+
+	# Special case: total if less than sum, so add diff to last column
+	if [[ $totalsize -lt $termsize ]]; then
+		:
+	fi
+
+	# Step 3: show our column sizel
+	ammLog::Dbg "Field '$colid' is now ${__AMMTABLE_CACHE_COLSIZE[$colid]}"
+	echo ${__AMMTABLE_CACHE_COLSIZE[$colid]}
+}
+
+# -----------------------------------------------------------------------------
+# Create the table
+# -----------------------------------------------------------------------------
+
+#
+function ammTable::Reset {
+	__AMMTABLE_NAME=""
+	__AMMTABLE_COLUMNS=()
+	__AMMTABLE_COLNAME2ID=()
+	__AMMTABLE_COLCFG_SIZE=()
+	__AMMTABLE_COLCFG_FORMAT=()
+	__AMMTABLE_COLCFG_OVERFLOW=()
+	__AMMTABLE_ROWS=()
+	__AMMTABLE_ROWLAST=()
+
+	__AMMTABLE_DISPLAYMODE=""
+	__AMMTABLE_DISPLAYPOS=0
+}
+
+
+# @description  Create a new table, optionally with structure
+# @arg $1 
+# @arg $@  Columns to be added, format: "Name|option:size"
+function ammTable::Create {
+	typeset name="$1"; shift
+
+	[[ -n "$__AMMTABLE_NAME" ]] && ammTable::Reset
+
+	__AMMTABLE_NAME="$name"
+
+	typeset col
+	for col in "$@"; do
+		typeset colname="${col%%|*}"
+		typeset colstate="${col#*|}"
+		typeset colcfg=(${colstate//,/ })
+		ammTable::AddColumn "$colname" "${colcfg[@]}"
+	done
+}
+
+# @description  Add a new column to the table
+# @arg $1  (string) Name of the column
+# @arg $@  (string) Configuration of the column
+function ammTable::AddColumn {
+	typeset name="$1"; shift
+
+	typeset -i colid="${__AMMTABLE_COLUMNS+${#__AMMTABLE_COLUMNS[@]}}"
+	__AMMTABLE_COLUMNS+=("$name")
+	__AMMTABLE_COLNAME2ID[$name]="$colid"
+
+	ammLog::Dbg "Adding column '$name' ($@) pos '$colid'"
+
+	# Process column format (simple validation)
+	typeset -i r=0
+	typeset cfg
+	for cfg in "$@"; do
+		typeset key="${cfg%%:*}"
+		typeset val="${cfg#*:}"
+		typeset err=""
+
+		case "$key" in
+			size)
+				case "$val" in
+					*%|*%total|fill|max|[0-9]|[0-9][0-9]) __AMMTABLE_COLCFG_SIZE[$colid]="$val" ;;
+					*) err="Must be '%' '%total' 'fill' 'max' or fixed int" ;;
+				esac
+				;;
+
+			format)
+				;;
+
+			overflow)
+				case "$val" in
+					hidden|wrap) __AMMTABLE_COLCFG_OVERFLOW[$colid]="$val" ;;
+					*) err="Must by 'hidden' or 'wrap'" ;;
+				esac
+				;;
+			*)
+				err="Valid keys are size, format, overflow"
+				;;
+		esac
+
+		if [[ -n "$err" ]]; then
+			ammLog::Err "Skiped invalid cfg '$cfg' for column '$name': $err"
+			r=r+1
+		fi
+	done
+
+	return $r
+}
+
+
+# -----------------------------------------------------------------------------
+# Add data
+# -----------------------------------------------------------------------------
+
+# @description  Add a new row to the table
+# @args $@  Each column in order
+function ammTable::AddRow {
+
+	typeset -i colid=0
+	typeset colval rowstr
+	for colval in "$@"; do
+		rowstr+="${colval}${__AMMTABLE_ROWSEP}"
+		__AMMTABLE_ROWLAST[$colid]="$colval"
+		colid+=1
+	done
+
+	__AMMTABLE_ROWS+=("$rowstr")
+
+	if [[ "$__AMMTABLE_DISPLAYMODE" == "direct" ]]; then
+		ammTable::Display
+	fi
+}
+
+# -----------------------------------------------------------------------------
+# Display
+# -----------------------------------------------------------------------------
+
+# @description  Display the table
+function ammTable::Display {
+	typeset mode="${1:-}"
+
+	# Display the header on first invocation
+	if [[ "$__AMMTABLE_DISPLAYPOS" == "0" ]]; then
+		ammTable::DisplayHeader
+	fi
+
+	# Display rows
+	while [[ $__AMMTABLE_DISPLAYPOS -lt ${#__AMMTABLE_ROWS[@]} ]]; do
+		ammTable::DisplayRow $__AMMTABLE_DISPLAYPOS
+		__AMMTABLE_DISPLAYPOS+=1
+	done
+
+	[[ -n "$mode" ]] && __AMMTABLE_DISPLAYMODE="$mode"
+
+	return 0
+}
+
+
+function ammTable::DisplayHeader {
+
+	typeset colid colnum="${#__AMMTABLE_COLUMNS[@]}" termsize="$(_ammTable::TermCols)"
+	# "dead" termcols: 1 for seperator, 2 for space between
+	typeset -i colsdead="$(($colnum*3 + 1))" colid=0
+
+	ammLog::Color bold white underline
+	echo -n "$__AMMTABLE_DISPLAYSEP"
+	#while [[ $colid -lt ${#__AMMTABLE_COLUMNS[@]} ]]; do
+	for colid in ${!__AMMTABLE_COLUMNS[@]}; do
+		typeset colname="${__AMMTABLE_COLUMNS[$colid]}"
+		typeset -i len="$(_ammTable::ColGetSize $colid)"
+		printf " %-${len}.${len}s $__AMMTABLE_DISPLAYSEP" "$colname"
+	done
+	ammLog::Color reset
+	echo
+}
+
+# @description  Display only specific row
+
+function ammTable::DisplayRow {
+
+	typeset rowid
+	for rowid in "$@"; do
+		typeset -a datas
+		typeset -i colid=0
+		# Use the last row cache
+		if [[ "$rowid" == "${#__AMMTABLE_ROWS[@]}" ]]; then
+			datas=("${__AMMTABLE_ROWLAST[@]}")
+		else
+			#set -x
+			#datas=(${__AMMTABLE_ROWS[$rowid]//$__AMMTABLE_ROWSEP/" "})
+			readarray -t datas < <(echo "${__AMMTABLE_ROWS[$rowid]}")
+		fi
+
+		# Display each column according to cfg
+		echo -n "$__AMMTABLE_DISPLAYSEP"
+		for colid in ${!__AMMTABLE_COLUMNS[@]}; do
+			typeset len="$(_ammTable::ColGetSize $colid)"
+			typeset data="${datas[$colid]:-}"
+			printf " %-${len}.${len}s $__AMMTABLE_DISPLAYSEP" "$data"
+		done
+		echo
+	done
+}

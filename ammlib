@@ -94,6 +94,10 @@ typeset __AMMLIB_DATATMP="/tmp/.ammlib.${UID:-$(id -u)}/${__AMMLIB_CALLNAME##*/}
 typeset __AMMLIB_DATA="$HOME/.ammlib/data/"
 [[ -d "$__AMMLIB_DATA" ]] || mkdir -p "$__AMMLIB_DATA"
 
+# Custom binaries
+typeset __AMMLIB_BIN="$HOME/.ammlib/bin"
+[[ -d "$__AMMLIB_BIN" ]] || mkdir -p "$__AMMLIB_BIN"
+export PATH+=":$__AMMLIB_BIN"
 
 # -----------------------------------------------------------------------------
 # Hooks and events
@@ -1104,6 +1108,15 @@ function ammExec::AsUser {
 
 	fi
 
+}
+
+function ammExec::GetPath {
+	typeset bin="$1"
+
+	typeset p
+	for p in ${PATH//:/ }; do
+		[[ -x "$p/$bin" ]] && echo "$p/$bin"
+	done
 }
 
 # @description  Check if one or more command are available in PATH

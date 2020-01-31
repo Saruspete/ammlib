@@ -33,10 +33,15 @@ function wgStatus {
 	ammTable::Create "WireGuard Details" "${cols[@]}"
 	ammTable::SetDisplayMode "direct"
 
-	typeset iface pubkey privkey endpoint lasthandshake datasent datareceived keepalive _junk
-	while read iface pubkey privkey endpoint lasthandshake datasent datareceived keepalive _junk; do
-	ammTable::AddRow "$iface" "$pubkey" "$privkey" "$endpoint" "$lasthandshake" "$datasent" "$datareceived" "$keepalive"
-	done < <(wg show $iface dump);
+	# You can use the read per line assignment form for complex processing
+	#typeset ifname pubkey privkey endpoint lasthandshake datasent datareceived keepalive _junk
+	#while read ifname pubkey privkey endpoint lasthandshake datasent datareceived keepalive _junk; do
+	#	$showpriv || privkey=""
+	#	ammTable::AddRow "$ifname" "$pubkey" $privkey "$endpoint" "$lasthandshake" "$datasent" "$datareceived" "$keepalive"
+	#done < <(wg show $iface dump);
+
+	# Or this shortest form
+	wg show $iface dump | awk -v show=$showpriv '{if(show=="false")$3=""; print}' | ammTable::AddRow "-"
 
 }
 

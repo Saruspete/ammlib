@@ -246,18 +246,33 @@ function ammTable::AddColumn {
 function ammTable::AddRow {
 
 	typeset -i colid=0
-	typeset colval rowstr
-	for colval in "$@"; do
-		rowstr+="${colval}${__AMMTABLE_ROWSEP}"
-		__AMMTABLE_ROWLAST[$colid]="$colval"
-		colid+=1
+	typeset -a fields=()
+	typeset moretoread=true
+
+	while $moretoread; do
+		# Read from stdin (piped)
+		if [[ "$#" == "1" ]] && [[ "$1" == "-" ]]; then
+			fields=()
+			read -a fields || moretoread=false
+		else
+			fields=("$@")
+			moretoread=false
+		fi
+
+		# Process every column
+		typeset colval="" rowstr=""
+		for colval in "${fields+${fields[@]}}"; do
+			rowstr+="${colval}${__AMMTABLE_ROWSEP}"
+			__AMMTABLE_ROWLAST[$colid]="$colval"
+			colid+=1
+		done
+		__AMMTABLE_ROWS+=("$rowstr")
+
+		# Direct display of content
+		if [[ "$__AMMTABLE_DISPLAYMODE" == "direct" ]]; then
+			ammTable::Display
+		fi
 	done
-
-	__AMMTABLE_ROWS+=("$rowstr")
-
-	if [[ "$__AMMTABLE_DISPLAYMODE" == "direct" ]]; then
-		ammTable::Display
-	fi
 }
 
 # -----------------------------------------------------------------------------

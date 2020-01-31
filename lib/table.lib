@@ -39,25 +39,25 @@ fi
 typeset -g  __AMMTABLE_NAME=""
 
 # Columns name and state
-typeset -ga __AMMTABLE_COLUMNS
-typeset -gA __AMMTABLE_COLNAME2ID
-typeset -ga __AMMTABLE_COLCFG_SIZE
-typeset -ga __AMMTABLE_COLCFG_FORMAT
-typeset -ga __AMMTABLE_COLCFG_OVERFLOW
+typeset -ga __AMMTABLE_COLUMNS=()
+typeset -gA __AMMTABLE_COLNAME2ID=()
+typeset -ga __AMMTABLE_COLCFG_SIZE=()
+typeset -ga __AMMTABLE_COLCFG_FORMAT=()
+typeset -ga __AMMTABLE_COLCFG_OVERFLOW=()
 
 # Rows content
-typeset -ga __AMMTABLE_ROWS
+typeset -ga __AMMTABLE_ROWS=()
 typeset -g  __AMMTABLE_ROWSEP=$'\n'
-typeset -ga __AMMTABLE_ROWLAST
+typeset -ga __AMMTABLE_ROWLAST=()
 
 # Display mode
 typeset -g  __AMMTABLE_DISPLAYMODE=""
-typeset -gi __AMMTABLE_DISPLAYPOS=0
+typeset -gi __AMMTABLE_DISPLAYPOS=
 typeset -g  __AMMTABLE_DISPLAYSEP="|"
 
 # Used as cache for column size
 typeset -g  __AMMTABLE_CACHE_TERMSIZE=0
-typeset -ga __AMMTABLE_CACHE_COLSIZE
+typeset -ga __AMMTABLE_CACHE_COLSIZE=()
 
 function _ammTable::TermCols {
 	echo "${COLUMNS:-$(tput cols)}"
@@ -194,6 +194,11 @@ function ammTable::AddColumn {
 		typeset val="${cfg#*:}"
 		typeset err=""
 
+		# If no cfg is set, skip all
+		if [[ "$key" == "$cfg" ]] || [[ -z "$key" ]]; then
+			continue
+		fi
+
 		case "$key" in
 			size)
 				case "$val" in
@@ -211,6 +216,7 @@ function ammTable::AddColumn {
 					*) err="Must by 'hidden' or 'wrap'" ;;
 				esac
 				;;
+
 			*)
 				err="Valid keys are size, format, overflow"
 				;;
@@ -221,6 +227,11 @@ function ammTable::AddColumn {
 			r=r+1
 		fi
 	done
+
+	# By default set the value to the column name size
+	if ( set +u; [[ -z "${__AMMTABLE_COLCFG_SIZE[$colid]}" ]] ); then
+		__AMMTABLE_COLCFG_SIZE[$colid]="${#name}"
+	fi
 
 	return $r
 }
@@ -253,9 +264,18 @@ function ammTable::AddRow {
 # Display
 # -----------------------------------------------------------------------------
 
+function ammTable::SetDisplayMode {
+	typeset mode="${1:-}"
+	__AMMTABLE_DISPLAYMODE="$mode"
+}
+
+function ammTable::SetHeaderRepeat {
+	typeset nrows="$1"
+	# TODO
+}
+
 # @description  Display the table
 function ammTable::Display {
-	typeset mode="${1:-}"
 
 	# Display the header on first invocation
 	if [[ "$__AMMTABLE_DISPLAYPOS" == "0" ]]; then
@@ -268,7 +288,6 @@ function ammTable::Display {
 		__AMMTABLE_DISPLAYPOS+=1
 	done
 
-	[[ -n "$mode" ]] && __AMMTABLE_DISPLAYMODE="$mode"
 
 	return 0
 }
@@ -280,7 +299,9 @@ function ammTable::DisplayHeader {
 	# "dead" termcols: 1 for seperator, 2 for space between
 	typeset -i colsdead="$(($colnum*3 + 1))" colid=0
 
-	ammLog::Color bold white underline
+	# Only color on human output
+	$__AMMLIB_INTERACTIVE && ammLog::Color bold white underline
+
 	echo -n "$__AMMTABLE_DISPLAYSEP"
 	#while [[ $colid -lt ${#__AMMTABLE_COLUMNS[@]} ]]; do
 	for colid in ${!__AMMTABLE_COLUMNS[@]}; do
@@ -288,7 +309,7 @@ function ammTable::DisplayHeader {
 		typeset -i len="$(_ammTable::ColGetSize $colid)"
 		printf " %-${len}.${len}s $__AMMTABLE_DISPLAYSEP" "$colname"
 	done
-	ammLog::Color reset
+	$__AMMLIB_INTERACTIVE && ammLog::Color reset
 	echo
 }
 

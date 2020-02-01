@@ -43,7 +43,9 @@ typeset -ga __AMMTABLE_COLUMNS=()
 typeset -gA __AMMTABLE_COLNAME2ID=()
 typeset -ga __AMMTABLE_COLCFG_SIZE=()
 typeset -ga __AMMTABLE_COLCFG_FORMAT=()
+typeset -ga __AMMTABLE_COLCFG_HIDDEN=()
 typeset -ga __AMMTABLE_COLCFG_OVERFLOW=()
+typeset -ga __AMMTABLE_COLCFG_CALLBACK=()
 
 # Rows content
 typeset -ga __AMMTABLE_ROWS=()
@@ -146,7 +148,9 @@ function ammTable::Reset {
 	__AMMTABLE_COLNAME2ID=()
 	__AMMTABLE_COLCFG_SIZE=()
 	__AMMTABLE_COLCFG_FORMAT=()
+	__AMMTABLE_COLCFG_HIDDEN=()
 	__AMMTABLE_COLCFG_OVERFLOW=()
+	__AMMTABLE_COLCFG_CALLBACK=()
 	__AMMTABLE_ROWS=()
 	__AMMTABLE_ROWLAST=()
 
@@ -169,6 +173,7 @@ function ammTable::Create {
 	for col in "$@"; do
 		typeset colname="${col%%|*}"
 		typeset colstate="${col#*|}"
+		[[ "$colname" == "$colstate" ]] && colstate=""
 		typeset colcfg=(${colstate//,/ })
 		ammTable::AddColumn "$colname" "${colcfg[@]}"
 	done
@@ -195,7 +200,7 @@ function ammTable::AddColumn {
 		typeset err=""
 
 		# If no cfg is set, skip all
-		if [[ "$key" == "$cfg" ]] || [[ -z "$key" ]]; then
+		if [[ -z "$key" ]]; then
 			continue
 		fi
 
@@ -215,6 +220,22 @@ function ammTable::AddColumn {
 					hidden|wrap) __AMMTABLE_COLCFG_OVERFLOW[$colid]="$val" ;;
 					*) err="Must by 'hidden' or 'wrap'" ;;
 				esac
+				;;
+
+			callback)
+				if [[ -z "$val" ]]; then
+					err="Cannot set an empty callback"
+				else
+					if ! amm::IsFunc $val; then
+						err="Non-existant callback function '$val'"
+					else
+						__AMMTABLE_COLCFG_CALLBACK[$colid]="$val"
+					fi
+				fi
+				;;
+
+			hidden)
+				__AMMTABLE_COLCFG_HIDDEN[$colid]=true
 				;;
 
 			*)
@@ -320,8 +341,15 @@ function ammTable::DisplayHeader {
 	echo -n "$__AMMTABLE_DISPLAYSEP"
 	#while [[ $colid -lt ${#__AMMTABLE_COLUMNS[@]} ]]; do
 	for colid in ${!__AMMTABLE_COLUMNS[@]}; do
+
+		# Skip hidden columns
+		if (set +u; [[ -n "${__AMMTABLE_COLCFG_HIDDEN[$colid]}" ]] ); then
+			continue
+		fi
+
 		typeset colname="${__AMMTABLE_COLUMNS[$colid]}"
 		typeset -i len="$(_ammTable::ColGetSize $colid)"
+
 		printf " %-${len}.${len}s $__AMMTABLE_DISPLAYSEP" "$colname"
 	done
 	$__AMMLIB_INTERACTIVE && ammLog::Color reset
@@ -350,6 +378,17 @@ function ammTable::DisplayRow {
 		for colid in ${!__AMMTABLE_COLUMNS[@]}; do
 			typeset len="$(_ammTable::ColGetSize $colid)"
 			typeset data="${datas[$colid]:-}"
+
+			# Skip hidden columns
+			if (set +u; [[ -n "${__AMMTABLE_COLCFG_HIDDEN[$colid]}" ]] ); then
+				continue
+			fi
+
+			# Call the callback if any
+			if (set +u; [[ -n "${__AMMTABLE_COLCFG_CALLBACK[$colid]}" ]] ); then
+				data="$(${__AMMTABLE_COLCFG_CALLBACK[$colid]} "$data")"
+			fi
+
 			printf " %-${len}.${len}s $__AMMTABLE_DISPLAYSEP" "$data"
 		done
 		echo

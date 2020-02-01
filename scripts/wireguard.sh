@@ -5,27 +5,40 @@ readonly MYPATH="${MYSELF%/*}"
 
 . "$MYPATH/../ammlib"
 
-ammLib::Require "table" "optparse"
+ammLib::Require "table" "optparse" "string"
 
 ammOptparse::AddOpt "-p|--private!" "Show private key too" "false"
 ammOptparse::Parse
 
 typeset showpriv="$(ammOptparse::Get "private")"
 
+function _wgSize {
+	typeset size="$1"
+	[[ -z "$size" ]] && return
+	ammString::UnitConvert "$size" "K" "M"
+}
+function _wgTimestamp {
+	typeset ts="$1"
+	[[ -z "$ts" ]] && return
+
+	echo $(( $(date +%s) - $ts))
+}
+
 function wgStatus {
 	typeset iface="${1:-all}"
+
+	typeset privkeyopts=""
+	$showpriv || privkeyopts=",hidden"
 
 	typeset -a cols=(
 		"Iface|size:10"
 		"Public Key|size:46"
-	)
-	
-	$showpriv && cols+=("Private Key|size:46")
-	cols+=(
+		"Private Key|size:46$privkeyopts"
 		"Endpoint|size:32"
-		"Last Handshake"
-		"KB Sent"
-		"KB Received"
+		"Allowed IPs|size:18"
+		"HS sec ago|callback:_wgTimestamp"
+		"MB Sent|callback:_wgSize"
+		"MB Recv|callback:_wgSize"
 		"Keepalive"
 	)
 
@@ -33,15 +46,7 @@ function wgStatus {
 	ammTable::Create "WireGuard Details" "${cols[@]}"
 	ammTable::SetDisplayMode "direct"
 
-	# You can use the read per line assignment form for complex processing
-	#typeset ifname pubkey privkey endpoint lasthandshake datasent datareceived keepalive _junk
-	#while read ifname pubkey privkey endpoint lasthandshake datasent datareceived keepalive _junk; do
-	#	$showpriv || privkey=""
-	#	ammTable::AddRow "$ifname" "$pubkey" $privkey "$endpoint" "$lasthandshake" "$datasent" "$datareceived" "$keepalive"
-	#done < <(wg show $iface dump);
-
-	# Or this shortest form
-	wg show $iface dump | awk -v show=$showpriv '{if(show=="false")$3=""; print}' | ammTable::AddRow "-"
+	wg show $iface dump | ammTable::AddRow "-"
 
 }
 

@@ -274,7 +274,7 @@ function ammTable::AddRow {
 		# Read from stdin (piped)
 		if [[ "$#" == "1" ]] && [[ "$1" == "-" ]]; then
 			fields=()
-			read -a fields || moretoread=false
+			read -a fields || break
 		else
 			fields=("$@")
 			moretoread=false

@@ -540,7 +540,7 @@ function ammLib::Load {
 
 		else
 			if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
-				ammLog::Err "Unable to load lib '$libname' due to failed init (enable debug with AMMLIB_DEBUG=1 for more detail)"
+				ammLog::Err "Unable to load lib '$libname' due to failed init (enable debug with AMMLIB_DEBUG=Lib for full detail)"
 			else
 				ammLog::Err "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
 			fi
@@ -781,6 +781,22 @@ function ammLog::Inf {
 	_ammLog::Log "INF" "bold green" "$@"
 }
 
+function ammLog::_DbgIsEnabled {
+	# Early tests
+	[[ $__AMMLOG_VERBOSITY -ge 2 ]] && return 0
+	[[ -z "${AMMLIB_DEBUG:-}" ]] && return 1
+	[[ "$AMMLIB_DEBUG" == "all" ]] && return 0
+
+	# Remove leading "amm"
+	typeset func="${1##amm}"
+
+	# If the lib is within the debug, or only the func
+	if [[ "${AMMLIB_DEBUG//$func/}" != "$AMMLIB_DEBUG" ]] || [[ "$AMMLIB_DEBUG" =~ (^|,)${func%%::*}(,|$) ]]; then
+		return 0
+	fi
+	return 1
+}
+
 # @description  Log a debug info
 # @arg $@  Debug text to log. If "-", text is read from stdin
 function ammLog::Dbg {
@@ -790,7 +806,8 @@ function ammLog::Dbg {
 	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
 
 	# Only send to log on verbose level
-	if [[ -n "${AMMLIB_DEBUG:-}" ]] || [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
+	#if [[ -n "${AMMLIB_DEBUG:-}" ]] || [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
+	if ammLog::_DbgIsEnabled "${FUNCNAME[1]}"; then
 		# Get the caller
 		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}::${BASH_LINENO[0]}"
 

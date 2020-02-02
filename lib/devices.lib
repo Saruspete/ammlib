@@ -1,0 +1,61 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammDevice::MetaCheck {
+	ammExec::Requires lspci
+}
+#function ammDevice::MetaInit {
+#}
+
+# -----------------------------------------------------------------------------
+# List and manage local devices
+# -----------------------------------------------------------------------------
+
+
+function ammDevices::GetVendorFromId {
+                typeset vendor="$vendorid"
+                typeset pcidb="/usr/share/hwdata/pci.ids"
+                if [[ -n "$vendorid" ]] && [[ -e "$pcidb" ]]; then
+                    vendor="$(grep "^${vendorid#0x}" "$pcidb")"
+                    vendor="${vendor#* }"
+                fi
+                echo "vendor=\"${vendor# }\""
+
+}
+
+function ammDevices::List {
+
+	typeset pciid devtype vendor device rev subvendor subdevice _junk
+#	for dev in /sys/bus/pci*/devices/*/uevent; do
+	while read line; do
+		eval "typeset -a data=($line)"
+		echo "pciid=\"${data[0]}\" devtype=\"${data[1]}\" vendor=\"${data[2]}\" device=\"${data[3]}\" version=\"${data[4]}\""
+	done < <(lspci -mm)
+	
+
+}
+
+function ammDevices::GetDetail {
+	typeset device="$1"
+
+	typeset pcipath="/sys/bus/pci/devices/0000:$device/"
+
+	if [[ -e "$pcipath" ]]; then
+		for param in {current,max}_link_{speed,width} irq numa_node enable; do
+			echo -n "$param=\"$(cat "$pcipath/$param" 2>/dev/null)\" "
+		done
+
+		if [[ -e "$pcipath/driver" ]]; then
+			typeset drv="$(readlink -f "$pcipath/driver")"
+			echo -n "driver=\"${drv##*/}\" "
+		fi
+	fi
+}

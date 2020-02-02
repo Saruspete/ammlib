@@ -41,7 +41,7 @@ function ammSyscfgNetwork::NicExists {
 # @arg $1  Name of the NIC
 function ammSyscfgNetwork::NicInfo {
 	typeset iface="$1"
-	typeset fields="carrier duplex speed type master mac ipv4"
+	typeset fields="${2:-carrier duplex speed type master mac vendorid deviceid ipv4}"
 
 	if ! ammSyscfgNetwork::NicExists "$iface"; then
 		ammLog::Err "Iface '$iface' does not exists"
@@ -49,19 +49,22 @@ function ammSyscfgNetwork::NicInfo {
 	fi
 
 	typeset ifpath="/sys/class/net/$iface"
-	typeset field
+	typeset field vendor
 	for field in $fields; do
 		case $field in
 			carrier) echo "carrier=$(<$ifpath/carrier)"   ;;
 			duplex)  echo "duplex=$(cat $ifpath/duplex 2>/dev/null|| echo none)" ;;
 			speed)   echo "speed=$(cat $ifpath/speed 2>/dev/null || echo 0)" ;;
-			mac)     echo "mac=$(cat $ifpath/address)" ;;
+			mac)     echo "mac=$(cat $ifpath/address 2>/dev/null)" ;;
 			#index)   echo "index=$(awk -F= '$1=="IFINDEX" {print $2}' $ifpath/uevent)" ;;
 			index)   echo "index=$(<$ifpath/iflink)" ;;
-			ipv4)    echo "ipv4=$(ip address show dev $iface|ammString::Filter "inet" "^inet$" "+1")" ;;
+			ipv4)    echo "ipv4=\"$(ip address show dev $iface|ammString::Filter "inet" "^inet$" "+1")\"" ;;
 			# More complex processing
 			type)    echo "type=$(awk -F= '$1=="DEVTYPE"{print $2}' $ifpath/uevent)" ;;
 			master)  echo "master=" ;;
+
+			vendorid) echo "vendorid=$(cat $ifpath/device/vendor 2>/dev/null)" ;;
+			deviceid) echo "deviceid=$(cat $ifpath/device/device 2>/dev/null)" ;;
 		esac
 	done
 

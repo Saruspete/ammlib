@@ -940,7 +940,7 @@ function ammLog::Stackdump {
 
 		echo -n "${BASH_SOURCE[$i]##*/}::${FUNCNAME[$i]}::${BASH_LINENO[$(($i-1))]} "
 		if [[ "$extdbg" == "on" ]]; then
-			j=$(($argoff + ${BASH_ARGC[$i]} -1))
+			j=$(($argoff + ${BASH_ARGC[$i]:-0} -1))
 			while [[ $j -ge $argoff ]]; do
 				#echo "j=$j argoff=$argoff ARGV=${BASH_ARGV[@]}"
 				echo -n "'${BASH_ARGV[$j]}' "

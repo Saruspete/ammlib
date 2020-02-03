@@ -8,6 +8,9 @@ readonly MYPATH="${MYSELF%/*}"
 ammLib::Require "table" "optparse" "syscfg" "syscfg.network" "network" "string" "devices"
 
 # Check for user root, else issue a warning
+if [[ "$__AMMLIB_USERID" != "0" ]]; then
+	ammLog::Wrn "You are not running this script as root. Some detail may be missing"
+fi
 
 
 #

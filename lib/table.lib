@@ -175,7 +175,7 @@ function ammTable::Create {
 		typeset colstate="${col#*|}"
 		[[ "$colname" == "$colstate" ]] && colstate=""
 		typeset colcfg=(${colstate//,/ })
-		ammTable::AddColumn "$colname" "${colcfg[@]}"
+		ammTable::AddColumn "$colname" "${colcfg+${colcfg[@]}}"
 	done
 }
 
@@ -331,7 +331,7 @@ function ammTable::Display {
 
 function ammTable::DisplayHeader {
 
-	typeset colid colnum="${#__AMMTABLE_COLUMNS[@]}" termsize="$(_ammTable::TermCols)"
+	typeset colid= colnum="${#__AMMTABLE_COLUMNS[@]}" termsize="$(_ammTable::TermCols)"
 	# "dead" termcols: 1 for seperator, 2 for space between
 	typeset -i colsdead="$(($colnum*3 + 1))" colid=0
 

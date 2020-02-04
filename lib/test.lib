@@ -35,7 +35,7 @@ function ammTest::Function {
 	typeset retc="$(ammLog::Color $color)$ret$(ammLog::Color rst)"
 
 	# Display result
-	echo "$func '$@'  =[$retc]=> ${out}"
+	echo "$func '$@'  =[$retc]=> '${out}'"
 
 	return $ret
 }

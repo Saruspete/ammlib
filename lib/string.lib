@@ -7,7 +7,7 @@ fi
 
 function ammString::MetaCheck {
 	# try to keep to coreutils
-	ammExec::Requires sed seq tr
+	ammExec::Requires seq tr
 }
 
 # -----------------------------------------------------------------------------
@@ -215,12 +215,29 @@ function ammString::Type {
 
 function _ammString::Trim {
 	typeset str="$1"
-	# Protect the / as used by the regex
-	typeset chars="${2////\\/}"
-	
-	echo "$str" | sed -E \
-		-e "s/^${chars}+//g" \
-		-e "s/${chars}+$//g"
+	typeset chars="$2"
+
+	# Protect special chars
+	chars="${chars// /\\ }"
+	chars="${chars//\t/$'\t'}"
+	chars="${chars//\n/$'\n'}"
+
+	while [[ "${str#$chars}" != "$str" ]]; do str="${str#$chars}"; done
+	while [[ "${str%$chars}" != "$str" ]]; do str="${str%$chars}"; done
+	echo "$str"
+
+	# bash regex: Posix regex doesn't support ungreedy (+?) so...
+	#if [[ "$str" =~ ^($chars)*(.+?)($chars)*$ ]]; then
+	#	echo "${BASH_REMATCH[2]}"
+	#else
+	#	echo "$str"
+	#fi
+
+	# Protect the | as used by the regex
+	#typeset chars="${2//|/\|}"
+	#echo "$str" | sed -E \
+	#	-e "s|^${chars}+||g" \
+	#	-e "s|${chars}+$||§g"
 }
 
 function ammString::Trim {
@@ -424,6 +441,8 @@ function ammString::BaseConvert {
 		return 1
 	fi
 }
+
+
 
 function ammString::HexToDec {
 	ammString::BaseConvert 16 10 $1

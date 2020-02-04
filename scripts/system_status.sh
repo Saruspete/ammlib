@@ -5,12 +5,19 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLib::Require "table" "optparse" "syscfg" "syscfg.network" "network" "string" "devices"
+ammLib::Require "table" "optparse" "syscfg" "syscfg.network" "network" "string" "hardware"
 
 # Check for user root, else issue a warning
 if [[ "$__AMMLIB_USERID" != "0" ]]; then
 	ammLog::Wrn "You are not running this script as root. Some detail may be missing"
 fi
+
+
+function _ramSizeConvert {
+	typeset val="$1"
+
+	ammString::UnitConvert "$val" "KB" "MB"
+}
 
 
 #
@@ -20,7 +27,7 @@ function showHardware {
 
 	ammTable::Create "Hardware" "Type|size:16" "Vendor|size:10%" "Model|size:fill" "Node" "Speed" "Drivers|size:20"
 	ammTable::SetDisplayMode "direct"
-	
+
 	typeset t line
 	# DMI Elements
 	for t in chassis system bios; do
@@ -53,13 +60,13 @@ function showHardware {
 		# Get more details
 		typeset driver= current_link_speed= max_link_speed= current_link_width= max_link_width=
 		typeset irq= numa_node= enable=
-		eval "$(ammDevices::GetDetail $pciid)"
+		eval "$(ammHardware::DeviceDetail $pciid)"
 	
 		typeset speed=""
 		[[ -n "$current_link_width" ]] && speed+="$current_link_width/$max_link_width"
 	
 		ammTable::AddRow "$devtype" "$vendor" "$device" "$numa_node" "$speed" "$driver"
-	done < <(ammDevices::List)
+	done < <(ammHardware::DeviceSummary)
 
 }
 
@@ -68,8 +75,19 @@ function showHardware {
 #
 function showCPUMem {
 	echo
-	ammTable::Create "CPU and Memory"  "NUMA" "CPU Model" "RAM Size" "DIMMs"
+	ammTable::Create "CPU and Memory"  "NUMA" "CPU Model|size:40" "CPU ucode rev" "RAM MB|size:8,callback:_ramSizeConvert" "CPU IDs|size:fill,overflow:wrap"
 	ammTable::SetDisplayMode "direct"
+
+	typeset line
+	while read line; do
+		typeset numanode= cpucount= cpuids= cpumodel= cpuucode= memsize=
+		eval "$line"
+		ammTable::AddRow "$numanode" "$cpumodel" "$cpuucode" "$memsize" "$cpuids"
+	done < <(ammHardware::NumaSummary)
+
+	while read line; do
+		echo "$line"
+	done < <(ammHardware::MemoryDetail)
 
 }
 

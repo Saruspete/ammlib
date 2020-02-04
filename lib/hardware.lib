@@ -1,0 +1,158 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammHardware::MetaCheck {
+	ammExec::Requires lspci
+}
+#function ammDevice::MetaInit {
+#}
+
+# -----------------------------------------------------------------------------
+# List and manage local devices
+# -----------------------------------------------------------------------------
+
+
+function ammHardware::GetVendorFromId {
+                typeset vendor="$vendorid"
+                typeset pcidb="/usr/share/hwdata/pci.ids"
+                if [[ -n "$vendorid" ]] && [[ -e "$pcidb" ]]; then
+                    vendor="$(grep "^${vendorid#0x}" "$pcidb")"
+                    vendor="${vendor#* }"
+                fi
+                echo "vendor=\"${vendor# }\""
+
+}
+
+function ammHardware::DeviceSummary {
+
+	typeset line
+#	for dev in /sys/bus/pci*/devices/*/uevent; do
+	while read line; do
+		eval "typeset -a data=($line)"
+		echo "pciid=\"${data[0]}\" devtype=\"${data[1]}\" vendor=\"${data[2]}\" device=\"${data[3]}\" version=\"${data[4]}\""
+	done < <(lspci -mm)
+	
+
+}
+
+function ammHardware::DeviceDetail {
+	typeset device="$1"
+
+	typeset pcipath="/sys/bus/pci/devices/0000:$device/"
+
+	if [[ -e "$pcipath" ]]; then
+		for param in {current,max}_link_{speed,width} irq numa_node enable; do
+			echo -n "$param=\"$(cat "$pcipath/$param" 2>/dev/null)\" "
+		done
+
+		if [[ -e "$pcipath/driver" ]]; then
+			typeset drv="$(readlink -f "$pcipath/driver")"
+			echo -n "driver=\"${drv##*/}\" "
+		fi
+	fi
+}
+
+
+function ammHardware::NumaSummary {
+
+	typeset -a numanodes cpucount cpuids cpumodels cpuucodes memsize
+	typeset -A tmp
+	typeset numapath key val currnode
+
+#set -x
+	#
+	# Parse /proc/cpuinfo
+	#
+	while IFS=: read key val; do
+		[[ -z "$key" ]] && continue
+
+		key="$(ammString::Trim "$key")"
+		val="$(ammString::Trim "$val")"
+
+		case $key in
+			processor)     tmp[cpuid]="$val" ;;
+			model\ name)   tmp[model]="$val" ;;
+			microcode)     tmp[ucode]="$val" ;;
+
+			physical\ id)
+				typeset numaid="$val"
+				currnode="$numaid"
+				# Flush previously stored tmp
+				( set +u; [[ -z "${cpumodels[$numaid]}" ]] ) && cpumodels[$numaid]="${tmp[model]}"
+				( set +u; [[ -z "${cpuucodes[$numaid]}" ]] ) && cpuucodes[$numaid]="${tmp[ucode]}"
+				#cpuids[$numaid]+="${tmp[cpuid]},"
+				tmp=()
+				;;
+
+			core\ id) cpucores[$currnode]+="$val," ;;
+		esac
+	done < /proc/cpuinfo
+
+	#
+	# Discover numa nodes from /sys
+	#
+	for numapath in /sys/devices/system/node/node[0-9]*; do
+		typeset numaid="${numapath##*node}"
+		typeset cpulist="$(< $numapath/cpulist)"
+		typeset meminfo="$(< $numapath/meminfo)"
+
+		numanodes+=("$numaid")
+		# CPU listing
+		typeset cpupath
+		typeset -i cpucnt=0
+		for cpupath in $numapath/cpu[0-9]*; do
+			typeset cpuid="${cpupath##*cpu}"
+			cpuids[$numaid]+="$cpuid,"
+			cpucnt+=1
+		done
+		cpucount[$numaid]=$cpucnt
+
+		# 
+		memsize[$numaid]="$(echo "$meminfo" | awk '$3 == "MemTotal:" { print $4; }')"
+	done
+
+	# Get DMI data if available
+
+
+	#
+	# Display content
+	#
+	typeset numaid=0
+	for numaid in ${numanodes[@]}; do
+		echo "numanode=$numaid cpucount=\"${cpucount[$numaid]}\" cpuids=\"${cpuids[$numaid]%,}\" cpumodel=\"${cpumodels[$numaid]}\" cpuucode=\"${cpuucodes[$numaid]}\" memsize=\"${memsize[$numaid]}\""
+	done
+}
+
+function ammHardware::MemoryDetail {
+	typeset showEmpty="${1:-false}"
+
+	# Append DMI data if available
+	while IFS=: read key val; do
+		key="$(ammString::Trim "$key")"
+		val="$(ammString::Trim "$val")"
+
+		case "$key" in
+			Size) ;;
+			Form\ Factor) ;;
+			Manufacturer) ;;
+			Rank) ;;
+			Type) ;;
+			Type\ Detail) ;;
+			Speed);;
+			Configured\ Memory\ Speed) ;;
+			Serial\ Number) ;;
+			Locator) ;;
+			Bank\ Locator) ;;
+		esac
+	done < <(dmidecode -t memory 2>/dev/null)
+
+
+}

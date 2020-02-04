@@ -42,9 +42,9 @@ function showHardware {
 				Serial\ Number) serial="$val" ;;
 				Release\ Date)  model="$val" ;;
 			esac
-	
+
 		done < <(dmidecode -t "$t" 2>/dev/null)
-	
+
 		[[ -n "$version" ]] && model+=" / Version: $version"
 		[[ -n "$serial" ]] && model+="  / Serial: $serial"
 		ammTable::AddRow "$t" "$vendor" "$model"
@@ -53,18 +53,18 @@ function showHardware {
 	while read line; do
 		typeset pciid= devtype= vendor= version= device= driver=
 		eval "$line"
-	
+
 		# Skip useless devices
 		[[ "$devtype" =~ (PCI|Host|ISA)\ bridge ]] && continue
-	
+
 		# Get more details
 		typeset driver= current_link_speed= max_link_speed= current_link_width= max_link_width=
 		typeset irq= numa_node= enable=
 		eval "$(ammHardware::DeviceDetail $pciid)"
-	
+
 		typeset speed=""
 		[[ -n "$current_link_width" ]] && speed+="$current_link_width/$max_link_width"
-	
+
 		ammTable::AddRow "$devtype" "$vendor" "$device" "$numa_node" "$speed" "$driver"
 	done < <(ammHardware::DeviceSummary)
 
@@ -97,21 +97,31 @@ function showCPUMem {
 #
 function showNetwork {
 	echo
-	ammTable::Create "NIC Details"  "NIC|size:16" "Type|size:8" "VendorId" "ModelId" "MAC Address|size:18" "Speed" "Dplx" "Medium" "IPv4|size:18"
+	ammTable::Create "NIC Details"  "NIC|size:16" "Type|size:8" "Driver|size:10" "MAC Address|size:18" "Speed" "Dplx" "Medium" "IPv4|size:18"
 	ammTable::SetDisplayMode "direct"
-	
+
 	typeset nic
 	for nic in $(ammSyscfgNetwork::NicGet); do
-		typeset speed= duplex= medium= mac= ipv4= vendorid= deviceid=
+		typeset speed= duplex= medium= mac= ipv4= vendorid= deviceid= driver=
 		eval $(ammSyscfgNetwork::NicInfo $nic)
 		eval $(ammSyscfgNetwork::CableInfo $nic)
-	
+
 		# 
 		[[ "$carrier" == "0" ]] && duplex="N/A"
-	
-		
-	
-		ammTable::AddRow "$nic" "$type" "$vendorid" "$deviceid" "$mac" "$speed" "$duplex" "$medium" "$ipv4"
+
+		# Try to guess the medium with type
+		if [[ -z "$medium" ]]; then
+			case "$type" in
+				wwan)    medium="WAN" ;;
+				wlan)    medium="WiFi" ;;
+				bridge)  medium="Virtual" ;;
+				ipsec|wireguard)
+					medium="VPN"
+					;;
+			esac
+		fi
+
+		ammTable::AddRow "$nic" "$type" "$driver" "$mac" "$speed" "$duplex" "$medium" "$ipv4"
 		
 	done
 

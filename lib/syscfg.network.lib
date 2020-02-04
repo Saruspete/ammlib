@@ -41,7 +41,7 @@ function ammSyscfgNetwork::NicExists {
 # @arg $1  Name of the NIC
 function ammSyscfgNetwork::NicInfo {
 	typeset iface="$1"
-	typeset fields="${2:-carrier duplex speed type master mac vendorid deviceid ipv4}"
+	typeset fields="${2:-carrier duplex speed type master mac vendorid deviceid ipv4 driver}"
 
 	if ! ammSyscfgNetwork::NicExists "$iface"; then
 		ammLog::Err "Iface '$iface' does not exists"
@@ -62,6 +62,10 @@ function ammSyscfgNetwork::NicInfo {
 			# More complex processing
 			type)    echo "type=$(awk -F= '$1=="DEVTYPE"{print $2}' $ifpath/uevent)" ;;
 			master)  echo "master=" ;;
+			driver)
+				typeset driver="$(readlink -f "$ifpath/device/driver" 2>/dev/null)"
+				echo "driver=\"${driver##*/}\""
+				;;
 
 			vendorid) echo "vendorid=$(cat $ifpath/device/vendor 2>/dev/null)" ;;
 			deviceid) echo "deviceid=$(cat $ifpath/device/device 2>/dev/null)" ;;

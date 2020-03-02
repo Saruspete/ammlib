@@ -97,7 +97,7 @@ function _ammOptparse::Expand {
 		typeset val=""
 
 		# Check if we have a joined value var=val (can be -abc=def${#__AMMLIB_CALLOPTS[@]} or --abc=def)
-		if [[ "${opt#*=}" != "$opt" ]]; then
+		if [[ "${opt#*=}" != "$opt" ]] && [[ "${opt##--}" != "$opt" ]]; then
 			val="${opt#*=}"
 			opt="${opt%%=*}"
 		fi

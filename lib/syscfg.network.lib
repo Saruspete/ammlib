@@ -21,6 +21,10 @@ function ammSyscfgNetwork::MetaInit {
 # -----------------------------------------------------------------------------
 # Ifaces
 # -----------------------------------------------------------------------------
+function ammSyscfgNetwork::NicNameValidate {
+	:
+}
+
 function ammSyscfgNetwork::NicGet {
 	typeset i
 	for ifacepath in /sys/class/net/*; do
@@ -32,9 +36,45 @@ function ammSyscfgNetwork::NicGet {
 	done
 }
 
+function ammSyscfgNetwork::NicCreate {
+	typeset ifname="$1"
+	typeset iftype="$2"
+
+	if ammSyscfgNetwork::NicExists "$ifname"; then
+		ammLog::Err "Nic '$ifname' already exists"
+		return 1
+	fi
+
+	ip link add dev "$ifname" type "$iftype"
+}
+
+
 function ammSyscfgNetwork::NicExists {
 	typeset iface="$1"
 	[[ -d "/sys/class/net/$iface" ]]
+}
+
+function ammSyscfgNetwork::NicValidate {
+	typeset iface="$1"
+
+	if ! ammSyscfgNetwork::NicExists "$iface"; then
+		ammLog::Err "Iface '$iface' does not exists"
+		return 1
+	fi
+}
+
+function ammSyscfgNetwork::NicIsUp {
+	typeset iface="$1"
+
+	ammSyscfgNetwork::NicValidate "$iface" || return $?
+	[[ "$(( $(</sys/class/net/$iface/flags) & 1 ))" == "1" ]]
+}
+
+function ammSyscfgNetwork::NicEnable {
+	typeset iface="$1"
+
+	ammSyscfgNetwork::NicValidate "$iface" || return $?
+	ip link set "$iface" up
 }
 
 # @description: Display information about a given NIC
@@ -43,10 +83,7 @@ function ammSyscfgNetwork::NicInfo {
 	typeset iface="$1"
 	typeset fields="${2:-carrier duplex speed type master mac vendorid deviceid ipv4 driver}"
 
-	if ! ammSyscfgNetwork::NicExists "$iface"; then
-		ammLog::Err "Iface '$iface' does not exists"
-		return 1
-	fi
+	ammSyscfgNetwork::NicValidate "$iface" || return $?
 
 	typeset ifpath="/sys/class/net/$iface"
 	typeset field vendor
@@ -212,10 +249,7 @@ function ammSyscfgNetwork::IpAddrGet {
 
 	typeset iface
 	for iface in $ifaces; do
-		if ! ammSyscfgNetwork::NicExists "$iface"; then
-			ammLog::Wrn "Non existant iface '$iface'"
-			continue
-		fi
+		ammSyscfgNetwork::NicValidate "$iface" || continue
 
 		typeset ipfilter=""
 		case $ipfamily in
@@ -228,10 +262,18 @@ function ammSyscfgNetwork::IpAddrGet {
 				;;
 		esac
 
-		ip addr show dev $iface | ammString::Filter "$ipfilter" "$ipfilter" "+1"
+		ip address show dev $iface | ammString::Filter "$ipfilter" "$ipfilter" "+1"
 
 	done
 }
+
+function ammSyscfgNetwork::IpAddrAdd {
+	typeset iface="$1"; shift
+	typeset addr="$1"; shift
+
+	ip address add dev "$iface" "$addr" "$@"
+}
+
 
 # -----------------------------------------------------------------------------
 # Namespace

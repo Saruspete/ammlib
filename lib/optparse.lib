@@ -280,18 +280,21 @@ function ammOptparse::AddOpt {
 # @description  Parse the options, optionnally only those matching the prefix $1
 # @arg $@  (string) Prefix
 function ammOptparse::Parse {
-	typeset opts="${1:-}"
 
 	typeset -i r=0
 	typeset nounknown=false
 	typeset prefix=""
+	typeset -i optidstart=0
 
 	# Special options parsing
 	typeset opt
-	for opt in $opts; do
+	for opt in "$@"; do
 		case $opt in
 			--no-unknown)
 				nounknown=true
+				;;
+			--skip=*)
+				optidstart="${opt##--skip=}"
 				;;
 			--*)
 				ammLog::Wrn "Unknown ammOptparse::Parse() option '$opt'"
@@ -311,7 +314,7 @@ function ammOptparse::Parse {
 	typeset -i optid
 	typeset lastvar=""
 	# For loop with number so keep at the same place for short options concatenated
-	for (( optid=0; optid < ${#__AMMLIB_CALLOPTS[@]}; optid+=1 )); do
+	for (( optid=$optidstart; optid < ${#__AMMLIB_CALLOPTS[@]}; optid+=1 )); do
 		typeset -i optextra=0
 		typeset var="${__AMMLIB_CALLOPTS[$optid]}"
 		typeset val="true"

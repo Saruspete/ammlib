@@ -11,18 +11,35 @@ readonly MYSELF="$(readlink -f $0)"
 readonly MYPATH="${MYSELF%/*}"
 
 # Temporary folder
-typeset DEST="$MYPATH/${0##*/}.data"
-mkdir -p "$DEST"
+typeset DSTDIR="$MYPATH/${0##*/}.data"
+typeset PKGDIR="$MYPATH/${0##*/}.pkgs"
 
 . $MYPATH/../ammlib
 
-ammLibRequire pkg chroot
+ammLib::Require pkg chroot optparse
+
+ammOptparse::AddOpt "-d|--dstdir=" "Destination folder to extract the packages" "$DSTDIR"
+ammOptparse::AddOpt "-t|--pkgdir=" "Temporary folder where to place downloaded packages" "$PKGDIR"
+#mmOptparse::AddOpt "--downloadonly!" "Only download packages to pkgdir"
+
+
+if ! ammOptparse::Parse; then
+	ammOptparse::Help
+	ammLog::Die "Options parsing errors. Please check"
+fi
+
+DSTDIR="$(ammOptparse::Get 'dstdir')"
+PKGDIR="$(ammOptparse::Get 'pkgdir')"
+
+mkdir -p "$DSTDIR"
 
 if [[ -z "${1:-}" ]]; then
-	ammLogInf "Usage: $0 <file or package to extract> [file or pkg...]"
+	echo "Usage: $0 <file or package to extract> [file or pkg...]"
+	echo
+	ammOptparse::Help
 	exit 1
 fi
 
-ammLogInf "Extracting to '$DEST'"
-ammPkgExtractWithDeps "$DEST" "$@"
-ammLogInf "Done."
+ammLog::Inf "Extracting to '$DSTDIR'"
+ammPkg::ExtractWithDeps "$DSTDIR" "$@"
+ammLog::Inf "Done."

@@ -257,7 +257,7 @@ function wgPeerAddClient {
 	typeset peername="$3"
 	typeset peeraddr="$4"
 
-	wgPeerAdd "$name" "$peerkey" "$peeraddr" "" "" "$peeraddr" "" "$peername" "client"
+	wgPeerAdd "$name" "$peerkey" "$peeraddr" "" "" "${peeraddr%%:*}/32" "" "$peername" "client"
 }
 
 function wgPeerAddServer {
@@ -344,7 +344,7 @@ function wgPeerDisable {
 	wg set "$name" peer "$peerkey" remove
 }
 
-function wgPeerDel {
+function wgPeerDelete {
 	typeset name="$1"
 	typeset peerkey="$2"
 
@@ -481,6 +481,7 @@ typeset op="${1:-}"; shift
 
 case "$op" in
 	start)
+		
 		;;
 
 	stop)
@@ -501,6 +502,8 @@ case "$op" in
 	setup)
 		if ! wgAvailable; then
 			mainInstall || ammLog::Die "Unable to setup Wireguard."
+		else
+			ammLog::Inf "WireGuard installed and available"
 		fi
 
 		exit 0
@@ -530,9 +533,10 @@ case "$op" in
 		typeset    lkey="$(ammOptparse::Get "localkey")"
 		typeset -a route=($(ammOptparse::Get "route"))
 
-		if [[ -n "$iface" ]]; then
+		if [[ -z "$iface" ]]; then
 			ammLog::Err "Usage: $0 addserver <iface> [options...]"
 			ammOptparse::Help
+			exit 1
 		fi
 
 		# Create NIC if needed
@@ -541,6 +545,7 @@ case "$op" in
 				ammLog::Err "Cannot create iface '$iface' (eg 'ip link add $iface type wireguard')"
 				exit 1
 			fi
+			ammLog::Inf "Interface '$iface' created as wireguard"
 		fi
 
 		# Initialize the tunnel
@@ -548,19 +553,21 @@ case "$op" in
 			ammLog::Err "Unable to configure the iface '$iface'"
 			exit 1
 		fi
+		ammLog::Inf "Iface '$iface' configured"
 
 		# Add the server peer
 		if ! wgPeerAddServer "$iface" "$rkey" "$raddr" "${routes[@]}"; then
 			ammLog::Err "Unable to add the server configuration to '$iface'"
 			exit 1
 		fi
+		ammLog::Inf "Peer '$raddr' configured on '$iface'"
 
 		# Save the configuration
 		if ! wgCfgSave "$iface"; then
 			ammLog::Err "Unable to save the configuration of '$iface'"
 			exit 1
 		fi
-
+		ammLog::Inf "Configuration of '$iface' saved"
 		;;
 
 	removepeer)

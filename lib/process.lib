@@ -115,12 +115,12 @@ function ammProcess::LastRun {
 function ammProcess::Run {
 	typeset funcname="$1"; shift
 
-	if ! amm::IsFunc "${funcname}Cmd"; then
+	if ! ammEnv::IsFunc "${funcname}Cmd"; then
 		ammLog::Err "Unable to run '$funcname' as not '${funcname}Cmd' is defined"
 		return 1
 	fi
 
-	if ! amm::IsFunc "${funcname}Parse"; then
+	if ! ammEnv::IsFunc "${funcname}Parse"; then
 		ammLog::Err "Unable to run '$funcname' as not '${funcname}Parse' is defined"
 		return 1
 	fi

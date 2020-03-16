@@ -168,7 +168,7 @@ function ammLib::HookTrigger {
 
 	typeset callback args
 	while read callback args; do
-		if ! amm::IsFunc "$callback"; then
+		if ! ammEnv::IsFunc "$callback"; then
 			ammLog::Wrn "Callback '$callback' is not a function. Skipping it"
 			continue
 		fi
@@ -534,7 +534,7 @@ function ammLib::Load {
 
 			# Call init
 			typeset metapref="$(ammLib::MetaGetPrefix "$libname")"
-			amm::IsFunc ${metapref}Init && ${metapref}Init
+			ammEnv::IsFunc ${metapref}Init && ${metapref}Init
 
 			continue
 
@@ -1055,6 +1055,29 @@ function ammEnv::ManAdd {
 	_ammEnv::Add "MANPATH" "$@"
 }
 
+# @description  Check if given name is a function
+# @exitcode 0  is a function
+# @exitcode 1  is not a function
+function ammEnv::IsFunc {
+	[[ "$(type -t "$1")" == "function" ]]
+}
+
+function ammEnv::IsAlias {
+	[[ "$(type -t "$1")" == "alias" ]]
+}
+
+# @description  Check if name if a variable
+# @exitcode 0  is a defined variable
+# @exitcode 1  is not a variable
+function ammEnv::IsVar {
+	typeset varname="$1"
+
+	typeset var
+	while read var; do
+		[[ "$varname" == "${var%%=*}" ]] && return 0
+	done < <(set -o posix; set)
+	return 1
+}
 # -----------------------------------------------------------------------------
 # Execution helpers
 # -----------------------------------------------------------------------------
@@ -1198,30 +1221,3 @@ function ammExec::RequiresOne {
 	return 0
 }
 
-# -----------------------------------------------------------------------------
-# Internal script state (bash) helpers
-# -----------------------------------------------------------------------------
-
-# @description  Check if given name is a function
-# @exitcode 0  is a function
-# @exitcode 1  is not a function
-function amm::IsFunc {
-	[[ "$(type -t "$1")" == "function" ]]
-}
-
-function amm::IsAlias {
-	[[ "$(type -t "$1")" == "alias" ]]
-}
-
-# @description  Check if name if a variable
-# @exitcode 0  is a defined variable
-# @exitcode 1  is not a variable
-function amm::IsVar {
-	typeset varname="$1"
-
-	typeset var
-	while read var; do
-		[[ "$varname" == "${var%%=*}" ]] && return 0
-	done < <(set -o posix; set)
-	return 1
-}

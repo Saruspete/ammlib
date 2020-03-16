@@ -51,7 +51,7 @@ function ammInput::Register {
 	__ammInputHelp[$id]="$helptext"
 
 	# Only call if internal function
-	if [[ -n "$validcb" ]] && amm::IsFunc "$validcb"; then
+	if [[ -n "$validcb" ]] && ammEnv::IsFunc "$validcb"; then
 		__ammInputValidationCB[$id]="$validcb"
 	fi
 }
@@ -84,7 +84,7 @@ function ammInput::Batch {
 		fi
 
 		# Check if the feature exists
-		amm::IsVar "__ammInputBatch${var}" && {
+		ammEnv::IsVar "__ammInputBatch${var}" && {
 			eval "__ammInputBatch${var}=$val"
 		}
 	done
@@ -174,7 +174,7 @@ function ammInput::Get {
 		# Validation (locally supplied)
 		if [[ -n "$validcb" ]]; then
 			# I expect it to be a simple function, not a binary
-			if amm::IsFunc "$validcb"; then
+			if ammEnv::IsFunc "$validcb"; then
 				if ! $validcb "$reply"; then
 					ammLog::Wrn "Reply '$reply' is invalid (callback '$validcb')"
 
@@ -196,7 +196,7 @@ function ammInput::Get {
 		# Validation (registration)
 		elif [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputValidationCB[$id]}" ]] ); then
 			typeset func="${__ammInputValidationCB[$id]}"
-			if amm::IsFunc "$func"; then
+			if ammEnv::IsFunc "$func"; then
 				if ! $func "$reply"; then
 
 					# If we are in silent ok, and had error, display it now

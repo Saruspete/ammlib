@@ -466,7 +466,7 @@ function ammOptparse::Parse {
 			typeset val="$(ammOptparse::Get "$id")"
 
 			# Don't use quotes to avoid composite values to be used in name
-			if amm::IsFunc $validator; then
+			if ammEnv::IsFunc $validator; then
 				# TODO: Clean this function call
 				#typeset valcall="${validator//%
 				if ! "${validator%% *}" "$val" "${validator#* }"; then

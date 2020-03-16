@@ -226,7 +226,7 @@ function ammTable::AddColumn {
 				if [[ -z "$val" ]]; then
 					err="Cannot set an empty callback"
 				else
-					if ! amm::IsFunc $val; then
+					if ! ammEnv::IsFunc $val; then
 						err="Non-existant callback function '$val'"
 					else
 						__AMMTABLE_COLCFG_CALLBACK[$colid]="$val"

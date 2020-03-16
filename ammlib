@@ -1088,6 +1088,150 @@ function ammExec::Logged {
 	"$@"
 }
 
+function ammExec::SudoIsAble {
+	typeset runcmd="$1"
+	typeset runuser="${2:-root}"
+
+	typeset -i r=2
+
+	typeset runuserdata="$(getent passwd "$runuser")"
+
+	if [[ -z "$runuserdata" ]]; then
+		ammLog::Err "Target user '$runuser' does not exists"
+		return 1
+	fi
+
+	# Remove 3 firsts fields: username, password, uid
+	typeset runusergid="${runuserdata#*:*:*:}"
+	runusergid="${runusergid%%:*}"
+	typeset runusergrp="$(getent group $runusergid)"
+	runusergrp="${runusergrp%%:*}"
+
+	typeset stmp="$(sudo -n -ll 2>/dev/null)"
+	if [[ -n "$stmp" ]]; then
+		typeset grantstarted=false
+		typeset grantuseful=false
+		# Pop in a subshell. Don't care about variable locality.
+		echo "$stmp" | while read line; do
+
+			#ammLog::Dbg "== sudo line: '$line'"
+
+			case "$line" in
+				# Reset vars
+				Sudoers\ entry:|LDAP\ Role:*)
+					ammLog::Dbg "New grant '$line'"
+					grantstarted=true
+					grantuseful=false
+					;;
+
+				# Check if line is useful for us
+				RunAsUsers:*)
+					typeset users="${line#*: }"
+					for user in $users; do
+						user="${user%,}"
+						if [[ "$user" == "ALL" ]] || [[ "$user" == "$runuser" ]]; then
+							ammLog::Dbg " Grant '$line' useful for target user '$runuser' (direct access)"
+							grantuseful=true
+						fi
+
+						case $user in
+							# UID
+							\#[0-9]*)
+								typeset userdata="$(getent passwd ${user#\#})"
+								if [[ "${userdata%%:*}" == "$runuser" ]]; then
+									ammLog::Dbg " Grant '$line' match UID of user '$runuser'"
+									grantuseful=true
+								fi
+								;;
+
+							# GID / Group
+							%\#[0-9]*|%[a-zA-Z_]*)
+								user="${user#%}"
+								user="${user#\#}"
+								if [[ "$user" == "$runusergid" ]] || [[ "$user" == "$runusergrp" ]]; then
+									ammLog::Dbg " Grant '$user' in '$line' match primary group of user '$runuser'"
+									grantuseful=true
+									break
+								fi
+								typeset members="$(getent group $user 2>/dev/null)"
+								members="${members##*:}"
+								for member in ${members//, /}; do
+									if [[ "$member" == "$runuser" ]]; then
+										ammLog::Dbg " Grant '$user' in '$line' match membership of user '$runuser'"
+										grantuseful=true
+										break
+									fi
+								done
+								;;
+
+							# Netgroups
+							+[a-zA-Z0-9_]*)
+								typeset members="$(getent netgroup $user)"
+								OIFS="$IFS"
+								IFS='('
+								for i in "$members"; do
+									i="${i#*,}"
+									i="${i%,*}"
+									if [[ "$i" == "$runuser" ]]; then
+										IFS="$OIFS"
+										ammLog::Dbg " Grant in '$line' match netgroup membership of user '$runuser'"
+										grantuseful=true
+										break
+									fi
+								done
+								;;
+							# TODO: User_Alias
+							# TODO: negation
+						esac
+					done
+					;;
+
+				Options:*)
+					;;
+
+				Commands:)
+					# Will eat stdin from parent loop
+					while read cmd; do
+						# Stop on empty newline to continue on parent loop
+						[[ -z "$cmd" ]] && break
+
+						# Keep in this loop to consume commands lines
+						$grantuseful || continue
+
+						# Most usual & easy cases: Wildcard, full bin or exact
+						if [[ "$cmd" == "ALL" ]] ||
+						   [[ "$cmd" == "${runcmd%% *}" ]] ||
+						   [[ "$cmd" == "$runcmd" ]]; then
+							ammLog::Dbg " Matching '$cmd' for '$runcmd'"
+							return 99
+						fi
+
+						# Glob matching (sudo is not regex)
+						case "$runcmd" in
+							$cmd)
+								ammLog::Dbg " Matching glob '$cmd' for '$runcmd'"
+								return 99
+								;;
+						esac
+
+					done
+					;;
+
+				*)
+					# Skip error if we have not yet encountered a grant
+					$grantstarted || continue
+
+					ammLog::Wrn "Unmanaged sudo grant line '$line'"
+					;;
+			esac
+		done
+		# Only use 99 return code as valid
+		[[ $? == 99 ]] && r=0
+	fi
+
+	return $r
+}
+
 # @description  Execute a command as a different user
 # @arg $1  (string) User to run the command as
 # @arg $@  (string) the command to run, and its arguments. if "-", command is read from stdin
@@ -1112,6 +1256,8 @@ function ammExec::AsUser {
 			cat | runuser -m "$userrunas" 98>&- 99>&-
 			ret=$?
 
+		elif ammExec::Exists "sudo" && ammExec::SudoIsAble "ALL" "$userrunas"; then
+			sudo -u "$userrunas" -i
 		else
 			ammLog::Err "Cannot change from user $usercurrent to user $userrunas"
 			ret=4
@@ -1134,7 +1280,7 @@ function ammExec::AsUser {
 			ret=$?
 
 		# Maybe handle sudo ?
-		elif stmp="$(sudo -nl 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$stmp" ]]; then
+		elif stmp="$(sudo -nll 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$stmp" ]]; then
 			ammLog::Dbg "Using sudo to run as '$userrunas' cmd: '$@'"
 			# TODO: parse $stmp output more...
 			sudo -n -u "$userrunas" "$@" 98>&- 99>&-

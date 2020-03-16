@@ -72,7 +72,7 @@ if [[ "${BASH_VERSINFO[0]}" -eq 4 ]] && [[ "${BASH_VERSINFO[1]}" -lt 4 ]]; then
 	[[ -z "$@" ]] && __AMMLIB_CALLOPTS=("")
 fi
 # @description  The file that loaded ammlib
-typeset -r  __AMMLIB_CALLFILE="$(readlink -f ${BASH_SOURCE[1]})"
+typeset -r  __AMMLIB_CALLFILE="${BASH_SOURCE[1]##*/}"
 # @description  Path of the file that loaded ammlib
 typeset -r  __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
 

@@ -242,7 +242,12 @@ function ammLib::TrapRegister {
 function ammLib::TrapClean {
 	# clean global temp vars
 	if [[ -n ${AMMLIB_DEBUG:-} ]]; then
-		ammLog::Inf "Debug enabled: Keeping temporary path '$__AMMLIB_DATATMP'"
+		if ( shopt -s nullglob dotglob; f=($__AMMLIB_DATATMP/*); [[ ${#f[@]} ]] ); then
+			ammLog::Inf "Debug enabled: Keeping temporary path '$__AMMLIB_DATATMP'"
+		else
+			ammLog::Inf "Removing empty temporary path '$__AMMLIB_DATATMP'"
+			[[ -d "$__AMMLIB_DATATMP" ]] && rmdir "$__AMMLIB_DATATMP"
+		fi
 	else
 		[[ -d "$__AMMLIB_DATATMP" ]] && rm -fr "$__AMMLIB_DATATMP"
 	fi

@@ -49,7 +49,7 @@ fi
 #
 
 # @description  Path where ammlib is
-typeset    __AMMLIB_REALPATH="${BASH_SOURCE[0]}"
+typeset    __AMMLIB_REALPATH="$(readlink -f ${BASH_SOURCE[0]})"
 
 # Check the readlink usability
 if type -t readlink >/dev/null; then

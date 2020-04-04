@@ -242,7 +242,7 @@ function ammSyscfgNetwork::IpAddrGetMain {
 
 # Return the main IP address: the Ip 
 function ammSyscfgNetwork::IpAddrGet {
-	typeset ipfamily="${2:-4}"
+	typeset ipfamily="${1:-4}"
 	typeset ifaces="${2:-}"
 
 	[[ -z "$ifaces" ]] && ifaces="$(ammSyscfgNetwork::NicGet)"
@@ -267,13 +267,48 @@ function ammSyscfgNetwork::IpAddrGet {
 	done
 }
 
+function ammSyscfgNetwork::IpAddrExists {
+	typeset iface="$1"
+	typeset ipaddr="$2"
+
+	ip -o address show $iface
+}
+
 function ammSyscfgNetwork::IpAddrAdd {
 	typeset iface="$1"; shift
 	typeset addr="$1"; shift
 
-	ip address add dev "$iface" "$addr" "$@"
+	ip address add "$addr" dev "$iface" "$@"
 }
 
+function ammSyscfgNetwork::RouteExists {
+	typeset iface="$1"
+	typeset addr="$2"
+	typeset extra="${3:-}"
+
+	route="$(ip -o route show dev "$iface" "$addr")"
+	if [[ -n "$route" ]]; then
+		if [[ -n "$extra" ]]; then
+			# TODO...
+			:
+		fi
+		return 0
+	fi
+	return 1
+}
+
+function ammSyscfgNetwork::RouteAdd {
+	typeset iface="$1"
+	typeset route="$2"
+	typeset extra="${3:-}"
+
+	ip route add "$route" dev "$iface" $extra
+}
+
+function ammSyscfgNetwork::RouteUpdate {
+	:
+	#if ammSyscfgNetwork::RouteExists
+}
 
 # -----------------------------------------------------------------------------
 # Namespace

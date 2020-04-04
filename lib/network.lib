@@ -18,6 +18,103 @@ function ammNetwork::MetaInit {
 }
 
 # -----------------------------------------------------------------------------
+# Network IP calculations
+# -----------------------------------------------------------------------------
+
+# @description  Returns the requested segment of the IP address
+# @arg $1  (string) IP Address (4 or 6)
+# @arg $2  (int)    Segment number of the IP address to return (starts at 0)
+function _ammNetwork::CalcGetIpSegment {
+	typeset ip="$1"
+	typeset part="$2"
+
+	typeset -a parts=(${ip//[.:]/ })
+	echo ${parts[$part]:-}
+}
+
+# @description  Calculate
+# @arg $1  (string) IP Address to extract data from. "ip/cidr" or "ip netmask"
+# @arg $@  (string[]) Fields to show: ip prefix netmask network brdcast
+function ammNetwork::Calc {
+	typeset net="$1"; shift
+
+	typeset ip
+	typeset -i cidr
+
+	# Check for "ip/cidr" format
+	if [[ "${net%/*}" != "$net" ]]; then
+		ip="${net%/*}"
+		cidr="${net#*/}"
+
+	# Check for "ip netmask" format
+	elif [[ "${net% *}" != "$net" ]]; then
+		ip="${net% *}"
+		typeset nm="${net#* }" i
+		for i in ${nm//./ }; do
+			while [[ "$i" -gt 0 ]]; do
+				[[ $(( $i & 1 )) == "1" ]] && cidr+=1
+				i=$(( i >> 1 ))
+			done
+		done
+	else
+		ammLog::Err "Cannot extract cird or netmask from input '$net'"
+		return 1
+	fi
+
+
+	# calculate netmask
+	typeset -a netmask network brdcast
+	typeset    segnum segment
+	typeset -i prefix=0 prefixrem=$cidr
+	# TODO: handle ipv6
+	for segnum in {0..3}; do
+		typeset segment="$(_ammNetwork::CalcGetIpSegment "$ip" "$segnum")"
+
+		# Full network segment
+		if [[ $prefixrem -ge 8 ]]; then
+			prefix=8
+			prefixrem+=-8
+
+			netmask[$segnum]=255
+			network[$segnum]=$segment
+			brdcast[$segnum]=$segment
+
+		# No network
+		elif [[ $prefixrem -eq 0 ]]; then
+			netmask[$segnum]=0
+			network[$segnum]=0
+			brdcast[$segnum]=255
+
+		# Partial
+		else
+			prefix=$prefixrem
+			prefixrem=0
+
+			netmask[$segnum]=$((2**8 - 2**(8-$prefix) ))
+			network[$segnum]=$(($segment & ${netmask[$segnum]} ))
+			brdcast[$segnum]=$((${network[$segnum]} + 2**(8-$prefix) -1 ))
+		fi
+	done
+
+	# Generates string for display
+	typeset -A results
+	results['ip']="$ip"
+	results['prefix']="$cidr"
+	results['netmask']="${netmask[@]}" ; results['netmask']="${results['netmask']// /.}"
+	results['network']="${network[@]}" ; results['network']="${results['network']// /.}"
+	results['brdcast']="${brdcast[@]}" ; results['brdcast']="${results['brdcast']// /.}"
+
+	# Show results for eval or parsing
+	typeset field= fields="$@"
+	[[ $fields == "" ]] && fields="${!results[@]}"
+	for field in $fields; do
+		echo $field=${results[$field]}
+	done
+}
+
+
+
+# -----------------------------------------------------------------------------
 # Ping helpers
 # -----------------------------------------------------------------------------
 

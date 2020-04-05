@@ -1259,11 +1259,12 @@ function ammExec::AsUser {
 		# root... yay !
 		elif [[ "$usercurrent" == "root" ]]; then
 			# runuser is like su, but without PAM. Preferred when exec from root
-			cat | runuser -m "$userrunas" 98>&- 99>&-
+			cat | runuser "$userrunas" 98>&- 99>&-
 			ret=$?
 
 		elif ammExec::Exists "sudo" && ammExec::SudoIsAble "ALL" "$userrunas"; then
 			sudo -u "$userrunas" -i
+			ret=$?
 		else
 			ammLog::Err "Cannot change from user $usercurrent to user $userrunas"
 			ret=4
@@ -1279,14 +1280,15 @@ function ammExec::AsUser {
 
 		# root... yay !
 		elif [[ "$usercurrent" == "root" ]]; then
-			ammLog::Dbg "Using su to run as '$userrunas' cmd: '$*'"
+			ammLog::Dbg "Using runuser to run as '$userrunas' cmd: '$*'"
 			# I need to flatten
 			# runuser is like su, but without PAM. Preferred when exec from root
-			runuser -m -c "$*" "$userrunas" 98>&- 99>&-
+			runuser -c "$*" "$userrunas" 98>&- 99>&-
 			ret=$?
 
 		# Maybe handle sudo ?
-		elif stmp="$(sudo -nll 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$stmp" ]]; then
+		#elif stmp="$(sudo -nll 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$stmp" ]]; then
+		elif ammExec::Exists "sudo" && ammExec::SudoIsAble "$__AMMLIB_CALLNAME" "$userrunas"; then
 			ammLog::Dbg "Using sudo to run as '$userrunas' cmd: '$@'"
 			# TODO: parse $stmp output more...
 			sudo -n -u "$userrunas" "$@" 98>&- 99>&-
@@ -1300,6 +1302,7 @@ function ammExec::AsUser {
 
 	fi
 
+	return $ret
 }
 
 function ammExec::GetPath {

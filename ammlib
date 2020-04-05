@@ -10,6 +10,12 @@ set -u
 
 export LC_ALL=C
 
+# If no debug override has been done yet
+if [[ -n "$PS4" ]] && [[ "$PS4" == "+ " ]]; then
+	PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
+fi
+
+
 #
 # Compatibility check
 #
@@ -661,11 +667,6 @@ typeset -A __AMMLOG_TERMCODES=(
 typeset -i __AMMLOG_VERBOSITY=1
 typeset -i __AMMLOG_DEPTH=0
 
-# If no debug override has been done yet
-[[ -n "$PS4" ]] && [[ "$PS4" != "+" ]] && {
-	PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
-}
-
 # @description  Colorize the text with values in __AMMLOG_TERMCODES
 # @$ color codes to be printed
 function ammLog::Color {
@@ -881,7 +882,7 @@ function ammLog::Step {
 function ammLog::StepBegin {
 	typeset name="$1"
 
-	typeset txt="=> StepBegin: $name"
+	typeset txt=">> Begin: $name"
 
 	__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]="$name"
 	__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]="$(date +%s)"
@@ -908,7 +909,7 @@ function ammLog::StepEnd {
 
 	#typeset txt="$(_ammLog::StepPrefix $__AMMLOG_STEPDEPTH"
 	typeset -i time="$(($(date +%s) - ${__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]} ))"
-	typeset txt="<= StepEnd: ${__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]}. Took:${time}s"
+	typeset txt="<< End: ${__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]}. Took:${time}s"
 	[[ -n "$ret" ]] && txt+=" Ret:'$ret'"
 	[[ -n "$msg" ]] && txt+=" Msg:'$msg'"
 

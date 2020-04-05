@@ -7,7 +7,7 @@ readonly MYCONF="/etc/wireguard"
 
 . "$MYPATH/../ammlib"
 
-ammLib::Require "table" "optparse" "syscfg" "syscfg.network"
+ammLib::Require "table" "optparse" "syscfg" "syscfg.network" "network"
 
 # Common options
 ammOptparse::AddOptGroupDesc "Global options"
@@ -38,7 +38,7 @@ function wgStatus {
 		"Last Handshake"
 		"KB Sent"
 		"KB Received"
-		"Keepalive"
+		"K.A."
 	)
 
 
@@ -79,8 +79,8 @@ function wgPeerkeyFilename {
 }
 
 function wgGenKeys {
-	typeset name="$1"
-	typeset path="${2:-$MYCONF/$name}"
+	typeset iface="$1"
+	typeset path="${2:-$MYCONF/$iface}"
 
 	typeset -i r=0
 	typeset pkey="$path/wgkey.prv"
@@ -102,7 +102,7 @@ function wgGenKeys {
 	r=$?
 
 	if ! [[ -e "$pkey" ]]; then
-		ammLog::Err "Cannot generate keys for '$name' in '$pkey' ($r)"
+		ammLog::Err "Cannot generate keys for '$iface' in '$pkey' ($r)"
 		return 1
 	fi
 
@@ -111,55 +111,49 @@ function wgGenKeys {
 }
 
 function wgNicRunning {
-	typeset name="$1"
+	typeset iface="$1"
 
-	ammSyscfgNetwork::NicExists "$name" && ammSyscfgNetwork::NicIsUp "$name"
+	ammSyscfgNetwork::NicExists "$iface" && ammSyscfgNetwork::NicIsUp "$iface"
 }
 
 function wgNicExists {
-	typeset name="$1"
-	ammSyscfgNetwork::NicExists "$name"
+	typeset iface="$1"
+	ammSyscfgNetwork::NicExists "$iface"
 }
 
 function wgNicInit {
-	typeset name="$1"
+	typeset iface="$1"
 	typeset addr="${2:-}"
 
-	ammLog::Dbg "Initializating NIC '$name' with addr '$addr'"
+	ammLog::Dbg "Initializating NIC '$iface' with addr '$addr'"
 
 	# Create NIC if not existing
-	if wgNicExists "$name"; then
-		ammLog::Err "Iface '$name' already exists"
+	if wgNicExists "$iface"; then
+		ammLog::Err "Iface '$iface' already exists"
 		return 1
 	fi
 
-	if ! ammSyscfgNetwork::NicCreate "$name" "wireguard"; then
-		ammLog::Err "Unable to create wireguard iface '$name'"
+	if ! ammSyscfgNetwork::NicCreate "$iface" "wireguard"; then
+		ammLog::Err "Unable to create wireguard iface '$iface'"
 		return 1
 	fi
 
 	# try to add IPv4 if provided
-	if [[ -n "$addr" ]] && ! ammSyscfgNetwork::IpAddrAdd "$name" "$addr"; then
-		ammLog::Err "Unable to set wireguard local IP '$addr' to '$name'"
+	if [[ -n "$addr" ]] && ! ammSyscfgNetwork::IpAddrAdd "$iface" "$addr"; then
+		ammLog::Err "Unable to set wireguard local IP '$addr' to '$iface'"
 		return 1
 	fi
 
 	return 0
 }
 
-function wgCreateRouting {
-	typeset name="$1"
-
-}
-
-
 
 function wgSetup {
-	typeset name="$1"
+	typeset iface="$1"
 	typeset privkey="${2:-}"
 	typeset port="${3:-}"
 
-	typeset cfgpath="$MYCONF/$name"
+	typeset cfgpath="$MYCONF/$iface"
 
 	ammLog::Dbg "Configuring wireguard iface '$iface'"
 
@@ -174,7 +168,7 @@ function wgSetup {
 		if [[ -s "$cfgpath/wgkey.prv" ]]; then
 			privkey="$cfgpath/wgkey.prv"
 		else
-			privkey="$(wgGenKeys "$name")"
+			privkey="$(wgGenKeys "$iface")"
 			if ! [[ -s "$privkey" ]]; then
 				ammLog::Err "Error during keys generation."
 				return 1
@@ -184,13 +178,14 @@ function wgSetup {
 	wgcfg+=(private-key "$privkey")
 
 	# Configure wireguard
-	if ! wg set "$name" ${wgcfg[@]}; then
+	ammLog::Dbg "Calling 'wg set $iface ${wgcfg[@]}'"
+	if ! wg set "$iface" ${wgcfg[@]}; then
 		ammLog::Err "An error occured when configuring wireguard."
 		return 1
 	fi
 
-	if ! ammSyscfgNetwork::NicEnable "$name"; then
-		ammLog::Err "Unable to start the iface '$name' (ip link set $name up)"
+	if ! ammSyscfgNetwork::NicEnable "$iface"; then
+		ammLog::Err "Unable to start the iface '$iface' (ip link set $iface up)"
 		return 1
 	fi
 
@@ -207,42 +202,43 @@ function wgSetup {
 #
 
 function wgCfgLoad {
-	typeset name="$1"
+	typeset iface="$1"
 
-	typeset cfgfile="$MYCONF/$name/wg.cfg"
+	typeset cfgfile="$MYCONF/$iface/wg.cfg"
 	if ! [[ -s "$cfgfile" ]]; then
-		ammLog::Err "No configuration found for '$name' as '$cfgfile'"
+		ammLog::Err "No configuration found for '$iface' as '$cfgfile'"
 		return 1
 	fi
 
-	ammLog::Dbg "Loading cfg '$cfgfile' to iface '$name'"
+	# Load the main configuration
+	ammLog::Dbg "Loading cfg '$cfgfile' to iface '$iface'"
 
 	# If NIC is already up and running, sync conf instead of resetting it
-	if wgNicRunning "$name"; then
-		wg syncconf "$name" "$cfgfile"
+	if wgNicRunning "$iface"; then
+		wg syncconf "$iface" "$cfgfile"
 
 	# First init or syncconf not needed, reset it
 	else
-		wg setconf "$name" "$cfgfile"
+		wg setconf "$iface" "$cfgfile"
 	fi
+
 }
 
 
 function wgCfgSave {
-	typeset name="$1"
+	typeset iface="$1"
 
 	# Create config folder if not existing
-	typeset cfgpath="$MYCONF/$name"
+	typeset cfgpath="$MYCONF/$iface"
 	[[ -d "$cfgpath" ]] || mkdir -p "$cfgpath"
 
-	ammLog::Dbg "Save cfg of iface '$name' to '$cfgpath/wg.cfg'"
+	ammLog::Dbg "Save cfg of iface '$iface' to '$cfgpath/wg.cfg'"
 
 	# Dump the config
 	(
 		umask 077
-		wg showconf "$name" > "$cfgpath/wg.cfg"
+		wg showconf "$iface" > "$cfgpath/wg.cfg"
 	)
-
 }
 
 
@@ -251,39 +247,72 @@ function wgCfgSave {
 # Peer management
 #
 
+# @description  Wrapper to add a client peer
+# @arg $1  (string) Iface to add the peer to
+# @arg $2  (string) Key of the peer
+# @arg $3  (string) Address (or URL) of the peer
+# @arg $4  (string) Name of the peer
 function wgPeerAddClient {
-	typeset name="$1"
-	typeset peerkey="$2"
-	typeset peername="$3"
-	typeset peeraddr="$4"
-
-	wgPeerAdd "$name" "$peerkey" "$peeraddr" "" "" "${peeraddr%%:*}/32" "" "$peername" "client"
-}
-
-function wgPeerAddServer {
-	typeset name="$1"
+	typeset iface="$1"
 	typeset peerkey="$2"
 	typeset peeraddr="$3"
-	typeset peerroute="${4:-}"
+	typeset peername="$4"
 
-	wgPeerAdd "$name" "$peerkey" "$peeraddr" "" "25" "$peerroute" "$peerroute" "" "server"
+	wgPeerAdd "$iface" "$peerkey" "$peeraddr" "" "" "${peeraddr%%:*}/32" "$peername" "client" ""
 }
 
+# @description  Wrapper to add a server peer
+# @arg $1  (string) Iface to add the peer to
+# @arg $2  (string) Public key of the peer
+# @arg $3  (string) Address (or URL) of the peer
+# @arg $4  (string) Local address (ip/cidr)
+# @arg $@  (string[]) Routes to add to the connection
+function wgPeerAddServer {
+	typeset iface="$1"
+	typeset peerkey="$2"
+	typeset peeraddr="$3"
+	typeset localaddr="$4"
+	shift 4
+
+	# Add route to our local network, and optionnal routes if needed
+	typeset lnet="$(ammNetwork::Calc "$localaddr" "network")" ; lnet="${lnet#*=}"
+	typeset lcidr="${localaddr#*/}"
+	# Allow our routes
+	typeset allowedIps r
+	for r in "$lnet/$lcidr" "$@"; do
+		r="${r%% *}"
+		allowedIps+="${allowedIps:+,}$r"
+	done
+
+	ammLog::Dbg "Adding server peer with '$iface' '$peerkey' '$peeraddr' '' '25' '$allowedIps' '' 'server' '$lnet' '$@'"
+	wgPeerAdd "$iface" "$peerkey" "$peeraddr" "" "25" "$allowedIps" "" "server"  "$lnet/$lcidr" "$@"
+}
+
+# @description  Add a peer to a wireguard interface
+# @arg $1  (string) Iface to add the peer to
+# @arg $2  (string) Public key of the peer
+# @arg $3  (string) Address (or URL) of the peer
+# @arg $4  (string) Pre-shared key
+# @arg $5  (int)    Keep-alive interval
+# @arg $6  (string) IP/prefix allowed from this peer
+# @arg $7  (string) Name of the peer
+# @arg $8  (string) Type of the peer (client or server)
+# @arg $@  (string[]) Routes to be added
 function wgPeerAdd {
-	typeset name="$1"
+	typeset iface="$1"
 	typeset peerkey="$2"
 	typeset peeraddr="${3:-}"
 	typeset pskfile="${4:-}"
 	typeset keepalive="${5:-}"
 	typeset ipallowed="${6:-}"
-	typeset routes="${7:-}"
-	typeset peername="${8:-}"
-	typeset peertype="${9:-server}"
+	typeset peername="${7:-}"
+	typeset peertype="${8:-server}"
+	shift 8
+	typeset -a routes=("$@")
 
 	# Push peer to configuration folder
-	typeset cfgpath="$MYCONF/$name/peers"
+	typeset cfgpath="$MYCONF/$iface/peers"
 	typeset cfgpeer="$cfgpath/$(wgPeerkeyFilename $peerkey)"
-	typeset -a err=""
 	[[ -d "$cfgpath" ]] || mkdir -p "$cfgpath"
 
 	# Ensure correct formatting
@@ -291,7 +320,8 @@ function wgPeerAdd {
 		:
 	fi
 
-	wg set "$name" \
+	# Configure the iface
+	wg set "$iface" \
 		peer "$peerkey" \
 		endpoint "$peeraddr" \
 		${pskfile:+preshared-key $pskfile} \
@@ -303,55 +333,109 @@ function wgPeerAdd {
 		return 1
 	fi
 
-	# Do route management
-	if [[ -n "$routes" ]]; then
-		typeset net
-		for net in $routes; do
-			typeset route="$net via $peeraddr"
-			if ! ip route add $route; then
-				err+=("Route command failed: 'ip route add $route'")
-			fi
-		done
-	fi
-
-
-	# Save configuration
+	# Generate configuration to be tested by load function
 	cat >"$cfgpeer" <<-EOT
 		peername="$peername"
 		peerkey="$peerkey"
 		peeraddr="$peeraddr"
+		peertype="$peertype"
 		pskfile="$pskfile"
 		keepalive="$keepalive"
 		ipallowed="$ipallowed"
 		timeadd="$(date +%s)"
-		type="$peertype"
-		routes="$routes"
 		enabled="true"
+		$(ammEnv::VarExport "routes")
 	EOT
 
-	if [[ -n "$err" ]]; then
-		ammLog::Err "Some error occured: ${err[@]}"
+	if ! wgPeerLoad "$iface" "$peerkey"; then
+		ammLog::Err "Error during peer configuration load (check file '$cfgpeer')"
 		return 1
 	fi
 
 	return 0
 }
 
+function wgPeerLoad {
+	typeset iface="$1"
+	typeset filterpeerkey="${2:-}"
+
+	ammLog::Dbg "Will load peer cfg of '$iface' (filter: $filterpeerkey)"
+
+	# Load the peer configuration
+	typeset peercfg
+	for peercfg in "$MYCONF/$iface/peers/"*; do
+		[[ -e "$peercfg" ]] || continue
+		# Spawn a subshell for loading
+		(
+			typeset peertype peername peerkey peeraddr pskfile keepalive
+			typeset ipallowed timeadd enabled
+			typeset dnsserver dnssearch
+			typeset -a routes
+			source "$peercfg"
+
+			ammLog::Dbg "Checking file '$peercfg'"
+
+			# Filters on the peer
+			[[ -n "$filterpeerkey" ]] && [[ "$filterpeerkey" != "$peerkey" ]] && continue
+			[[ "$enabled" != "true" ]] && continue
+
+			ammLog::Dbg "Processing file '$peercfg'"
+
+			# Add local IP configuration
+			if [[ -n "${localip:-}" ]]; then
+				if ! ammSyscfgNetwork::IpAddrExists "$iface" "$localip"; then
+					ammLog::Inf "Add IP '$localip' to '$iface'"
+					ammSyscfgNetwork::IpAddrAdd "$iface" "$localip"
+				fi
+			fi
+
+			# If remote peer is a server, more network changes
+			if [[ "$peertype" == "server" ]]; then
+				# Routing
+				if [[ -n "${routes:-}" ]]; then
+					typeset route extra
+					for route in "${routes[@]}"; do
+						ammLog::Dbg "Checking for route '$route'"
+						extra="${route#* }"
+						route="${route%% *}"
+						[[ "$extra" == "$route" ]] && extra=
+						if ! ammSyscfgNetwork::RouteExists "$iface" "$route"; then
+							ammLog::Inf "Adding route '$route' ($extra) to '$iface'"
+							ammSyscfgNetwork::RouteAdd "$iface" "$route" "$extra"
+						fi
+					done
+				fi
+
+				# TODO: DNS
+				if [[ -n "${dnsserver:-}" ]]; then
+					:
+				fi
+			fi
+		)
+	done
+
+
+}
+
+
 function wgPeerDisable {
-	typeset name="$1"
+	typeset iface="$1"
 	typeset peerkey="$2"
 
-	wg set "$name" peer "$peerkey" remove
+	wg set "$iface" peer "$peerkey" remove
+
+	# TODO: Edit configuration
 }
 
 function wgPeerDelete {
-	typeset name="$1"
+	typeset iface="$1"
 	typeset peerkey="$2"
 
-	typeset cfgpath="$MYCONF/$name/peers"
-	rm -f "$cfgpath/$peerkey"
+	typeset cfgpath="$MYCONF/$iface/peers"
+	# TODO: Delete configuration
+	#rm -f "$cfgpath/$peerkey"
 
-	wg set "$name" peer "$peerkey" remove
+	wg set "$iface" peer "$peerkey" remove
 }
 
 
@@ -451,22 +535,40 @@ function mainInstall {
 }
 
 function mainStart {
-	typeset name="$1"
+	typeset iface="$1"
 
-	typeset cfgpath="$MYCONF/$name"
+	typeset cfgpath="$MYCONF/$iface"
+	typeset -i r=0
+
+	ammLog::Inf "Starting interface '$iface'"
 
 	# if configuration exists, load it
-	if [[ -s "$cfgpath/wg.cfg" ]]; then
-
-		# Create NIC
-		if ! ammSyscfgNetwork::NicExists "$name"; then
-			if ! wgInit "$name"; then
-				ammLog::Err "Error during NIC Initialization. try deleting it with --force"
-			fi
-		fi
-
-		# 
+	if ! [[ -s "$cfgpath/wg.cfg" ]]; then
+		ammLog::Err "Configuration '$cfgpath/wg.cfg' is empty or does not exists"
+		return 1
 	fi
+
+	# Create NIC
+	if ! ammSyscfgNetwork::NicExists "$iface"; then
+		if ! wgNicInit "$iface"; then
+			ammLog::Err "Error during NIC '$iface' Initialization. try deleting it with --force"
+			return 1
+		fi
+	fi
+
+	# Load WG configuration
+	if ! wgCfgLoad "$iface"; then
+		ammLog::Err "Error during NIC '$iface' configuration"
+		return 1
+	fi
+
+	# Load peer configuration (ip & route)
+	if ! wgPeerLoad "$iface"; then
+		ammLog::Wrn "Some peer configuration failed"
+		r+=1
+	fi
+
+	return $r
 }
 
 function mainStop {
@@ -478,10 +580,27 @@ function mainStatus {
 }
 
 typeset op="${1:-}"; shift
+typeset -i r=0
 
 case "$op" in
 	start)
-		
+		typeset ifaces="$@"
+		typeset iface=""
+
+		if [[ -z "$ifaces" ]]; then
+			for iface in $MYCONF/*/wg.cfg; do
+				iface="${iface%/wg.cfg}"
+				iface="${iface##*/}"
+				ifaces+=" $iface"
+			done
+		fi
+
+		for iface in $ifaces; do
+			if [[ -d "$MYCONF/$iface" ]]; then
+				mainStart $iface
+				r+=$?
+			fi
+		done
 		;;
 
 	stop)
@@ -516,13 +635,13 @@ case "$op" in
 
 		typeset iface="${1:-}"; shift
 		ammOptparse::AddOptGroupDesc "addserver command parameters"
-		ammOptparse::AddOpt "-s|--serveraddr=" "Remote server address (host[:port]) to connect to"
+		ammOptparse::AddOpt "-a|--serveraddr=" "Remote server address (host[:port]) to connect to"
 		ammOptparse::AddOpt "-k|--serverkey="  "Remote server public key"
-		ammOptparse::AddOpt "-a|--localaddr="  "Local address to be assigned"
+		ammOptparse::AddOpt "-A|--localaddr="  "Local address to be assigned (format: 'ip/cidr')"
 		ammOptparse::AddOpt    "--localport="  "Local port to listen to"
-		ammOptparse::AddOpt "-p|--localkey="   "Local private key"
+		ammOptparse::AddOpt "-K|--localkey="   "Local private key (will be generated if none exists)"
 		ammOptparse::AddOpt "-r|--route@"      "Routes to forward to remote server"
-		ammOptparse::AddOpt "-K|--keepalive="  "Keepalive (in seconds)" "25"
+		ammOptparse::AddOpt    "--keepalive="  "Keepalive (in seconds)" "25"
 
 		ammOptparse::Parse --no-unknown --skip=2 || ammLog::Die "Error during options parsing"
 
@@ -531,7 +650,7 @@ case "$op" in
 		typeset    laddr="$(ammOptparse::Get "localaddr")"
 		typeset    lport="$(ammOptparse::Get "localport")"
 		typeset    lkey="$(ammOptparse::Get "localkey")"
-		typeset -a route=($(ammOptparse::Get "route"))
+		typeset -a routes=$(ammOptparse::Get "route")
 
 		if [[ -z "$iface" ]]; then
 			ammLog::Err "Usage: $0 addserver <iface> [options...]"
@@ -556,7 +675,7 @@ case "$op" in
 		ammLog::Inf "Iface '$iface' configured"
 
 		# Add the server peer
-		if ! wgPeerAddServer "$iface" "$rkey" "$raddr" "${routes[@]}"; then
+		if ! wgPeerAddServer "$iface" "$rkey" "$raddr" "$laddr" "${routes[@]}"; then
 			ammLog::Err "Unable to add the server configuration to '$iface'"
 			exit 1
 		fi
@@ -601,5 +720,7 @@ case "$op" in
 
 		EOT
 		ammOptparse::Help
+		r=1
 esac
 
+exit $r

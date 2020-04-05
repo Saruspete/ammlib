@@ -271,7 +271,7 @@ function ammSyscfgNetwork::IpAddrExists {
 	typeset iface="$1"
 	typeset ipaddr="$2"
 
-	ip -o address show $iface
+	[[ -n "$(ip -o address show $iface|awk '$4 == "'$ipaddr'"')" ]]
 }
 
 function ammSyscfgNetwork::IpAddrAdd {

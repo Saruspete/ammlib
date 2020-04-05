@@ -286,7 +286,7 @@ function ammSyscfgNetwork::RouteExists {
 	typeset addr="$2"
 	typeset extra="${3:-}"
 
-	route="$(ip -o route show dev "$iface" "$addr")"
+	typeset route="$(ip -o route show dev "$iface" "$addr")"
 	if [[ -n "$route" ]]; then
 		if [[ -n "$extra" ]]; then
 			# TODO...
@@ -302,6 +302,7 @@ function ammSyscfgNetwork::RouteAdd {
 	typeset route="$2"
 	typeset extra="${3:-}"
 
+	ammLog::Inf "ip route add '$route' dev '$iface' $extra"
 	ip route add "$route" dev "$iface" $extra
 }
 

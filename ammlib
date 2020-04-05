@@ -1087,10 +1087,10 @@ function ammEnv::IsVar {
 
 function ammEnv::VarExport {
 
-	typeset v p
-	for v in "$@"; do
-		while read p; do
-			[[ "$varname" == "${var%%=*}" ]] echo "$p"
+	typeset varname vardef
+	for varname in "$@"; do
+		while read vardef; do
+			[[ "$varname" == "${vardef%%=*}" ]] && echo "$vardef"
 		done < <(set -o posix; set)
 	done
 }

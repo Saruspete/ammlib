@@ -258,7 +258,7 @@ function wgPeerAddClient {
 	typeset peeraddr="$3"
 	typeset peername="$4"
 
-	wgPeerAdd "$iface" "$peerkey" "$peeraddr" "" "" "${peeraddr%%:*}/32" "$peername" "client" ""
+	wgPeerAdd "$iface" "$peerkey" "$peeraddr" "" "" "" "${peeraddr%%:*}/32" "$peername" "client" ""
 }
 
 # @description  Wrapper to add a server peer
@@ -285,7 +285,7 @@ function wgPeerAddServer {
 	done
 
 	ammLog::Dbg "Adding server peer with '$iface' '$peerkey' '$peeraddr' '' '25' '$allowedIps' '' 'server' '$lnet' '$@'"
-	wgPeerAdd "$iface" "$peerkey" "$peeraddr" "" "25" "$allowedIps" "" "server"  "$lnet/$lcidr" "$@"
+	wgPeerAdd "$iface" "$peerkey" "$peeraddr" "$localaddr" "" "25" "$allowedIps" "" "server"  "$lnet/$lcidr" "$@"
 }
 
 # @description  Add a peer to a wireguard interface
@@ -302,12 +302,13 @@ function wgPeerAdd {
 	typeset iface="$1"
 	typeset peerkey="$2"
 	typeset peeraddr="${3:-}"
-	typeset pskfile="${4:-}"
-	typeset keepalive="${5:-}"
-	typeset ipallowed="${6:-}"
-	typeset peername="${7:-}"
-	typeset peertype="${8:-server}"
-	shift 8
+	typeset localaddr="${4:-}"
+	typeset pskfile="${5:-}"
+	typeset keepalive="${6:-}"
+	typeset ipallowed="${7:-}"
+	typeset peername="${8:-}"
+	typeset peertype="${9:-server}"
+	shift 9
 	typeset -a routes=("$@")
 
 	# Push peer to configuration folder
@@ -341,6 +342,7 @@ function wgPeerAdd {
 		peertype="$peertype"
 		pskfile="$pskfile"
 		keepalive="$keepalive"
+		localaddr="$localaddr"
 		ipallowed="$ipallowed"
 		timeadd="$(date +%s)"
 		enabled="true"
@@ -368,7 +370,7 @@ function wgPeerLoad {
 		# Spawn a subshell for loading
 		(
 			typeset peertype peername peerkey peeraddr pskfile keepalive
-			typeset ipallowed timeadd enabled
+			typeset localaddr ipallowed timeadd enabled
 			typeset dnsserver dnssearch
 			typeset -a routes
 			source "$peercfg"
@@ -382,10 +384,10 @@ function wgPeerLoad {
 			ammLog::Dbg "Processing file '$peercfg'"
 
 			# Add local IP configuration
-			if [[ -n "${localip:-}" ]]; then
-				if ! ammSyscfgNetwork::IpAddrExists "$iface" "$localip"; then
-					ammLog::Inf "Add IP '$localip' to '$iface'"
-					ammSyscfgNetwork::IpAddrAdd "$iface" "$localip"
+			if [[ -n "${localaddr:-}" ]]; then
+				if ! ammSyscfgNetwork::IpAddrExists "$iface" "$localaddr"; then
+					ammLog::Inf "Add IP '$localaddr' to '$iface'"
+					ammSyscfgNetwork::IpAddrAdd "$iface" "$localaddr"
 				fi
 			fi
 
@@ -562,6 +564,12 @@ function mainStart {
 		return 1
 	fi
 
+	# Set link up
+	if ! ammSyscfgNetwork::NicEnable "$iface"; then
+		ammLog::Err "Error during up to iface '$iface'"
+		return 1
+	fi
+
 	# Load peer configuration (ip & route)
 	if ! wgPeerLoad "$iface"; then
 		ammLog::Wrn "Some peer configuration failed"
@@ -715,7 +723,7 @@ case "$op" in
 
 			Usual sequence for first time configuration:
 			$0 setup
-			$0 addserver wg0 --server myvpn.example.com --key "1234567890+ABCDEF==" --address 10.254.254.123/24 --route 10.0.0./24 --keepalive 20"
+			$0 addserver wg0 --serveraddr myvpn.example.com --serverkey "1234567890+ABCDEF==" --localaddr 10.254.254.123/24 --route "10.0.0.0/8 mtu 1372" --keepalive 20"
 			$0 start wg0
 
 		EOT

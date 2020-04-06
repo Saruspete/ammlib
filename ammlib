@@ -1094,6 +1094,47 @@ function ammEnv::VarExport {
 		done < <(set -o posix; set)
 	done
 }
+
+# @description  Decompose a path to a list of all its folders
+# @arg $1  (path) The path to decompose
+function ammEnv::PathDecompose {
+	typeset path="$1"
+	path="$(readlink -f "$path")"
+	while [[ -n "$path" ]]; do
+		echo "$path"
+		path="${path%/*}"
+	done
+}
+
+# @description  Check if the full path of a file is secure for the current user
+# @arg $1  (path) File or folder to check
+# @exitcode 0   Path is secure
+# @exitcode >=1  Path has a number of insecurities, shown as stdout
+function ammEnv::PathIsSecure {
+	typeset path="$1"
+
+	typeset -i r=0
+	typeset d
+	while read d; do
+		typeset usr grp mod
+		read usr grp mod < <(stat --dereference --format "%U %G %a" "$d")
+		if [[ "$usr" != "root" ]] && [[ "$usr" != "$__AMMLIB_USERNAME" ]]; then
+			echo "'$d' is owned by '$usr' (not root, nor $__AMMLIB_USERNAME)"
+			r+=1
+		fi
+		if [[ $(( ${mod:1:1} & 2)) != 0 ]]; then
+			echo "'$d' is group-writable for '$grp'"
+			r+=1
+		fi
+		if [[ $(( ${mod:2:1} & 2)) != 0 ]]; then
+			echo "'$d' is world-writable"
+			r+=1
+		fi
+	done < <(ammEnv::PathDecompose "$path")
+
+	return $r
+}
+
 # -----------------------------------------------------------------------------
 # Execution helpers
 # -----------------------------------------------------------------------------

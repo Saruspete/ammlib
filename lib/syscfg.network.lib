@@ -203,8 +203,10 @@ function ammSyscfgNetwork::NicWithIp {
 		}
 		$1 ~ /inet6?/ {
 			gsub("/[0-9]+", "", $2)
-			if ($2 == ip)
+			if ($2 == ip) {
+				gsub(/:$/,"",nic)
 				print nic
+			}
 		}
 		'
 }
@@ -278,6 +280,7 @@ function ammSyscfgNetwork::IpAddrAdd {
 	typeset iface="$1"; shift
 	typeset addr="$1"; shift
 
+	ammLog::Inf "ip address add '$addr' dev '$iface' $@"
 	ip address add "$addr" dev "$iface" "$@"
 }
 
@@ -331,6 +334,59 @@ function ammSyscfgNetwork::NSExec {
 	typeset cmd="$2"
 
 	ip netns exec "$ns" "$cmd"
+}
+
+function ammSyscfgNetwork::NSEnumerate {
+
+	typeset -A namespaces
+	typeset -i r=0
+
+	# Populate our ns first, to avoid unneeded
+	typeset mynspath="/proc/self/ns/net"
+	typeset myns="$(stat -Lc %i "$mynspath")"
+	namespaces[$myns]="$$"
+
+	typeset netns
+	for netns in /proc/*/ns/net; do
+		if ! [[ -r "$netns" ]]; then
+			# Skip if transcient process (proc has exited)
+			[[ -d "${netns%/ns/net}" ]] || continue
+			# Else, maybe permission error. Report as error
+			ammLog::Dbg "Cannot read namespace of '$netns'"
+			r+=1
+			continue
+		fi
+		typeset pid="${netns#/proc/}"
+		pid="${pid%%/*}"
+
+		if [[ $netns -ef $mynspath ]]; then
+			namespaces[$myns]+=" $pid"
+		else
+			typeset nsid="$(stat -Lc "%c" "$netns" 2>/dev/null)"
+			[[ -z "$nsid" ]] && continue
+			namespaces[$nsid]+=" $pid"
+		fi
+	done
+
+	ammEnv::VarExport namespaces
+
+	return $r
+}
+
+function ammSyscfgNetwork::NSGetFromName {
+	typeset name="$1"
+
+	if ! [[ -d "/var/run/netns" ]]; then
+		ammLog::Err "netns folder '/var/run/netns' doesn't exists. No lookup possible"
+		return 1
+	fi
+
+	if ! [[ -e "/var/run/netns/$name" ]]; then
+		ammLog::Err "netns name '$name' doesn't exists in '/var/run/netns'."
+		return 1
+	fi
+
+	stat -Lc "%i" "/var/run/netns/$name" 2>/dev/null
 }
 
 # -----------------------------------------------------------------------------

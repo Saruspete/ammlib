@@ -534,7 +534,7 @@ function ammApp::IsRunning {
 
 # 
 # Upgrade steps:
-# 0) Get current version
+# 0) Get latest version string if none provided and check if update needed
 # 1) Download required content in tmpdir
 # 2) Prepare content (extract, compile)
 # 3) Deploy to target folder
@@ -562,9 +562,18 @@ function ammApp::Upgrade {
 			fi
 
 		# usual github project
-		elif [[ -n "${GHB_PROJECT}" ]]; then
+		elif [[ -n "${GHB_PROJECT:-}" ]]; then
 			ammLib::Require "http"
-			versionNew="$(ammHttp::GithubReleaseGetLastVersion "$GHB_PROJECT")"
+
+			# Allow usage of devel version
+			if ammString::IsTrue "${GHB_DEVALLOWED:-false}"; then
+				typeset branch="${GHB_DEVBRANCH:-master}"
+				versionNew="$(ammHttp::GithubBranchGetLastCommit "$GHB_PROJECT" "$branch")"
+				versionNew="${versionNew// /_}"
+			# Only releases
+			else
+				versionNew="$(ammHttp::GithubReleaseGetLastVersion "$GHB_PROJECT")"
+			fi
 
 		# No helper, no var...
 		else
@@ -578,6 +587,7 @@ function ammApp::Upgrade {
 		ammLog::Inf "Latest version found: '$versionNew', same as current one. Exiting"
 		return 0
 	fi
+
 
 	ammLog::Inf "Upgrading from '$versionOld' to '$versionNew'"
 	typeset r=0
@@ -650,7 +660,7 @@ function ammApp::Upgrade {
 	# Custom preparation function
 	if ammEnv::IsFunc "appUpgradePrepare"; then
 		# Call custom function
-		appUpgradePrepare "$versionNew" "$tmpdir"
+		appUpgradePrepare "$versionNew" "$versionOld" "$tmpdir"
 		r+=$?
 
 	# 2) Extract archives into extraction folder
@@ -686,7 +696,7 @@ function ammApp::Upgrade {
 	ammLog::StepBegin "Deploying new version to '$appdir'"
 
 	if ammEnv::IsFunc "appUpgradeDeploy"; then
-		appUpgradeDeploy "$versionNew" "$tmpextract" "$appdir"
+		appUpgradeDeploy "$versionNew" "$versionOld" "$tmpextract" "$appdir"
 	else
 
 		# Check for bin presency
@@ -711,8 +721,11 @@ function ammApp::Upgrade {
 	#
 	ammLog::StepBegin "Generating and deploy new configuration"
 	if ammEnv::IsFunc  "appUpgradeConfigure"; then
-		appUpgradeConfigure "$versionNew" "$appdir"
+		appUpgradeConfigure "$versionNew" "$versionOld" "$appdir"
 		r+=$?
+	elif [[ -n "$RUN_CFG" ]]; then
+		ammLog::Dbg "Using '$RUN_CFG' (TODO! )"
+		#cp "$RUN_CFG" "$CFG_ appdir"
 	else
 		ammLog::Inf "No function 'appUpgradeConfigure'. Skipping"
 	fi
@@ -724,7 +737,7 @@ function ammApp::Upgrade {
 	ammLog::StepBegin "Testing new version"
 	if ammEnv::IsFunc "appUpgradeTest"; then
 		# Generate a new network & fs namespace 
-		:
+		ammUpgradeTest "$versionNew" "$versionOld"
 	else
 		ammLog::Inf "No function 'appUpgradeTest'. Skipping"
 	fi

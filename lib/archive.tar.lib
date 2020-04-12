@@ -1,0 +1,90 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammArchiveTar::MetaCheck {
+	ammExec::Requires awk
+}
+
+# -----------------------------------------------------------------------------
+# Some description for your lib
+# -----------------------------------------------------------------------------
+
+# @description 
+function ammArchiveTar::Unpack {
+	typeset vers="$1"
+	typeset src="$2"
+
+	typeset file="${src##*/}"
+	typeset path="${src%/*}"
+	typeset user="${RUN_USER:-$(user_owner "$MYSELF")}"
+	typeset usercurr="$(user_current)"
+	typeset -i ret=0
+
+	typeset PREP_BIN=""
+	typeset PREP_OPTS=""
+	typeset TAR_BIN="\\tar"
+	typeset TAR_OPTS=" -C $path "
+
+	# if we need to change the ownership
+	if [[ "$user" != "$usercurr" ]]; then
+
+		# tar as root can change its owner
+		if [[ "$usercurr" = "root" ]]; then
+			TAR_OPTS+=" --owner=$user "
+		# prefix tar with sudo to run as root
+		elif ammExec::Exists "sudo" >/dev/null; then
+			TAR_BIN="\\sudo -n \\tar"
+			TAR_OPTS+=" --owner=$user "
+		else
+			ammLog::Err "Cannot change the ownership from $usercurr to $user"
+			return 1
+		fi
+	fi
+
+	# Preprocessing if needed (could use -a)
+	case $file in
+		*tar.gz|*.tgz)   TAR_OPTS+=" -z" ;;
+		*.tar.bz2|*.tbz) TAR_OPTS+=" -j" ;;
+		*.tar.xz|*.txz)  TAR_OPTS+=" -J" ;;
+		*.tar.lzma|*.tlzma) TAR_OPTS+=" --lzma" ;;
+	esac
+
+	# Check if we should strip the first path or not
+	typeset strip=" --strip-components=1"
+	while read line; do
+		# If no transformation is done, we have one or more folder at root level.
+		# Folders always ends with "/", even "./"
+		[[ "${line##*/}" == "$line" ]] && {
+			ammLog::Wrn "One or more file found at root archive. Not stripping first level"
+			strip=""
+			break
+		}
+		# If the tarball starts with "./", we need to strip it too
+		[[ "${line}" =~ ^\./ ]] && {
+			strip=" --strip-components=2"
+		}
+	done < <(\tar $TAR_OPTS -t -f "$src")
+
+	# Add the strip (if any left)
+	TAR_OPTS+=" $strip"
+
+	# Override the owner for the same user as the calling script
+	TAR_OPTS+=" --owner $user"
+
+	# Unpack the tarball
+	ammLog::Inf "Unpacking $file with tar opts: $TAR_OPTS"
+	set -o pipefail
+	\tar $TAR_OPTS -x -p -f "$src" 2>&1 | ammLog::Dbg -
+
+	ret=$?
+
+}
+

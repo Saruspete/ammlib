@@ -1,0 +1,120 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammArchiveMakeself::MetaCheck {
+	ammExec::Requires grep
+
+	# check if we have the script in our usual search path
+	typeset p
+	for p in $(ammExec::GetPath makeself.sh makeself); do
+		if [[ -x "$p" ]] && [[ -s "$p" ]]; then
+			if grep "^MS_VERSION=" $p >/dev/null 2>&1; then
+				ammLog::Dbg "Using '$p' as makeself"
+				AMMARCHIVEMAKESELF_BIN="$p"
+				return 0
+			fi
+		fi
+	done
+
+	# Check if we can fetch it
+	if [[ -z "$AMMARCHIVEMAKESELF_BIN" ]]; then
+		ammLib::Requires http
+		ammHttp:Fetch "https://raw.githubusercontent.com/megastep/makeself/master/makeself.sh" "$__AMMLIB_BIN/makeself.sh"
+		[[ -n "$ghlastcommit" ]] && return 0
+	fi
+
+	# No way to get it. Bailing out
+	return 1
+}
+
+# -----------------------------------------------------------------------------
+# Helpers and fixes
+# -----------------------------------------------------------------------------
+typeset -g AMMARCHIVEMAKESELF_BIN=
+
+function ammArchiveMakeself::Cleanup {
+	typeset file="$1"
+
+	if ! [[ -e "$file" ]] || ! [[ -f "$file" ]]; then
+		ammLog::Err "Archive file '$file' is invalid"
+		return 1
+	fi
+
+	# remove password if any
+	sed -i "$file" -Ee '/--ssl-passwd/!b;n;s/[^\\" ]+/**REMOVED**/g'
+
+	return 0
+}
+
+# -----------------------------------------------------------------------------
+# Base operations: extract and create
+# -----------------------------------------------------------------------------
+
+# @description  Extract a makeself archive to specified folder
+function ammArchiveMakeself::Extract {
+	typeset file="$1"
+	typeset dest="$2"
+
+	typeset -a opts=("--accept")
+
+	# TODO: check if archive is makeself
+	typeset pass="$(ammArchive::GetPassword "$file")"
+	if [[ -n "$pass" ]]; then
+		opts+=("--ssl-pass-src" "pass:$pass")
+	fi
+
+	bash $file ${opts[@]}
+}
+
+function ammArchiveMakeself::Add {
+	typeset file="$1"
+}
+
+
+# @description  Create the final archive
+#
+function ammArchiveMakeself::Finalize {
+	typeset file="$1"
+	typeset folder="${2:-}"
+	typeset label="${3:-}"
+	typeset script="${4:-}"
+
+	typeset -i r=0
+
+	typeset -a opts=("--sha256")
+	typeset pass="$(ammArchive::GetPassword "$file")"
+	if [[ -n "$pass" ]]; then
+		opts+=("--ssl-encrypt" "--ssl-passwd" "$pass")
+	fi
+
+	# call makeself
+	$AMMARCHIVEMAKESELF_BIN "${opts[@]}" "$folder" "$file" "$label" "$script"
+	r+=$?
+
+	# if the archive exists / was created, clean it up
+	if [[ -s "$file" ]]; then
+		ammArchiveMakeself::Cleanup "$file"
+		r+=$?
+	fi
+
+	return $r
+}
+
+
+# -----------------------------------------------------------------------------
+# Non-standard operations
+# -----------------------------------------------------------------------------
+function ammArchiveMakeself::SetLicense {
+	:
+}
+
+
+

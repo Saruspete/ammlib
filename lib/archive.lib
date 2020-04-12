@@ -1,0 +1,174 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammArchive::MetaInit {
+	ammExec::Requires file
+	ammLib::Require string
+}
+
+function ammArchive::LibLoad {
+	typeset atype="$1"
+
+	if ! ammLib::Load "archive.$atype"; then
+			ammLog::Err "Cannot load required archive library '$atype'"
+			return 1
+	fi
+}
+
+## @arg onlyusable Shall only the usable functions be returned
+function ammArchive::LibList {
+	typeset onlyusable="${1:-false}"
+
+	typeset sublib
+	for sublib in $(ammLib::LocatePattern "archive.*"); do
+		ammLog::Dbg "Found sublib '$sublib'"
+
+		if ammString::IsTrue "$onlyusable" && ! ammLib::Loadable $sublib >/dev/null; then
+			ammLog::Dbg "Unable to load $sublib"
+			continue
+		fi
+
+		typeset libname="$(ammLib::NameFromPath "$sublib")"
+		echo ${libname#archive.}
+
+	done
+}
+
+# @description  Call the real function from the library
+# @arg $1  (string) Operation to call on the sub-library
+# @arg $2  (path)   file o
+# @arg $3  (string) Format for the archive if not guessable from file
+# @arg $@  (string[])  Options to pass to the called function
+function _ammArchive::Proxy {
+	typeset op="$1"
+	typeset file="$2"
+	typeset fmt="${3:-}"
+	shift 3
+
+	# No format specified of discovery requested
+	if [[ -z "$fmt" ]] || [[ "$fmt" == "auto" ]]; then
+		if [[ -s "$file" ]]; then
+			fmt="$(ammArchive::FormatFromFile "$file")"
+			if [[ -z "$fmt" ]]; then
+				ammLog::Err "Unable to guess format of '$file' from current system available modules"
+				return 1
+			fi
+		else
+			ammLog::Err "Unable to guess format from empty file '$file'"
+			return 1
+		fi
+	fi
+
+	typeset func="ammArchive$fmt::$op"
+	if ! ammEnv::IsFunc "$func"; then
+		ammLog::Err "Function '$op' is not implemented with lib '$fmt'"
+		return 1
+	fi
+
+	$func "$file" "$@"
+}
+# -----------------------------------------------------------------------------
+# Format discovery / management
+# -----------------------------------------------------------------------------
+
+# @description  Get the archive format usable for library loading
+# @arg $1  (path) Archive file to be checked for format
+# @arg $2  (path) Optional format hint or fallback
+function ammArchive::FormatFromFile {
+	typeset file="$1"
+	typeset fmt="${2:-}"
+
+	typeset archfmt=""
+
+	# First by filename
+	case $file in
+		*.tar.gz|*.tgz)     archfmt="tar";;
+		*.tar.bz2|*.tbz2)   archfmt="tar";;
+		*.tar.xz|*.txz)     archfmt="tar";;
+		*.tar.lzma|*.tlzma) archfmt="tar";;
+		*.rpm)              archfmt="rpm";;
+		*.deb)              archfmt="deb";;
+		*.zip)              archfmt="zip";;
+		Dockerfile)         archfmt="docker";;
+	esac
+
+	# If format found, use it
+	if [[ -n "$archfmt" ]]; then
+		echo "$archfmt"
+		return 0
+
+	# Filename did not found the format, try every available lib
+	else
+		for archfmt in $(ammArchive::LibList); do
+			:
+		done
+	fi
+
+	return 1
+}
+
+
+# -----------------------------------------------------------------------------
+# Basic operations: create / unpack
+# -----------------------------------------------------------------------------
+
+# @description  Unpack an archive
+function ammArchive::Extract {
+	typeset arch="$1"
+	typeset dest="$2"
+	typeset fmt="${3:-}"
+	typeset opts="${4:-}"
+
+	# Call the real function
+	_ammArchive::Proxy "Extract" "$arch" "$fmt" "$dest" "$opts"
+}
+
+
+# @description  Add a file or folder to an archive
+# @arg $1  (file) Archive on which to add the file
+# @arg $2  (path) optionnal prefix for the content to be added
+# @arg $@  (path[]) Files or folders to be added to the archive
+function ammArchive::Add {
+	typeset arch="$1"; shift
+
+	typeset prefix=""
+
+
+}
+
+function ammArchive::Finalize {
+	:
+}
+
+# -----------------------------------------------------------------------------
+# Specfic operations
+# -----------------------------------------------------------------------------
+typeset -gA __AMMARCHIVE_PASSWORDS=()
+function ammArchive::SetPassword {
+	typeset file="$1"
+	typeset pass="$2"
+
+	__AMMARCHIVE_PASSWORDS[$file]="$pass"
+}
+
+function ammArchive::GetPassword {
+	typeset file="$1"
+
+	echo ${__AMMARCHIVE_PASSWORDS[$file]:-}
+}
+
+function ammArchive::SetEncryption {
+	:
+}
+
+
+
+

@@ -147,7 +147,7 @@ function ammHttp::FetchSmart {
 # Special sites (to be split into submodule ?
 # -----------------------------------------------------------------------------
 
-# TODO: use tools like jq to parse json APIs
+# TODO: use tools like jq to parse json APIs and use private keys
 
 function ammHttp::GithubBranchGetLastCommit {
 	typeset projectpath="$1"
@@ -165,12 +165,20 @@ function ammHttp::GithubBranchGetLastCommit {
 	[[ -n "$commitdate" ]]
 }
 
+function ammHttp::GithubCommitExists {
+	typeset projectpath="$1"
+	typeset commit="$2"
+
+	typeset url="https://github.com/$projectpath/commit/$commit"
+	[[ "$(ammHttp::Fetch "$url" "-" 2>/dev/null)" != "Not Found" ]]
+}
+
 function ammHttp::GithubArchiveGetUrl {
 	typeset projectpath="$1"
 	typeset commit="$2"
 
 	typeset url="https://github.com/$projectpath/archive/$commit.tar.gz"
-	ammHttp::Fetch "$url"
+	echo "$url"
 }
 
 function ammHttp::GithubReleaseGetLastVersion {

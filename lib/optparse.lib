@@ -545,7 +545,7 @@ function ammOptparse::Help {
 	done
 
 	# Columns of the output
-	typeset -i termSize="${COLUMNS:-$(tput cols 2>/dev/null)}"
+	typeset -i termSize="${COLUMNS:-$(ammExec::Exists tput && tput cols)}"
 	[[ "$termSize" == "0" ]] && termSize=80
 	descSize="$(( $termSize - 2 - $optSize - 4 ))"
 

@@ -1136,6 +1136,23 @@ function ammEnv::PathIsSecure {
 	return $r
 }
 
+# @description  Check if we can create the requested path
+# @arg $1  (path) File or folder to check
+# @exitcode 0  Path is writable
+function ammEnv::PathIsWritable {
+	typeset path="$1"
+
+	typeset element parent
+	while read e; do
+		if [[ -e "$e" ]] && ! [[ -w "$e" ]]; then
+			echo "Not writable: '$e'"
+			return 1
+		fi
+	done < <(ammEnv::PathDecompose "$path")
+	return 0
+}
+
+
 # -----------------------------------------------------------------------------
 # Execution helpers
 # -----------------------------------------------------------------------------

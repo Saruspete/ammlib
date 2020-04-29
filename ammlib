@@ -1099,11 +1099,12 @@ function ammEnv::VarExport {
 # @arg $1  (path) The path to decompose
 function ammEnv::PathDecompose {
 	typeset path="$1"
-	path="$(readlink -f "$path")"
+	path="$(readlink -m "$path")"
 	while [[ -n "$path" ]]; do
 		echo "$path"
 		path="${path%/*}"
 	done
+	echo "/"
 }
 
 # @description  Check if the full path of a file is secure for the current user

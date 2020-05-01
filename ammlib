@@ -1168,6 +1168,39 @@ function ammPath::IsWritable {
 	return 0
 }
 
+# @description  Copy a selection of files with their relative structure
+# @arg $1  (path) Source path where to find the content
+# @arg $2  (path) Destination path where to copy content
+# @arg $@  (string) files or patterns to copy from source to destination
+function ammPath::CopyStructure {
+	typeset pathsrc="$1"
+	typeset pathdst="$2"
+	shift 2
+
+	typeset -i r=0
+	typeset pattern srcfile
+	for pattern in "$@"; do
+		# Remove srcpath from pattern, we'll add it after to ensure its present
+		pattern="${pattern#$pathsrc/}"
+		for srcfile in $pathsrc/$pattern; do
+			typeset srcdir="${srcfile%/*}"
+			typeset dstdir="$pathdst${srcdir#$pathsrc}"
+			if ! [[ -d "$dstdir" ]]; then
+				typeset out="$(mkdir -p "$dstdir" 2>&1)"
+				if ! [[ -d "$dstdir" ]]; then
+					ammLog::Wrn "Cannot create target folder '$dstdir' for '$srcfile'"
+					r+=1
+					continue
+				fi
+			fi
+
+			\cp -a "$srcfile" "$dstdir"
+			r+=$?
+		done
+	done
+
+	return $r
+}
 
 # -----------------------------------------------------------------------------
 # Execution helpers

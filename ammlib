@@ -1095,9 +1095,25 @@ function ammEnv::VarExport {
 	done
 }
 
+function ammEnv::PathDecompose {
+	ammLog::Deprecated "ammPath::Decompose"
+	ammPath::Decompose "$@"
+}
+function ammEnv::PathIsSecure {
+	ammLog::Deprecated "ammPath::IsSecure"
+	ammPath::IsSecure "$@"
+}
+function ammEnv::PathIsWritable {
+	ammLog::Deprecated "ammPath::IsWritable"
+	ammPath::IsWritable "$@"
+}
+# -----------------------------------------------------------------------------
+# Path management helpers
+# -----------------------------------------------------------------------------
+
 # @description  Decompose a path to a list of all its folders
 # @arg $1  (path) The path to decompose
-function ammEnv::PathDecompose {
+function ammPath::Decompose {
 	typeset path="$1"
 	path="$(readlink -m "$path")"
 	while [[ -n "$path" ]]; do
@@ -1111,7 +1127,7 @@ function ammEnv::PathDecompose {
 # @arg $1  (path) File or folder to check
 # @exitcode 0   Path is secure
 # @exitcode >=1  Path has a number of insecurities, shown as stdout
-function ammEnv::PathIsSecure {
+function ammPath::IsSecure {
 	typeset path="$1"
 
 	typeset -i r=0
@@ -1131,7 +1147,7 @@ function ammEnv::PathIsSecure {
 			echo "'$d' is world-writable"
 			r+=1
 		fi
-	done < <(ammEnv::PathDecompose "$path")
+	done < <(ammPath::Decompose "$path")
 
 	return $r
 }
@@ -1139,7 +1155,7 @@ function ammEnv::PathIsSecure {
 # @description  Check if we can create the requested path
 # @arg $1  (path) File or folder to check
 # @exitcode 0  Path is writable
-function ammEnv::PathIsWritable {
+function ammPath::IsWritable {
 	typeset path="$1"
 
 	typeset element parent
@@ -1148,7 +1164,7 @@ function ammEnv::PathIsWritable {
 			echo "Not writable: '$e'"
 			return 1
 		fi
-	done < <(ammEnv::PathDecompose "$path")
+	done < <(ammPath::Decompose "$path")
 	return 0
 }
 

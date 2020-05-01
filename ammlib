@@ -1160,9 +1160,12 @@ function ammPath::IsWritable {
 
 	typeset element parent
 	while read e; do
-		if [[ -e "$e" ]] && ! [[ -w "$e" ]]; then
-			echo "Not writable: '$e'"
-			return 1
+		if [[ -e "$e" ]]; then
+			if ! [[ -w "$e" ]]; then
+				echo "Not writable: '$e'"
+				return 1
+			fi
+			return 0
 		fi
 	done < <(ammPath::Decompose "$path")
 	return 0

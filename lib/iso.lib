@@ -51,20 +51,65 @@ function ammIso::ExtractIsoinfo {
 	:
 }
 
+
 function ammIso::Extract {
 	typeset iso="$1"
 	typeset dstdir="${2:-$__AMMLIB_DATATMP/iso}"
-	typeset method="${3:-}"
+	shift 2
+
 
 	# We have multiple extract solutions available
 	# - mount -o loop : need root
-	# - FuseISO :  ammLib::Load fuse.iso
-	# - isoinfo :  ammExec::Exists isoinfo
-	# - udisk2  :  ammExec::Exists udiskctl
-	# - xorriso
-	# - 7z
-	# - rar
+	# - FuseISO :  fuse.iso
+	# - isoinfo :  isoinfo
+	# - udisk2  :  udiskctl
+	# - xorriso :
+	# - 7z      :  7z x
+	# - rar     :
+	# - bsdtar  :
 
+	# Try to use mount
+	if [[ $__AMMLIB_USERID -eq 0 ]]; then
+		ammLog::Inf "Bind-mounting '${iso##*/}' and copying to '$dstdir'"
+		# TODO: migrate this to a temp ammlib helper
+		typeset tmpmnt="$__AMMLIB_DATATMP/loop.${iso##*/}"
+		mkdir -p "$tmpmnt"
+		if mount -o loop "$iso" "$tmpmnt"; then
+			# A selection has been made ?
+			if [[ -n "$@" ]]; then
+				ammPath::CopyStructure "$tmpmnt" "$dstdir" "$@"
+			else
+				cp -a "$tmpmnt/" "$dstdir"
+			fi
+			if ! umount "$tmpmnt"; then
+				ammLog::Wrn "Error while unmounting '$tmpmnt'. Check once script is finished"
+			fi
+		else
+			ammLog::Wrn "Cannot bindmount. Trying other tools"
+		fi
+	fi
+
+	typeset logmsg="Extracting '${iso##*/}' to '$dstdir' using"
+	if ammExec::Exists "7z"; then
+		ammLog::Inf "$logmsg 7z"
+		\7z x "$iso" -o"$dstdir"
+		return $?
+	fi
+
+	if ammExec::Exists "isoinfo"; then
+		ammLog::Inf "$logmsg isoinfo"
+		\isoinfo -i "$iso" -X "$dstdir"
+		return $?
+	fi
+
+	if ammExec::Exists "xoriso"; then
+		ammLog::Inf "$logmsg xoriso"
+		\xorriso -osirrox on -indev "$iso" -extract / "$dstdir"
+		return $?
+	fi
+
+	ammLog::Wrn "Unable to find any tool to extract iso"
+	return 1
 }
 
 

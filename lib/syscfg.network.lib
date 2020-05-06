@@ -28,6 +28,8 @@ function ammSyscfgNetwork::NicNameValidate {
 function ammSyscfgNetwork::NicGet {
 	typeset i
 	for ifacepath in /sys/class/net/*; do
+		# Skip pseudo files like bonding_masters
+		[[ -d "$ifacepath" ]] || continue
 		typeset iface="${ifacepath##*/}"
 		# Skip lo
 		[[ "$iface" == "lo" ]] && continue

@@ -98,7 +98,24 @@ function ammIso::Extract {
 
 	if ammExec::Exists "isoinfo"; then
 		ammLog::Inf "$logmsg isoinfo"
-		\isoinfo -i "$iso" -X "$dstdir"
+		typeset isoinfovers="$(\isoinfo -version)"
+		if [[ $isoinfovers =~ isoinfo\ 3.+ ]]; then
+			\isoinfo -i "$iso" -X "$dstdir"
+		else
+			typeset fpath=""
+			while read fpath; do
+				# Files are under format "PATH;1", folders are "PATH"
+				if [[ "$fpath" != "${fpath%;*}" ]]; then
+					fpath="${fpath%;*}"
+					typeset fdir="$dstdir/${fpath%/*}"
+					# Create folder if not existing
+					[[ -d "$fdir" ]] || mkdir -p "$fdir"
+					# Extract file
+					\isoinfo -x "$fpath" -i "$iso" > "$dstdir/$fpath"
+				fi
+
+			done < <(\isoinfo -f -i "$iso")
+		fi
 		return $?
 	fi
 

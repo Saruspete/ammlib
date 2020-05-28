@@ -106,6 +106,37 @@ typeset __AMMLIB_BIN="$HOME/.ammlib/bin"
 export PATH+=":$__AMMLIB_BIN"
 
 # -----------------------------------------------------------------------------
+# Data management
+# -----------------------------------------------------------------------------
+function _ammLib::PathGetForCaller {
+	typeset prefix="$1"
+	typeset suffix="${2:-}"
+
+	# Get name and path from caller
+	typeset callingstr="$(ammLog::Stackdump 2 1)"
+	typeset callingfile="${callingstr%%::*}"
+
+	typeset dir="$prefix/$callingfile/$suffix"
+	! [[ -d "$dir" ]] && mkdir -p "$dir"
+	if ! [[ -d "$dir" ]]; then
+		ammLog::Err "Error during creation of path '$dir'. Please check"
+		return 1
+	fi
+
+	echo "$dir"
+}
+
+function ammLib::DataPathGet {
+	typeset extra="${1:-}"
+	_ammLib::PathGetForCaller "$__AMMLIB_DATA" "$extra"
+}
+
+function ammLib::TmpPathGet {
+	typeset extra="${1:-}"
+	_ammLib::PathGetForCaller "$__AMMLIB_DATATMP" "$extra"
+}
+
+# -----------------------------------------------------------------------------
 # Hooks and events
 # -----------------------------------------------------------------------------
 

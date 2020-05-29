@@ -100,21 +100,65 @@ function ammIso::Extract {
 		ammLog::Inf "$logmsg isoinfo"
 		typeset isoinfovers="$(\isoinfo -version)"
 		if [[ $isoinfovers =~ isoinfo\ 3.+ ]]; then
-			\isoinfo -i "$iso" -X "$dstdir"
+			\isoinfo -R -i "$iso" -X "$dstdir"
 		else
-			typeset fpath=""
-			while read fpath; do
-				# Files are under format "PATH;1", folders are "PATH"
-				if [[ "$fpath" != "${fpath%;*}" ]]; then
-					fpath="${fpath%;*}"
-					typeset fdir="$dstdir/${fpath%/*}"
-					# Create folder if not existing
-					[[ -d "$fdir" ]] || mkdir -p "$fdir"
-					# Extract file
-					\isoinfo -x "$fpath" -i "$iso" > "$dstdir/$fpath"
+
+			# Use isoinfo to read iso with Rock Ridge extension
+			typeset fmod fblk fusr fgrp fsize fmangled
+			typeset fcurrdir=""
+			typeset -A perms
+			ammLog::Inf "Extracting files from '$iso'"
+			while read fmod fblk fusr fgrp fsize fmangled; do
+				# Skip empty lines
+				[[ -z "$fmod" ]] && continue
+
+				# Check for new folder traversal
+				if [[ "$fmod $fblk $fusr" == "Directory listing of" ]]; then
+					fcurrdir="$fgrp"
+					continue
 				fi
 
-			done < <(\isoinfo -f -i "$iso")
+				# Parse the non "standard formats
+				typeset fdate="${fmangled%% [*}"
+				typeset fname="${fmangled##*]  }"
+				typeset fpath="$fcurrdir$fname"
+				typeset dstpath="$dstdir/$fpath"
+
+				# Skip special paths
+				if [[ "$fname" == "." ]] || [[ "$fname" == ".." ]]; then
+					continue
+				fi
+
+				ammLog::Dbg "Processing path='$fpath' fmod='$fmod' fdate='$fdate'"
+
+				# Create folder and apply large permissions for file creation
+				if [[ "${fmod:0:1}" == "d" ]]; then
+					! [[ -d "$dstpath" ]] && mkdir -p "$dstpath"
+					chmod u+rwx "$dstpath"
+
+				# Standard file
+				else
+					# Extract file
+					[[ -e "$dstpath" ]] && ! [[ -w "$dstpath" ]] && chmod u+rw "$dstpath"
+					\isoinfo -R -x "$fpath" -i "$iso" >| "$dstpath"
+				fi
+
+				# Fix permissions if available
+				perms[$fpath]="$fmod"
+
+			done < <(\isoinfo -R -l -i "$iso")
+
+			# Pass 2: fix permissions
+			typeset fpath
+			ammLog::Inf "Applying permissions to extracted files"
+			for fpath in "${!perms[@]}"; do
+				typeset fmod="${perms[$fpath]}"
+				typeset fmodusr="${fmod:1:3}" fmodgrp="${fmod:4:3}" fmodoth="${fmod:7:3}"
+				typeset fstr="u=${fmodusr//-/},g=${fmodgrp//-},o=${fmodoth//-}"
+				ammLog::Dbg "Setting '$fstr' ($fmod) to '$fpath'"
+				chmod "$fstr" "$dstdir/$fpath"
+			done
+
 		fi
 		return $?
 	fi

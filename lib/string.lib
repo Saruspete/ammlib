@@ -505,6 +505,27 @@ function ammString::Filter {
 		}' "$file" | tr -cd '\t\n [:print:]'
 }
 
+function ammString::FilterTuples {
+	typeset file="$1"
+	typeset parameter="$2"
+	typeset separator="${3:-=}"
+	typeset skipmatch="${4:-^#}"
+
+	typeset line
+	while read line; do
+		# Quick filter
+		[[ -z "$line" ]] && continue
+		[[ -n "$skipmatch" ]] && [[ $line =~ $skipmatch ]] && continue
+		# Filter on field name
+		typeset var="$(ammString::Trim ${line%%$separator*})"
+		[[ "$var" != "$parameter" ]] && continue
+
+		# Show current value
+		echo "$(ammString::Trim ${line#*$separator})"
+
+	done < "$file"
+}
+
 # -----------------------------------------------------------------------------
 # Counting
 # -----------------------------------------------------------------------------

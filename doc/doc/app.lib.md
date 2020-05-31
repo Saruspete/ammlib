@@ -1,0 +1,928 @@
+
+* [ammApp::Init](#ammAppInit)
+* [ammApp::GetOwner](#ammAppGetOwner)
+* [ammApp::GetAppDir](#ammAppGetAppDir)
+* [ammApp::GetDataDir](#ammAppGetDataDir)
+* [ammApp::GetTempDir](#ammAppGetTempDir)
+* [ammApp::GetBinPath](#ammAppGetBinPath)
+* [ammApp::GetPidPath](#ammAppGetPidPath)
+* [ammApp::GetLogPath](#ammAppGetLogPath)
+* [ammApp::GetCfgPath](#ammAppGetCfgPath)
+* [ammApp::VersionSetCurrent](#ammAppVersionSetCurrent)
+* [ammApp::VersionGetCurrent](#ammAppVersionGetCurrent)
+* [ammApp::Start](#ammAppStart)
+* [ammApp::Stop](#ammAppStop)
+* [ammApp::Status](#ammAppStatus)
+* [ammApp::Zap](#ammAppZap)
+* [ammApp::IsRunning](#ammAppIsRunning)
+* [ammApp::Upgrade](#ammAppUpgrade)
+* [ammApp::Main](#ammAppMain)
+
+
+## ammApp::Init
+
+ Initialize application vars
+function ammApp::Init {
+## ammApp::GetOwner
+
+
+Set my path according to these
+	typeset -gr APP_ROOT="${1:-$__AMMLIB_CALLPATH/..}"
+	typeset -gr APP_INST="${__AMMLIB_CALLFILE}"
+	typeset -gr APP_SDIR="${__AMMLIB_CALLPATH}"
+	typeset -gr APP_GRPN="${APP_INST%%-*}"
+	typeset -gr APP_NAME="${APP_INST#*-}"
+	typeset -g  APP_BASE="${APP_ROOT}/apps/${APP_GRPN}/${APP_NAME}/"
+	typeset -g  DAT_BASE="${APP_ROOT}/data/${APP_GRPN}/${APP_NAME}/"
+	typeset -g  SRC_BASE="${APP_ROOT}/srcs/${APP_GRPN}/${APP_NAME}/"
+	typeset -g  TMP_BASE="${APP_ROOT}/temp/${APP_GRPN}/${APP_NAME}/"
+
+
+Can be overridden
+	typeset -g RUN_USER="${RUN_USER:-$(ammApp::GetOwner ${APP_SDIR}/${APP_INST})}"
+	typeset -g RUN_BIN="${RUN_BIN:-}"
+	typeset -g RUN_CFG="${RUN_CFG:-}"
+	typeset -g RUN_OPTCOMMON="${RUN_OPTCOMMON:-}"
+	typeset -g RUN_OPTSTART="${RUN_OPTSTART:-}"
+	typeset -g RUN_OPTSTOP="${RUN_OPTSTOP:-}"
+	typeset -g RUN_OPTPID="${RUN_OPTPID:-}"
+	typeset -g RUN_DAEMON="${RUN_DAEMON:-}"
+	typeset -g RUN_WORKDIR="${RUN_WORKDIR:-$(readlink -f "$DAT_BASE")/current}"
+
+Check for cfg override
+	if [[ -e "${APP_SDIR}/${APP_INST}.d/config" ]]; then
+TODO: Check for path chmod and other security
+		source "${APP_SDIR}/${APP_INST}.d/config"
+	fi
+
+Check running user and reexec it here if needed
+	if [[ -n "$RUN_USER" ]] && [[ "$RUN_USER" != "$__AMMLIB_USERNAME" ]]; then
+		typeset -i r=99
+try to reexec the current script with the target user
+		ammLog::Inf "Reexecing $__AMMLIB_CALLNAME as '$RUN_USER'"
+		ammExec::AsUser "$RUN_USER" "$__AMMLIB_CALLNAME ${__AMMLIB_CALLOPTS_ORIG[@]}"
+		r=$?
+		if [[ $r != 0 ]]; then
+			ammLog::Err "An error occured during re-exec as '$RUN_USER'"
+		fi
+		exit $r
+	fi
+
+
+No app data, first time init. Ask
+	if ! [[ -d "$DAT_BASE" ]]; then
+		if ! ammInput::GetYN "initallowed" "First time need init. Create folder structure in '$APP_ROOT' ?"; then
+			ammLog::Err "Not validated. You can ... [TODO]"
+			return 1
+		fi
+	fi
+
+Create folders, they may be used by update procedures
+	typeset p
+	for p in "$APP_BASE" "$DAT_BASE" "$SRC_BASE" "$TMP_BASE"; do
+		if ! [[ -d "$p" ]]; then
+			if ! mkdir -p "$p"; then
+				ammLog::Err "Unable to create required folder '$p'"
+				return 1
+			fi
+		fi
+	done
+
+Clean the paths for absolute value
+	typeset -gr APP_BASE="$(readlink -f $APP_BASE)"
+	typeset -gr DAT_BASE="$(readlink -f $DAT_BASE)"
+	typeset -gr SRC_BASE="$(readlink -f $SRC_BASE)"
+	typeset -gr TMP_BASE="$(readlink -f $TMP_BASE)"
+
+Sanity checks
+	[[ -z "$APP_BASE" ]] && { echo >&2 "Unable to find APP_BASE value"; return 1; }
+	[[ -z "$DAT_BASE" ]] && { echo >&2 "Unable to find DAT_BASE value"; return 1; }
+	[[ -z "$TMP_BASE" ]] && { echo >&2 "Unable to find TMP_BASE value"; return 1; }
+	[[ -e "$APP_BASE" ]] || { echo >&2 "Missing required folder '$APP_BASE'"; return 1; }
+
+Export variables to be used by binaries and tools themselves
+	export APP_BASE DAT_BASE SRC_BASE TMP_BASE
+
+Change working directory (or not, to avoid going to $HOME)
+	[[ -d "$RUN_WORKDIR" ]] && cd "${RUN_WORKDIR:-.}"
+
+	return 0
+}
+
+
+
+
+##############################################################################
+
+Application path management
+
+##############################################################################
+function ammApp::GetOwner {
+## ammApp::GetAppDir
+
+	typeset file="$1"
+	stat -c '%U' "$file"
+}
+
+function ammApp::GetAppDir {
+## ammApp::GetDataDir
+
+	typeset vers="${1:-current}"
+	echo "$APP_BASE/$vers"
+}
+
+function ammApp::GetDataDir {
+## ammApp::GetTempDir
+
+	typeset vers="${1:-current}"
+	echo "$DAT_BASE/$vers"
+}
+
+function ammApp::GetTempDir {
+## ammApp::GetBinPath
+
+	typeset vers="${1:-current}"
+	echo "$TMP_BASE/$vers"
+}
+
+function ammApp::GetBinPath {
+## ammApp::GetPidPath
+
+	typeset vers="${1:-current}"
+	if [[ -n "$RUN_BIN" ]]; then
+Absolute path
+		if [[ "${RUN_BIN:0:1}" == "/" ]]; then
+			echo $RUN_BIN
+		else
+			echo "$(ammApp::GetAppDir "$vers")/$RUN_BIN"
+		fi
+	fi
+}
+
+function ammApp::GetPidPath {
+## ammApp::GetLogPath
+
+	typeset service="${1:-daemon}"
+	typeset version="${2:-current}"
+
+	typeset pidfile="$(ammApp::GetTempDir "$version")/pids/$service.pid"
+	echo "$pidfile"
+
+	typeset pidfolder="${pidfile%/*}"
+	if ! [[ -d "$pidfolder" ]];  then
+		if ! mkdir "$pidfolder" >/dev/null 2>&1; then
+			ammLog::Wrn "Unable to create pid folder '$pidfolder'"
+			return 1
+		fi
+	fi
+	return 0
+}
+
+function ammApp::GetLogPath {
+## ammApp::GetCfgPath
+
+	typeset service="${1:-daemon}"
+	typeset version="${2:-current}"
+
+	typeset logfile="$(ammApp::GetDataDir "$version")/logs/$service.log"
+	echo "$logfile"
+
+	typeset logfolder="${logfile%/*}"
+	if ! [[ -d "$logfolder" ]];  then
+		if ! mkdir "$logfolder" >/dev/null 2>&1; then
+			ammLog::Wrn "Unable to create log folder '$logfolder'"
+			return 1
+		fi
+	fi
+	return 0
+}
+
+function ammApp::GetCfgPath {
+## ammApp::VersionSetCurrent
+
+	typeset service="${1:-daemon}"
+	typeset version="${2:-current}"
+
+	typeset cfgfile="$(ammApp::GetDataDir "$version")/conf"
+	echo "$cfgfile"
+
+	typeset cfgfolder="${cfgfile%/*}"
+	if ! [[ -d "$cfgfolder" ]];  then
+		if ! mkdir "$cfgfolder" >/dev/null 2>&1; then
+			ammLog::Wrn "Unable to create cfg folder '$cfgfolder'"
+			return 1
+		fi
+	fi
+	return 0
+}
+
+
+
+function ammApp::VersionSetCurrent {
+## ammApp::VersionGetCurrent
+
+	typeset version="$1"
+
+	typeset currdir="$(ammApp::GetAppDir "current")"
+	typeset newdir="$(ammApp::GetAppDir "$version")"
+	typeset currvers="$(ammApp::VersionGetCurrent)"
+	typeset now="$(date +%y-%m-%d_%H-%M-%S)"
+
+Check if target version exists
+	if ! [[ -d "$newdir" ]]; then
+		ammLog::Err "The specified new version '$version' does not exists as '$newdir'"
+		return 1
+	fi
+
+Changing the application symlink
+	[[ -L "$currdir" ]] && rm $currdir
+	if [[ -e "$currdir" ]]; then
+		typeset currdirbak="current.$now"
+
+		ammLog::Wrn "The 'current' folder '$currdir' is not a symlink. Moving it as '$currdirbak'"
+		if ! mv "$currdir" "${currdir%/*}/${currdirbak}"; then
+			ammLog::Err "An error occured during renaming of '$currdir' to '$currdirbak'"
+			return 1
+		fi
+	fi
+
+Create app symlink
+	if ! ln -sf "$version" "$currdir"; then
+		ammLog::Err "Error when creating new symlink '$currdir' for '$version'"
+	fi
+
+Save data according to the policy
+	case "${UPG_DATAPOLICY:-}" in
+Plain file copy
+		copy)
+			ammLog::Inf "Copying current data to new version"
+			typeset p
+			for p in "$DAT_BASE" "$TMP_BASE"; do
+TODO: Check for data size & free space
+
+Symlink: Get realpath, create version, copy data, update symlink
+				if [[ -L "$p/current" ]]; then
+					cp -La "$p/current" "$p/$version"
+					rm "$p/current"
+					ln -sf "$version" "$p/current"
+
+Plain dir, copy data elsewere
+				else
+					typeset dat="$p/current"
+					typeset bak="$p/current.before-${version}.$now"
+					if ! cp -a "$dat" "$bak"; then
+						ammLog::Err "Error while copying data from '$dat' to '$bak'. Continuing"
+					fi
+				fi
+			done
+			;;
+
+Using filesystem snapshot
+		filesystem)
+			ammLog::Wrn "Filesystem snapshot not yet implemented..."
+			;;
+
+		none|'')
+			ammLog::Inf "Keeping data in place for new version '$version'"
+			;;
+	esac
+
+	return 0
+}
+
+function ammApp::VersionGetCurrent {
+## ammApp::Start
+
+
+	typeset realdir="$(readlink -f $(ammApp::GetAppDir))"
+	realdir="${realdir%/}"
+	echo "${realdir##*/}"
+}
+
+##############################################################################
+
+Main service processing
+
+##############################################################################
+
+Standard start
+function ammApp::Start {
+## ammApp::Stop
+
+
+Use global opts if available
+	typeset opts=""
+	typeset pidf=""
+	typeset version="${RUN_VERS:-current}"
+
+Add common options
+	if [[ -n "$RUN_OPTCOMMON" ]]; then
+		opts+=" $RUN_OPTCOMMON"
+	fi
+
+
+
+User defined startup func, just use it
+
+	if ammEnv::IsFunc "run_start"; then
+		ammLog::Inf "Starting with custom run_start function"
+		appStart "$opts"
+		ammLog::Inf "Result: $?"
+		return $?
+
+
+Variables defined for standard management
+
+	elif [[ -n "$RUN_BIN" ]]; then
+
+Runas specified user. If reset by user script, assume current user is wanted
+		typeset runas="${RUN_USER:-$__AMMLIB_USERNAME}"
+		typeset runapp="$(ammApp::GetBinPath "$version")"
+		if ! [[ -x "$runapp" ]]; then
+			ammLog::Err "Executable '$runapp' does not exists"
+			return 1
+		fi
+
+Common opts goes before action
+		if [[ -n "${RUN_OPTCOMMON:-}" ]]; then
+			opts+="$RUN_OPTCOMMON "
+		fi
+
+Start action
+		if [[ -n "${RUN_OPTSTART:-}" ]]; then
+			opts+="$RUN_OPTSTART "
+		fi
+
+
+PIDFILE management
+
+		if [[ -n "$RUN_OPTPID" ]]; then
+			pidf="$(ammApp::GetPidPath "$version")"
+			opts+=" $RUN_OPTPID $pidf"
+		fi
+
+If pidfile, check it has access to the file
+		if [[ -n "$pidf" ]] && [[ -e "$pidf" ]]; then
+
+Does the file already belong to target user
+			[[ "$(ammApp::GetOwner "$pidf")" != "$runas" ]] && {
+				\chown $runas: "$pidf" || {
+					ammLog::Err "Unable to chown '$runas' '$pidf'. The app may fail or be unmanageable"
+				}
+			}
+		fi
+
+
+Logfile and daemon management
+
+		if ammString::IsTrue "$RUN_DAEMON"; then
+			typeset logfile="$(ammApp::GetLogPath "$version")"
+			ammLog::Dbg "Daemonizing and sending logs to '$logfile'"
+			opts+=" >>$logfile 2>&1 0>/dev/null &"
+		fi
+
+Append optionnal arguments
+		if [[ -n "${1:-}" ]]; then
+			opts+="$@"
+		fi
+
+Run the process
+		ammLog::Inf "Starting with \$RUN_BIN var ($runapp $opts) as '$runas'"
+		typeset out=""
+		typeset -i ret
+
+		out="$(eval "$runapp $opts 2>&1 99>&- 98>&-")"
+		ret=$?
+
+
+Check return value
+		if [[ $ret -ne 0 ]]; then
+			ammLog::Err "Service start return: $ret. Output:\n$out"
+			ammLog::Dbg "$(ammLog::Stackdump)"
+		else
+			ammLog::Inf "Result: $ret"
+		fi
+		return $ret
+
+Nothing...
+	else
+		ammLog::Err "Cannot use generic start: No function 'run_start' and no var 'RUN_BIN' defined"
+		return 1
+	fi
+
+}
+
+
+function ammApp::Stop {
+## ammApp::Status
+
+
+	typeset pid="" out=""
+	typeset r=99
+
+	if ammEnv::IsFunc "appStop"; then
+		appStop "$@"
+		r=$?
+	else
+		if pid="$(ammApp::IsRunning true)"; then
+
+Custom stop command: call it
+			if [[ -n "$RUN_OPTSTOP" ]]; then
+				out="$(eval "$(ammApp::GetBinPath) $RUN_OPTSTOP $RUN_OPTCOMMON 2>&1 99>&- 98>&-")"
+				r=$?
+Standard stop: kill it with fire
+			else
+				if ! kill "$pid"; then
+					ammLog::Err "Unable to kill pid $pid"
+				fi
+TODO: Handle cgroup or wait to send -9
+				
+				r=0
+			fi
+		fi
+
+Clean the pidfile and lock if needed
+		if ! ammApp::IsRunning && [[ -n "$RUN_OPTPID" ]]; then
+			typeset pidfile="$(ammApp::GetPidPath)"
+			[[ -e "$pidfile" ]] && rm -f "$pidfile"
+		fi
+
+	fi
+	return $r
+}
+
+function ammApp::Status {
+## ammApp::Zap
+
+
+	ammApp::IsRunning "$@"
+	typeset -i r=$?
+
+	case $r in
+		0)   echo "Running"; r=0  ;;
+		1)   echo "Stopped"; r=0  ;;
+		2)   echo "Dead";    r=1  ;;
+		99)  echo "Unimplemented" ;;
+		*)   echo "Unhandled return code '$r'"; r=99 ;;
+	esac
+
+	return $r
+}
+
+function ammApp::Zap {
+## ammApp::IsRunning
+
+	typeset pidfile="$(ammApp::GetPidPath)"
+	if [[ -n "$pidfile" ]]; then
+		if [[ -w "$pidfile" ]] || [[ -w "${pidfile%/*}" ]]; then
+			echo "Removing pidfile '$pidfile'"
+			rm -f "$pidfile"
+			return $?
+		else
+			ammLog::Err "Cannot remove '$pidfile' (permission error)"
+			return 1
+		fi
+	fi
+	return 0
+}
+
+function ammApp::IsRunning {
+## ammApp::Upgrade
+
+	typeset showPid=${1:-false}
+	typeset -i r=99
+
+Custom status handled by script
+	if ammEnv::IsFunc "appIsRunning"; then
+		appIsRunning "$@"
+		r=$?
+
+Standard status handling
+	else
+If we have an option set, maybe we have a pidfile
+		if [[ -n "$RUN_OPTPID" ]]; then
+			typeset pidfile="$(ammApp::GetPidPath)"
+			if [[ -e "$pidfile" ]] && [[ -r "$pidfile" ]]; then
+				typeset pidstr="$(<$pidfile)"
+
+TODO: Test for format ?
+				if [[ -n "$pidstr" ]]; then
+
+					typeset proc="/proc/$pidstr"
+					if [[ -e "$proc" ]]; then
+
+						typeset pid="${proc#/proc/}"
+
+Double check with binary
+						if [[ -n "$RUN_BIN" ]]; then
+
+Check if the process is the one we expect
+							typeset bin=""
+Direct symlink reading
+							if [[ -r "$proc/exe" ]]; then
+								bin="$(readlink -f "$proc/exe" 2>/dev/null)"
+							fi
+
+fallback to cmdline parsing
+							if [[ -z "$bin" ]]; then
+								bin="$(cat "$proc/cmdline"|tr '\0' ' ')"
+								bin="${bin%% *}"
+							fi
+
+Check if binary match
+							typeset binwant="$(ammApp::GetBinPath)"
+							if [[ "$bin" -ef "$binwant" ]]; then
+								ammLog::Dbg "Pid '$pid' found (matching binary) and running"
+								ammString::IsTrue "$showPid" && echo $pid
+								r=0
+							else
+								ammLog::Wrn "Pid '$pid' found, but its binary '$bin' does not match expected '$binwant'"
+								r=2
+							fi
+
+No binary to compare with. Assuming ok
+						else
+							ammLog::Dbg "Pid ($pid) found and running"
+							ammString::IsTrue "$showPid" && echo $pid
+							r=0
+						fi
+
+					else
+						ammLog::Dbg "Process '$pidstr' not running. Stale pidfile?"
+						ammLog::Wrn "Pidfile present ($pidfile) but process ($pidstr) dead"
+						r=2
+					fi
+				else
+					ammLog::Dbg "Process '$pidstr' present but empty"
+					r=1
+				fi
+No pidfile, process dead or untracked
+			else
+				ammLog::Dbg "No pidfile '$pidfile' available. Consider process stopped"
+				r=1
+			fi
+
+No pidfile available, try from name
+		else
+Seek for a binary with same path & user
+			if [[ -n "$RUN_BIN" ]]; then
+Get the target binary file
+				typeset binpath="$(ammApp::GetBinPath)"
+				if [[ -e "$binpath" ]]; then
+Seek for a matching symlink in /proc
+					typeset exetest
+					for exetest in /proc/[0-9]*/exe; do
+						if [[ "$binpath" -ef "$exetest" ]] && [[ "$(ammApp::GetOwner "")" == "$RUN_USER" ]]; then
+							typeset pid="${exetest#/proc/}"
+							pid="${pid%/exe}"
+
+							ammLog::Dbg "Found matching bin ($binpath) & user ($RUN_USER) as pid $pid"
+							ammString::IsTrue "$showPid" && echo $pid
+							r=0
+						fi
+					done
+				fi
+			else
+				ammLog::Err "No RUN_OPTPID nor RUN_BIN available. cannot check"
+			fi
+		fi
+	fi
+
+	return $r
+}
+
+
+Upgrade steps:
+0) Get latest version string if none provided and check if update needed
+1) Download required content in tmpdir
+2) Prepare content (extract, compile)
+3) Deploy to target folder
+4) Generate / Use new configuration
+5) Test the binary in standalone environment
+6) Stop current version
+7) Call a snapshot on all services within the group
+8) test the new version
+9) Update current to new version
+function ammApp::Upgrade {
+## ammApp::Main
+
+	typeset versionNew="${1:-}"
+
+	typeset versionOld="${RUN_VERS:-}"
+	typeset currentLink="$APP_BASE/current"
+	if [[ -z "$versionOld" ]] && [[ -L "$currentLink" ]]; then
+		typeset oldpath="$(readlink -f "$currentLink")"
+		oldpath="${oldpath%/}"
+		oldpath="${oldpath##*/}"
+		versionOld="$oldpath"
+		if [[ -z "$versionOld" ]]; then
+			ammLog::Err "Unable to guess the current version. Check '$currentLink' symlink format"
+			return 1
+		fi
+	fi
+
+0) No new version specified. Try to get the latest
+	if [[ -z "$versionNew" ]]; then
+		if ammEnv::IsFunc "appUpgradeGetLatest"; then
+			ammLog::Dbg "Calling 'appUpgradeGetLatest' to get latest version"
+			versionNew="$(appUpgradeGetLatest)"
+
+			if [[ -n "$versionNew" ]]; then
+				ammLog::Inf "Found latest version: '$versionNew'"
+			else
+				ammLog::Err "Unable to find automatically latest version"
+				return 1
+			fi
+
+usual github project
+		elif [[ -n "${UPG_GHPROJECT:-}" ]]; then
+			ammLib::Require "http"
+
+Allow usage of devel version
+			if ammString::IsTrue "${UPG_GHDEVALLOWED:-false}"; then
+				typeset branch="${UPG_GHDEVBRANCH:-master}"
+				versionNew="$(ammHttp::GithubBranchGetLastCommit "$UPG_GHPROJECT" "$branch")"
+				versionNew="${versionNew// /_}"
+Only releases
+			else
+				versionNew="$(ammHttp::GithubReleaseGetLastVersion "$UPG_GHPROJECT")"
+			fi
+
+No helper, no var...
+		else
+			ammLog::Err "No version specified and no helper 'appUpgradeGetLatest' defined"
+			return 1
+		fi
+	fi
+
+
+Nothing to update
+	if [[ "$versionNew" == "$versionOld" ]]; then
+		ammLog::Inf "Latest version found: '$versionNew', same as current one. Exiting"
+		return 0
+	fi
+
+
+	ammLog::Inf "Upgrading from '$versionOld' to '$versionNew'"
+	typeset r=0
+	typeset url="" urls=
+	typeset appdir="$APP_BASE/${versionNew}"
+	typeset tmpdir="$TMP_BASE/${versionNew}"
+	typeset tmpsource="$tmpdir/source"
+	typeset tmpextract="$tmpdir/extract"
+
+
+Preparing upgrade
+
+	ammLog::StepBegin "Preparing upgrade"
+
+0) Get the URL to fetch
+	if ammEnv::IsFunc "appUpgradeGetUrls"; then
+		urls="$(appUpgradeGetUrls "$versionNew")"
+		ammLog::Dbg "function appUpgradeGetUrls returned: '$urls'"
+	elif [[ -n "${UPG_GHPROJECT}" ]]; then
+Try if supplied a release
+		ammLog::Dbg "Trying to get release assets from '$UPG_GHPROJECT' version '$versionNew'"
+		typeset assets="$(ammHttp::GithubReleaseGetAssets "$UPG_GHPROJECT" "$versionNew")"
+		if [[ -n "$assets" ]]; then
+			urls="$assets"
+			ammLog::Dbg "Found release assets: $urls"
+
+No asset found, try as a commit
+		else
+			typeset commit="${version#*_}"
+			ammLog::Dbg "No release matched. Trying as a commit"
+			if ammHttp::GithubCommitExists "$UPG_GHPROJECT" "$commit"; then
+				urls="$(ammHttp::GithubArchiveGetUrl "$UPG_GHPROJECT" "$commit")"
+				ammLog::Dbg "Found commit archive: $urls"
+			else
+				ammLog::Wrn "Version '$versionNew' does not match a release nor a commit of github' '$UPG_GHPROJECT'"
+			fi
+		fi
+	fi
+
+Prepare temp folder
+	typeset t
+	for t in "$tmpdir" "$tmpsource" "$tmpextract" "$appdir"; do
+		if ! [[ -e "$t" ]]; then
+			ammLog::Dbg "Creating folder '$t'"
+			mkdir -p "$t"
+		fi
+	done
+#		if ! [[ -e "$tmpdir" ]] && ! [[ -d "$tmpdir" ]]; then
+#			ammLog::Wrn "Destination folder exists but is not a folder. Moving it"
+#			typeset suffix=".$(date +%y%m%d_%H%M%S)"
+#			if ! mv "$appdir" "${appdir}${suffix}"; then
+#				ammLog::Err "Unable to rename folder '$appdir' with suffix '$suffix'"
+#				return 1
+#			fi
+#		fi
+
+
+
+
+1) Download new package or sources
+
+	if [[ -n "$urls" ]]; then
+
+		ammLib::Require "http"
+		for url in $urls; do
+
+			typeset tmpdl="${url%%\?*}"      # Remove all URL options
+			tmpdl="${tmpdl%/}"               # Remove trailing /
+			tmpdl="$tmpsource/${tmpdl##*/}"  # Keep only last filename
+
+			if [[ -s "$tmpdl" ]]; then
+				ammLog::Inf "File '$tmpdl' already present. Skipping"
+			else
+				ammLog::Inf "Downloading '$url' to '$tmpdl'"
+				typeset dlfile="$(ammHttp::FetchSmart "$url" "$tmpdl")"
+				if ! [[ -s "$dlfile" ]]; then
+					ammLog::Err "Error while fetching '$url'"
+					r+=1
+				fi
+			fi
+		done
+	fi
+
+
+2) Prepare content (compile, extract...)
+
+
+
+Custom preparation function
+	if ammEnv::IsFunc "appUpgradePrepare"; then
+Call custom function
+		appUpgradePrepare "$versionNew" "$versionOld" "$tmpdir"
+		r+=$?
+
+2) Extract archives into extraction folder
+	else
+Look in temp folder for archive to extract
+		typeset f
+		for f in "$tmpsource/"*; do
+If it's a file, maybe an archive to extract
+			if [[ -f "$f" ]]; then
+
+If an archive, extract it in temp folder
+				if ammArchive::FormatFromFile "$f" >/dev/null; then
+					if ! ammArchive::Extract "$f" "$tmpextract"; then
+						ammLog::Err "Error while extracting archive '$f' to '$tmpextract'"
+						r+=1
+					fi
+				fi
+			fi
+		done
+	fi
+
+If something during preparation failed
+	if [[ $r -gt 0 ]]; then
+		ammLog::Err "Preparation failed"
+		ammLog::StepEnd $r
+		return $r
+	fi
+	ammLog::StepEnd $r
+
+
+3) Deploy new version into target
+
+	ammLog::StepBegin "Deploying new version to '$appdir'"
+
+	if ammEnv::IsFunc "appUpgradeDeploy"; then
+		appUpgradeDeploy "$versionNew" "$versionOld" "$tmpextract" "$appdir"
+	else
+
+Check for bin presency
+		if [[ -n "${RUN_BIN:-}" ]]; then
+			if ! [[ -e "$tmpextract/$RUN_BIN" ]]; then
+				ammLog::Err "Unable to find '$RUN_BIN' in extracted folder '$tmpextract'"
+				ammLog::StepEnd $r
+				return 1
+			fi
+		fi
+
+		(
+			shopt -s dotglob
+			cp -r "$tmpextract/"* "$appdir"
+		)
+		r+=$?
+	fi
+	ammLog::StepEnd $r
+
+
+4) Generate new configuration
+
+	ammLog::StepBegin "Generating and deploy new configuration"
+	if ammEnv::IsFunc  "appUpgradeConfigure"; then
+		appUpgradeConfigure "$versionNew" "$versionOld" "$appdir"
+		r+=$?
+	elif [[ -n "$RUN_CFG" ]]; then
+		ammLog::Dbg "Using '$RUN_CFG' (TODO! )"
+		#cp "$RUN_CFG" "$CFG_ appdir"
+	else
+		ammLog::Inf "No function 'appUpgradeConfigure'. Skipping"
+	fi
+	ammLog::StepEnd
+
+
+5) Testing new version in standalone env
+
+	ammLog::StepBegin "Testing new version in namespace"
+	if ammEnv::IsFunc "appUpgradeTest"; then
+Generate a new network & fs namespace
+		ammUpgradeTest "$versionNew" "$versionOld"
+	else
+		ammLog::Inf "No function 'appUpgradeTest'. Skipping"
+	fi
+	ammLog::StepEnd
+
+
+
+6) Stop current version
+
+	ammLog::StepBegin "Stopping current version"
+	ammApp::Stop
+	ammLog::StepEnd $?
+
+
+7) Call a snapshot on required services
+
+
+	ammLog::StepBegin "Saving current state (snapshot) for easy rollback"
+	r=0
+	typeset snapname="svcupgrade-${APP_NAME}-$(date +%s)"
+	if [[ -n "${RUN_REQUIRES:-}" ]]; then
+		ammLog::Inf "Will snapshot dependencies ($RUN_REQUIRES) as '$snapname'"
+
+		typeset dep
+		for dep in ${RUN_REQUIRES}; do
+			typeset script="$APP_SDIR/${APP_GRPN}-$dep"
+			if ! [[ -s "$script" ]] && [[ -x "$script" ]]; then
+				script="$APP_SDIR/$dep"
+				if ! [[ -s "$script" ]] && [[ -x "$script" ]]; then
+					ammLog::Wrn "Unable to find dependency '$dep' script in '$APP_SDIR'. Skipping"
+					continue
+				fi
+			fi
+
+			$script snapshot "$snapname"
+			typeset scriptret=$?
+			scriptretstr="${script##*/} returned '$scriptret'"
+
+			case $scriptret in
+				99) scriptretstr+=" (not implemented)" ;;
+				1) scriptretstr+=" (failed)"; r+=1 ;;
+			esac
+			ammLog::Inf "$scriptretstr"
+		done
+	fi
+
+TODO call filesystem snapshot
+	ammLog::Inf "TODO: Calling filesystem Snapshot as '$snapname'"
+
+Check if snapshot was successful
+	if [[ $r -gt 0 ]]; then
+		ammLog::Wrn "Some snapshot failed"
+		if ! ammInput::GetYN "upgradeContinueSnapFail" "Do you want to continue ?"; then
+			ammLog::Inf "Aborting. You'll want to remove '$snapname'"
+			ammLog::StepEnd $r
+			return 1
+		fi
+	fi
+	ammLog::StepEnd $r
+
+
+8) Test the new version
+
+	ammLog::StepBegin "Testing new version with real data"
+	if ammEnv::IsFunc "appUpgradeTest"; then
+		appUpgradeTest "$versionNew"
+		r=$?
+	else
+		RUN_VERS="$versionNew" ammApp::Start
+		r=$?
+	fi
+
+	if [[ $r -gt 0 ]]; then
+		ammLog::Err "Start/Test of new version failed. Check or consider rollback"
+		ammLog::Err " - Logs: "
+		ammLog::StepEnd $r
+		return 1
+	fi
+	ammLog::StepEnd
+
+
+9) Update curret version to new version
+
+	ammLog::StepBegin "Setting version '$versionNew' as 'current'"
+	ammApp::VersionSetCurrent "$versionNew"
+	r+=$?
+	ammLog::StepEnd $r
+
+
+End of upgrade
+	return $r
+}
+
+
+function ammApp::Main {

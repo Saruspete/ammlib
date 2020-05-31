@@ -1,11 +1,11 @@
 
-* [_ammPkgYum::Yum](#_ammPkgYumYum)
-* [ammPkgYum::DownloadRecursive](#ammPkgYumDownloadRecursive)
-* [ammPkgYum::Download](#ammPkgYumDownload)
-* [ammPkgYum::Extract](#ammPkgYumExtract)
+* [_ammPkgPortage::Emerge](#_ammPkgPortageEmerge)
+* [ammPkgPortage::DownloadRecursive](#ammPkgPortageDownloadRecursive)
+* [ammPkgPortage::Download](#ammPkgPortageDownload)
+* [ammPkgPortage::Extract](#ammPkgPortageExtract)
 
 
-## _ammPkgYum::Yum
+## _ammPkgPortage::Emerge
 
  (private) proxy for rpm executable
 
@@ -13,7 +13,7 @@
 
 * $1  (string) Action for RPM to exec
 
-## ammPkgYum::DownloadRecursive
+## ammPkgPortage::DownloadRecursive
 
  Download an archive from configured yum repositories and all dependencies
 
@@ -26,7 +26,7 @@
 
 *  (path[]) List of archives downloaded
 
-## ammPkgYum::Download
+## ammPkgPortage::Download
 
  Download an archive from configured yum repositories
 
@@ -39,7 +39,7 @@
 
 *  (path[]) List of archives downloaded
 
-## ammPkgYum::Extract
+## ammPkgPortage::Extract
 
  Extract one or more packages into provided path
 

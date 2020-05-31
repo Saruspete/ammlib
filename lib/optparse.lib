@@ -532,6 +532,13 @@ function ammOptparse::Get {
 	fi
 }
 
+function ammOptparse::GetUnparsedOpts {
+	for i in ${!__AMMLIB_CALLOPTS[@]}; do
+		echo -n "\"${__AMMLIB_CALLOPTS[$i]}\" "
+	done
+}
+
+
 # @description: Generate the help from registered options
 # @noarg
 function ammOptparse::Help {

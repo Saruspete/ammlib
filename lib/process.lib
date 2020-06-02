@@ -259,8 +259,8 @@ function ammProcess::PoolStart {
 
 		# Run the job (and close stdin)
 		ammLog::Inf "Starting $jobcmd (id:$jobid) in background"
-		echo "# Starting $jobcmd" >| "$datapath/job.$jobid.out"
-		$timeoutcmd $jobcmd >> "$datapath/job.$jobid.out" 2> "$datapath/job.$jobid.err" 0>/dev/null &
+		#echo "# Starting $jobcmd" >| "$datapath/job.$jobid.out"
+		eval "$timeoutcmd $jobcmd >> '$datapath/job.$jobid.out' 2> '$datapath/job.$jobid.err' 0>/dev/null &"
 		# A bit of bookkeeping
 		jobrunning[$!]=-1
 		__AMMPROCESS_POOL_PID2JOBID[$!]=$jobid
@@ -270,6 +270,7 @@ function ammProcess::PoolStart {
 			[[ "$jobid" -eq "${__AMMPROCESS_POOL_LASTJOBID[$name]}" ]] && [[ "${#jobrunning[@]}" -gt 0 ]]
 		); do
 			# Find a candidate for finalization
+			typeset -i reaped=0
 			for pid in ${!jobrunning[@]}; do
 				# Check if PID exists. If not, wait and reap it
 				if ! ammProcess::PidExists $pid; then
@@ -288,11 +289,18 @@ function ammProcess::PoolStart {
 
 					unset jobrunning[$pid]
 					unset __AMMPROCESS_POOL_PID2JOBID[$pid]
+					reaped+=1
 				fi
-
-				# Sleep a bit
-				sleep .5
 			done
+
+			# Check if we have reaped a process
+			if [[ $reaped -gt 0 ]]; then
+				ammLog::Dbg "Reaped $reaped processes, will start a new one"
+
+			# No process reaped, sleep a bit to avoid busy loop
+			else
+				sleep .1
+			fi
 
 			# TODO: Global timeout for the pool
 			if [[ -n "$timeouttotal" ]]; then

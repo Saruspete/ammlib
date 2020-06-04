@@ -32,6 +32,8 @@ typeset -gA  _AMMOPTPARSE_OPTLONG
 typeset -gA  _AMMOPTPARSE_OPTSHORT
 # Raw options
 typeset -gA  _AMMOPTPARSE_OPTALL
+# Special words
+typeset -gA  _AMMOPTPARSE_WORDS
 
 # Options value, description and backtrace
 typeset -gA  _AMMOPTPARSE_VALUE
@@ -274,7 +276,28 @@ function ammOptparse::AddOpt {
 
 }
 
+# @description Add one or more words that will infer on the parsing
+# @arg $1  (string) words to handle, separated by '|'
+# @arg $2  (string) action for the words. Can be 'stop'
+function ammOptparse::AddSpecialWord {
+	typeset words="$1"
+	typeset action="${2:-stop}"
 
+	case "$action" in
+		stop)
+			;;
+		*)
+			ammLog::Err "Invalid action '$action' for words '$words'"
+			return 1
+			;;
+	esac
+
+	# Register words with requested action
+	typeset word
+	for word in ${words//|/ }; do
+		_AMMOPTPARSE_WORDS[$word]="$action"
+	done
+}
 
 
 # @description  Parse the options, optionnally only those matching the prefix $1
@@ -329,27 +352,66 @@ function ammOptparse::Parse {
 			return $r
 		fi
 
-		# Check if we accept unparsed options
+		# Check if we accept unparsed options, and our previous one was faulty
 		if $nounknown && [[ -n "$lastvar" ]]; then
 			ammLog::Err "Invalid unknown option '$lastvar'"
 			lastvar=""
 			r+=1
 		fi
 
-		ammLog::Dbg "Processing option '$var' (pos: $optid)"
 
-		# Set lastvar
+		#
+		# Start processing the new input
+		#
+		# Beware: Registration is done after the main test. breaking early will
+		# cause incoherency if not properly done
+		#
+
+		# Set lastvar: act as a canary for unparsed values
 		lastvar="$var"
 
+
+		ammLog::Dbg "Processing option '$var' (pos: $optid)"
+
+		# Check the word is a valid registered option (we'll take it as ref)
 		id="$(_ammOptparse::OptToId "$var")"
+		if [[ -z "$id" ]]; then
+
+			# If it's not a registerd option, maybe it's a registered word
+			if ( set +u; [[ -n "${_AMMOPTPARSE_WORDS[$var]}" ]] ); then
+				# Do the registered action
+				typeset action="${_AMMOPTPARSE_WORDS[$var]}"
+				case $action in
+					# Stop parsing more options
+					stop)
+						lastvar=""
+						break
+						;;
+					# Unknown operation, not filtered by AddWord ?!
+					*)
+						ammLog::Err "Unknown operation '$action' for word '$var'. How was it registered ?!"
+						return 1
+						;;
+				esac
+
+			# Not a registered option, nor registered word. Should we stop
+			elif $nounknown; then
+				ammLog::Err "Invalid unknown option '$lastvar'"
+				lastvar=""
+				r+=1
+				continue
+			fi
+		fi
+
+
 		# Remove leading -
 		var="${var#-}"
 		var="${var#-}"
 
-
-		# If the option is not registered
-		if [[ -z "$id" ]]; then
-			ammLog::Dbg "Skipping unregistered option '$var'"
+		# Check if we do prefix filtering
+		if [[ -n "$prefix" ]] && [[ "${var#$prefix}" == "$var" ]]; then
+			ammLog::Dbg "Skipping option '$var' not matching prefix '$prefix'"
+			lastvar=""
 			continue
 		fi
 
@@ -426,11 +488,6 @@ function ammOptparse::Parse {
 					return 1
 					;;
 			esac
-		fi
-
-		if [[ -n "$prefix" ]] && ! [[ "${var#$prefix}" != "$var" ]]; then
-			ammLog::Dbg "Skipping option '$var' not matching prefix '$prefix'"
-			continue
 		fi
 
 

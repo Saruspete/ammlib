@@ -15,7 +15,6 @@ function ammOptparse::MetaCheck {
 }
 
 function ammOptparse::MetaInit {
-	_ammOptparse::Expand
 	ammOptparse::AddOpt "-h|--help" "Show this help"
 	#ammoptparse::AddOpt "--version" "Show script version" "unknown"
 }
@@ -92,11 +91,17 @@ function _ammOptparse::OptToId {
 # @description: Expand short options and var=val to independant elements
 function _ammOptparse::Expand {
 
-	typeset optid
+	typeset optid skipall=false
 	typeset -a options
 	for (( optid=0; optid < ${#__AMMLIB_CALLOPTS[@]}; optid+=1 )); do
 		typeset opt="${__AMMLIB_CALLOPTS[$optid]}"
 		typeset val=""
+
+		# If we should stop parsing next element
+		if $skipall; then
+			options+=("$opt")
+			continue
+		fi
 
 		# Check if we have a joined value var=val (can be -abc=def${#__AMMLIB_CALLOPTS[@]} or --abc=def)
 		if [[ "${opt#*=}" != "$opt" ]] && [[ "${opt##--}" != "$opt" ]]; then
@@ -128,6 +133,13 @@ function _ammOptparse::Expand {
 		else
 			ammLog::Dbg "Plain value option: '$opt'"
 			options+=("$opt")
+
+			# Special word and special action: stop all parsing
+			if ( set +u; [[ -n "${_AMMOPTPARSE_WORDS[$opt]}" ]] ); then
+				if [[ "${_AMMOPTPARSE_WORDS[$opt]}" == "stop" ]]; then
+					skipall=true
+				fi
+			fi
 		fi
 
 		if [[ -n "$val" ]]; then
@@ -309,6 +321,9 @@ function ammOptparse::Parse {
 	typeset prefix=""
 	typeset -i optidstart=0
 
+	# Call data expansion
+	_ammOptparse::Expand
+
 	# Special options parsing
 	typeset opt
 	for opt in "$@"; do
@@ -342,6 +357,10 @@ function ammOptparse::Parse {
 		typeset var="${__AMMLIB_CALLOPTS[$optid]}"
 		typeset val="true"
 		typeset id=""
+
+		#
+		# String validity tests
+		#
 
 		# Skip emptied variables (not consumed by previous options)
 		[[ -z "$var" ]] && continue
@@ -589,9 +608,11 @@ function ammOptparse::Get {
 	fi
 }
 
+# @description Get unparsed options. To be used as 'eval set $(ammOptparse::GetUnparsedOpts)'
+# @noarg
 function ammOptparse::GetUnparsedOpts {
 	for i in ${!__AMMLIB_CALLOPTS[@]}; do
-		echo -n "\"${__AMMLIB_CALLOPTS[$i]}\" "
+		[[ -n "${__AMMLIB_CALLOPTS[$i]}" ]] && echo -n "\"${__AMMLIB_CALLOPTS[$i]}\" "
 	done
 }
 

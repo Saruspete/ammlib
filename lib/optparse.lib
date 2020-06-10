@@ -291,12 +291,12 @@ function ammOptparse::AddOpt {
 # @description Add one or more words that will infer on the parsing
 # @arg $1  (string) words to handle, separated by '|'
 # @arg $2  (string) action for the words. Can be 'stop'
-function ammOptparse::AddSpecialWord {
+function ammOptparse::AddActionWord {
 	typeset words="$1"
 	typeset action="${2:-stop}"
 
 	case "$action" in
-		stop)
+		stop|skip)
 			;;
 		*)
 			ammLog::Err "Invalid action '$action' for words '$words'"
@@ -406,6 +406,10 @@ function ammOptparse::Parse {
 						lastvar=""
 						break
 						;;
+					skip)
+						lastvar=""
+						continue
+						;;
 					# Unknown operation, not filtered by AddWord ?!
 					*)
 						ammLog::Err "Unknown operation '$action' for word '$var'. How was it registered ?!"
@@ -413,11 +417,14 @@ function ammOptparse::Parse {
 						;;
 				esac
 
-			# Not a registered option, nor registered word. Should we stop
-			elif $nounknown; then
-				ammLog::Err "Invalid unknown option '$lastvar'"
+			# Not a registered option, nor registered word.
+			else
+				# Should we fail on unknown options
+				if $nounknown; then
+					ammLog::Err "Invalid unknown option '$lastvar'"
+					r+=1
+				fi
 				lastvar=""
-				r+=1
 				continue
 			fi
 		fi

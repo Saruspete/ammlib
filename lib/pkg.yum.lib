@@ -43,14 +43,16 @@ function ammPkgYum::IsDnf {
 function _ammPkgYum::Yum {
 	typeset act="$1"; shift
 
-	typeset opts=""
-	$__AMMLIB_INTERACTIVE || opts+="-y"
+	typeset -a opts=("-y")
+	#$__AMMLIB_INTERACTIVE || opts+="-y"
 
 	# Check if input contains options
 	while [[ -n "${1:-}" ]]; do
 		if ammString::IsOption "$1"; then
 			opts+=" $1"
 			shift
+		elif [[ -d "${1:-}" ]] && [[ -d "$1/var/lib/rpm" ]]; then
+			opts+=("--installroot=$1" "--setopt=cachedir=$1/var/cache/yum" )
 		else
 			break
 		fi
@@ -355,6 +357,7 @@ function _ammPkgYum::RepodataParseFilelist {
 
 		# This is utterly ugly, and a really bad idea (parsing xml in awk...)
 		# but it's the easiest available for quick an portable solution
+		# Better way: use xpath or sqlite3 to do the queries
 
 		awk -v search="$dep" '
 		# Check what are we looking for (file, package...)

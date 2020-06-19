@@ -64,6 +64,40 @@ function _ammPkgRpm::Rpm {
 	rpm $opts "$@"
 }
 
+function ammPkgRpm::Install {
+
+	typeset -a installopts
+	while [[ -n "${1:-}" ]]; do
+		if ammString::IsOption "$1"; then
+			installopts+=("$1")
+			shift
+		elif [[ -d "$1" ]]; then
+			ammLog::Dbg "Working in prefix '$1'. Adding '--noscripts'"
+			installopts+=("$1" "--noscripts")
+			shift
+		else
+			break
+		fi
+	done
+
+	typeset pkgfile
+	for pkgfile in "$@"; do
+		typeset pkgname="$(_ammPkgRpm::Rpm "-qp --qf %{NAME}" "$pkgfile")"
+		typeset pkgvers="$(_ammPkgRpm::Rpm "-qp --qf %{VERSION}-%{RELEASE}" "$pkgfile")"
+
+		#if ammPkgRpm::Installed
+		typeset curvers="$(_ammPkgRpm::Rpm "${installopts[@]} -qp --qf %{VERSION}-%{RELEASE}" "$pkgname")"
+
+		# If we have a package version mismatch...
+		if [[ -n "$curvers" ]] && [[ "$curvers" != "$pkgvers" ]]; then
+			ammLog::Inf "Changing version of package '$pkgname' from '$curvers' to '$pkgvers'"
+		fi
+	done
+
+	_ammPkgRPm::Rpm "${installopts[@]} --upgrade --oldpackage" "$@"
+}
+
+
 function ammPkgRpm::Installed {
 	typeset pkgs="$@"
 	typeset -i ret=0
@@ -130,7 +164,7 @@ function ammPkgRpm::InfoWhatProvides {
 	done
 }
 
-# 
+#
 function ammPkgRpm::InfoRequiresToPkg {
 	[[ -z "${1:-}" ]] && return 0
 
@@ -154,12 +188,23 @@ function ammPkgRpm::InfoRequiresToPkg {
 function ammPkgRpm::DbInit {
 	typeset prefix="${1:-}"
 
-	mkdir -p "$root"
-	rpm --root="$root" --initdb
+	typeset rpmopts=""
+	if [[ -n "$prefix" ]]; then
+		[[ -d "$prefix" ]] || mkdir -p "$prefix"
+		rpmopts+="--root=$prefix"
+	fi
+	rpm $rpmopts --initdb
 }
 
 function ammPkgRpm::DbKeyImport {
-	typeset prefix="${1:-}"; shift;
+	typeset prefix="${1:-}";
+
+	# If the first element is a folder, consider it a prefix
+	if [[ -d "$prefix" ]]; then
+		shift
+	else
+		prefix=""
+	fi
 
 	typeset rpmopts=""
 	for key in "$@"; do
@@ -186,7 +231,7 @@ function ammPkgRpm::DbImport {
 	typeset rpmdb="$1"
 	typeset import="$2"
 
-	
+
 }
 
 function ammPkgRpm::DbRecover {
@@ -201,8 +246,54 @@ function ammPkgRpm::DbRecover {
 function ammPkgRpm::DbMigrate {
 	typeset prefix="${1:-}"
 
-	# 
+
+	# List existing rpmdb
+	typeset rpmdbs="$(file "$prefix/var/lib/rpm/"* | awk '$2$3 =="BerkeleyDB"{print $1}' | awk -F/ '{print $NF}' | tr -d ':')"
+
+	typeset db
+	for db in $rpmdbs; do
+		/usr/lib/rpm/rpmdb_dump "$db" > "$db.dump"
+	done
+
+	$prefix/usr/lib/rpm/rpmdb_recover
+	rm $prefix/log.0000000001
+
+	for db in $rpmdbs; do
+		/usr/lib/rpm/rpmdb_load -f /var/lib/rpm/$db.dmp /var/lib/rpm/$db.new
+		mv $db.new $db
+		rm $db.dump
+	done
+
+	$prefix/rpm --rebuilddb
+	#$prefix/rpm --import
+
 }
+
+
+#         typeset rpmdbs="$(file $dest/var/lib/rpm/* | awk '$2$3 =="BerkeleyDB"{print $1}' | awk↪ -F/ '{print $NF}' | tr -d ':')"
+
+#typeset db
+#for db in $rpmdbs; do
+#    typeset dbsrc="$dest/var/lib/rpm/$db"
+#    [[ -e "$dbsrc" ]] || continue
+#
+#    /usr/lib/rpm/rpmdb_dump "$dbsrc" > "$dbsrc.dmp"
+#done
+#
+#chroot "$dest" /usr/lib/rpm/rpmdb_recover
+#rm $dest/log.0000000001
+#
+#for db in $rpmdbs; do
+#    typeset dbsrc="$dest/var/lib/rpm/$db"
+#    chroot "$dest" /usr/lib/rpm/rpmdb_load -f /var/lib/rpm/$db.dmp /var/lib/rpm/$db.ne↪w
+#    mv $dbsrc.new $dbsrc
+#    rm $dbsrc.dmp
+#done
+#
+## prepare the RPM database
+#chroot "$dest" rpm --rebuilddb
+#chroot "$dest" rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+
 
 # -----------------------------------------------------------------------------
 # Static values, helpers...

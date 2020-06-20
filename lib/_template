@@ -13,7 +13,7 @@ fi
 # -----------------------------------------------------------------------------
 
 #function amm##NAME##::MetaCheck {
-#	ammExec::Requires awk
+#	ammExec::Require awk
 #}
 #function amm##NAME##::MetaInit {
 #}

@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammArchive::MetaInit {
-	ammExec::Requires file
+	ammExec::Require file
 	ammLib::Require string
 }
 

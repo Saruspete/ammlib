@@ -11,7 +11,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammOptparse::MetaCheck {
-	ammExec::Requires awk
+	ammExec::Require awk
 }
 
 function ammOptparse::MetaInit {

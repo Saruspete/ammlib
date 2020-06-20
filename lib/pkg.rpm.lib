@@ -11,7 +11,7 @@ fi
 
 # Some tools are required for this module to work
 function ammPkgRpm::MetaCheck {
-	ammExec::Requires rpm rpm2cpio cpio
+	ammExec::Require rpm rpm2cpio cpio
 }
 
 # -----------------------------------------------------------------------------

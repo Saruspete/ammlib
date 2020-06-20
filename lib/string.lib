@@ -7,7 +7,7 @@ fi
 
 function ammString::MetaCheck {
 	# try to keep to coreutils
-	ammExec::Requires seq tr
+	ammExec::Require seq tr
 }
 
 # -----------------------------------------------------------------------------

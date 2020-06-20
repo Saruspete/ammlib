@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammArchiveMakeself::MetaCheck {
-	ammExec::Requires grep
+	ammExec::Require grep
 
 	# check if we have the script in our usual search path
 	typeset p

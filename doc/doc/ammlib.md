@@ -48,8 +48,8 @@
 * [ammExec::AsUser](#ammExecAsUser)
 * [ammExec::Exists](#ammExecExists)
 * [ammExec::RequestOne](#ammExecRequestOne)
-* [ammExec::Requires](#ammExecRequires)
-* [ammExec::RequiresOne](#ammExecRequiresOne)
+* [ammExec::Require](#ammExecRequires)
+* [ammExec::RequireOne](#ammExecRequiresOne)
 
 
 ## ammLib::HookNameToVarname
@@ -450,14 +450,14 @@ function ammLog::Step {
 * **0**: if at least one is found
 * **1**: if none are found
 
-## ammExec::Requires
+## ammExec::Require
 
  Same as ammExecExists but calls ammLog::Die and terminate the script if any requested binary is not found
 ### Arguments
 
 * $@  (string) Binaries to search for in PATH
 
-## ammExec::RequiresOne
+## ammExec::RequireOne
 
  Same as ammExecRequestOne but calls ammLog::Die and terminates if none of requested binary is found
-function ammExec::RequiresOne {
+function ammExec::RequireOne {

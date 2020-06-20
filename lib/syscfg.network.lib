@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammSyscfgNetwork::MetaCheck {
-	ammExec::Requires ip awk
+	ammExec::Require ip awk
 	ammLib::Require string
 }
 

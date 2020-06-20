@@ -11,7 +11,7 @@ fi
 
 function ammKernel::MetaCheck {
 	ammLib::Require string
-	ammExec::Requires wc
+	ammExec::Require wc
 }
 
 function ammKernel::MetaInit {

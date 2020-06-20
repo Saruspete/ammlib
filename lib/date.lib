@@ -6,7 +6,7 @@ if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
 fi
 
 function ammDate::MetaCheck {
-	ammExec::Requires date
+	ammExec::Require date
 }
 
 function ammDate::ParseInt {

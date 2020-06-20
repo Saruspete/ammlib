@@ -13,7 +13,7 @@ fi
 # -----------------------------------------------------------------------------
 
 #function ammTable::MetaCheck {
-#	ammExec::Requires awk
+#	ammExec::Require awk
 #}
 #function ammTable::MetaInit {
 #}

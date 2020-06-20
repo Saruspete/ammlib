@@ -11,7 +11,7 @@ fi
 
 function ammProcess::MetaCheck {
 	# Stick with coreutils
-	ammExec::Requires tr head
+	ammExec::Require tr head
 	ammLib::Require string
 }
 

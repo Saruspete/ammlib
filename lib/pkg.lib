@@ -11,7 +11,7 @@ fi
 
 function ammPkg::MetaCheck {
 	ammLib::Require string
-	ammExec::Requires ldd
+	ammExec::Require ldd
 }
 
 function ammPkg::MetaInit {

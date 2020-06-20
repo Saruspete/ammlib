@@ -11,7 +11,7 @@ fi
 
 function ammStorage::MetaCheck {
 	# Should be in util-linux
-	ammExec::RequiresOne lsblk blkid
+	ammExec::RequireOne lsblk blkid
 }
 
 # -----------------------------------------------------------------------------

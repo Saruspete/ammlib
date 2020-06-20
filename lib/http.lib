@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammHttp::MetaCheck {
-	ammExec::RequiresOne curl wget
+	ammExec::RequireOne curl wget
 
 }
 

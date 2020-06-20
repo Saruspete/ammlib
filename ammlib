@@ -1507,7 +1507,7 @@ function ammExec::RequestOne {
 
 # @description  Same as ammExecExists but calls ammLog::Die and terminate the script if any requested binary is not found
 # @arg $@  (string) Binaries to search for in PATH
-function ammExec::Requires {
+function ammExec::Require {
 	typeset bin
 	for bin in "$@"; do
 		ammLog::Dbg "Trying to find required bin '$bin'"
@@ -1520,7 +1520,7 @@ function ammExec::Requires {
 }
 
 # @description  Same as ammExecRequestOne but calls ammLog::Die and terminates if none of requested binary is found
-function ammExec::RequiresOne {
+function ammExec::RequireOne {
 	if ! ammExec::RequestOne "$@"; then
 		ammLog::MissingBin "$@"
 		ammLog::Die "Unable to find any of required binaries '$@' in $PATH"

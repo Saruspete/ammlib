@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammHardware::MetaCheck {
-	ammExec::Requires lspci
+	ammExec::Require lspci
 }
 #function ammDevice::MetaInit {
 #}

@@ -14,8 +14,8 @@ fi
 # Some tools are required for this module to work
 function ammPkgYum::MetaCheck {
 	ammLib::Require pkg.rpm string
-	ammExec::Requires cksum gzip awk
-	#ammExec::Requires "repoquery"
+	ammExec::Require cksum gzip awk
+	#ammExec::Require "repoquery"
 }
 function ammPkgYum::MetaInit {
 	ammLib::Require pkg.rpm string

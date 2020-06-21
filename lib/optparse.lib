@@ -641,6 +641,13 @@ function ammOptparse::Help {
 	[[ "$termSize" == "0" ]] && termSize=80
 	descSize="$(( $termSize - 2 - $optSize - 4 ))"
 
+	# highlight only if non-parsing output (human did it)
+	typeset currValBold="" currValRst=""
+	if ! $__AMMLIB_STDOUTPIPED; then
+		currValBold="$(ammLog::Color bold white)"
+		currValRst="$(ammLog::Color reset)"
+	fi
+
 	# Display
 	for optidnum in ${!_AMMOPTPARSE_ORDER[@]}; do
 		typeset optid="${_AMMOPTPARSE_ORDER[$optidnum]}"
@@ -657,7 +664,7 @@ function ammOptparse::Help {
 
 		# Append current value to the end
 		if (set +u; [[ -n "${_AMMOPTPARSE_VALUE[$optid]}" ]] ); then
-			desc+=". Current value: '${_AMMOPTPARSE_VALUE[$optid]}'"
+			desc+=". Current value: '$currValBold${_AMMOPTPARSE_VALUE[$optid]}$currValRst'"
 		fi
 
 		while [[ -n "$desc" ]]; do

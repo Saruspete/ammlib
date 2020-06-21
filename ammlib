@@ -49,6 +49,10 @@ if [[ -z "$__AMMLIB_TTY" ]] || ! [[ -e $__AMMLIB_TTY ]]; then
 	__AMMLIB_TTY=""
 	__AMMLIB_INTERACTIVE=false
 fi
+typeset    __AMMLIB_STDOUTPIPED=false
+if ! [[ -t 1 ]]; then
+	__AMMLIB_STDOUTPIPED=true
+fi
 
 #
 # Path management

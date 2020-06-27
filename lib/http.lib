@@ -50,7 +50,7 @@ function ammHttp::Fetch {
 		done
 
 		# Do the query
-		\curl $curlopts -sS -f --connect-timeout 10 -o "$dst" "$src" 2>&1 | ammLog::Dbg "-"
+		\curl $curlopts -sS -f --connect-timeout 10 -o "$dst" "$src" 2>/dev/null
 		ret=$?
 		return $ret
 

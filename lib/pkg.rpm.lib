@@ -145,14 +145,18 @@ function ammPkgRpm::Installed {
 
 # What does a package requires
 function ammPkgRpm::InfoRequirements {
+
 	for file in "$@"; do
-		_ammPkgRpm::Rpm --query  --queryformat="%{name}.%{arch}" --requires "$file"
+		echo -n "$file"
+		#_ammPkgRpm::Rpm --query  --queryformat="%{name}.%{arch}\n" --requires "$file"
+		_ammPkgRpm::Rpm --query  --queryformat="[%{REQUIRES} ]" --requires "$file"
+		echo
 	done
 }
 
 # What does a package provides
 function ammPkgRpm::InfoProvides {
-	_ammPkgRpm::Rpm --query --queryformat="%{name}.%{arch}" --fileprovide "$@"
+	_ammPkgRpm::Rpm --query --queryformat="%{name}.%{arch}\n" --fileprovide "$@"
 }
 
 # What package provides a given element
@@ -160,7 +164,7 @@ function ammPkgRpm::InfoWhatProvides {
 
 	typeset element
 	for element in "$@"; do
-		_ammPkgRpm::Rpm --query  --queryformat="%{name}.%{arch}" --file "$element"
+		_ammPkgRpm::Rpm --query  --queryformat="%{name}.%{arch}\n" --file "$element"
 	done
 }
 

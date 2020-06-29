@@ -146,6 +146,18 @@ function ammPkg::Installed {
 	_ammPkg::Proxy "Installed" "$@"
 }
 
+
+# Terminology
+#
+# from file, get pkg providing it: OwnerOf, WhatProvides, BelongsTo
+# from file, get siblings:         SiblingsOf, 
+# from pkg,  get dependencies:     RequirementsOf, WhatRequires, WhatNeeds
+# from pkg,  get what need it:     ListPkgNeeding, NeededBy, WhatPulls, WhatRequires, WhatNeeds, what is needing
+# from pkg,  get files provided:   ListContent, WhatProvides
+#
+#
+
+
 # What files or requirements does a pkg need
 function ammPkg::InfoRequirements {
 	_ammPkg::Proxy "InfoRequirements" "$@"

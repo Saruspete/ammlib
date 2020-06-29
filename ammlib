@@ -389,7 +389,9 @@ function ammLib::Locate {
 	typeset libname="$1"
 
 	typeset libpath
-	for libpath in $__AMMLIB_SEARCHPATH; do
+	typeset searchextra="${AMMLIB_SEARCHPATH_EXTRA:-}"
+	typeset searchoverride="${AMMLIB_SEARCHPATH_OVERRIDE:-}"
+	for libpath in ${searchoverride//:/ } $__AMMLIB_SEARCHPATH ${searchextra//:/ }; do
 			typeset nlib="${libpath}/${libname}.lib"
 			[[ -r "$nlib" ]] && {
 				echo "$nlib"

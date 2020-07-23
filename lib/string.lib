@@ -562,6 +562,7 @@ function ammString::SortWords {
 # Advanced format parsers
 # -----------------------------------------------------------------------------
 
+# @description Expand a composite list to its full expression
 function ammString::ListExpand {
 	typeset    listFull=""
 	typeset -i err=0
@@ -571,56 +572,98 @@ function ammString::ListExpand {
 
 	typeset elem group
 	for elem in "$@"; do
-		# Split the g1,g2,g3 parts
-		for group in ${elem//,/ }; do
-			# Split the groups (if any)
-			typeset bgn="${group%-*}"
-			typeset end="${group#*-}"
 
-			# Some checks
-			[[ -z "$bgn" ]] && {
-				ammLog::Wrn "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
-				continue
-			}
-			[[ -z "$end" ]] && {
-				ammLog::Wrn "List end element '$end' (in group '$group') cannot be empty. Skipping"
-				continue
-			}
+#set -x
+		group="$(echo "$elem"|tr '[]' '{}')"
+		group="${group//-/..}"
 
-			! ammString::IsInteger "$bgn" && {
-				ammLog::Wrn "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
-				continue
-			}
-			! ammString::IsInteger "$end" && {
-				ammLog::Wrn "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
-				continue
-			}
+		# bash-like expansion: pfx{g1,g2}sfx (with prefix/suffix & between {} )
+		#if [[ $group =~ ([a-zA-Z0-9_-]*)\{(.+)(,.*)}([a-zA-Z0-9_-]*) ]]; then
+		if [[ $group =~ ([-a-zA-Z0-9_/]*)\{(.+)}([-a-zA-Z0-9_/]*) ]]; then
 
-			# Different int values means a group like "start-end"
-			if [[ "$bgn" != "$end" ]]; then
-				typeset -i i=$bgn
+			typeset pfx="${BASH_REMATCH[1]}"
+			typeset seq="${BASH_REMATCH[2]}"
+			typeset sfx="${BASH_REMATCH[3]}"
 
-				# We may want begin/end to be in ascending order.. or just swap them
-				[[ $bgn -gt $end ]] && {
-					i=$end
-					end=$bgn
+			# Composed of 2 or more sequences {seq1,seq2}
+			typeset seq2="${seq##*,}"
+			if [[ "$seq" != "$seq2" ]]; then
+				seq="${seq%,*}"
+
+				# Composite or final seq
+				if [[ "${seq//,/}" != "$seq" ]] || [[ "${seq//../}" != "${seq}" ]]; then
+					ammString::ListExpand "$pfx{$seq}$sfx"
+				else
+					values+=("${pfx}${seq}${sfx}")
+				fi
+
+				# Composite or final seq2
+				if [[ "${seq2//,/}" != "$seq2" ]] || [[ "${seq2//../}" != "${seq2}" ]]; then
+					ammString::ListExpand "$pfx{$seq2}$sfx"
+				else
+					values+=("${pfx}${seq2}${sfx}")
+				fi
+			# No seq2, only seq try to expand it maybe
+			else
+				# WARNING / TODO: This may be nasty here... Securization needed
+				typeset i=""
+				for i in $(eval echo $pfx{$seq}$sfx); do
+					values+=("$i")
+				done
+			fi
+
+		# Simple list of elements without '{}' like '1,2,4-10,11'
+		else
+			# Split the g1,g2,g3 parts
+			for group in ${elem//,/ }; do
+				# Split the groups (if any)
+				typeset bgn="${group%-*}"
+				typeset end="${group#*-}"
+
+				# Some checks
+				[[ -z "$bgn" ]] && {
+					ammLog::Wrn "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
+					continue
+				}
+				[[ -z "$end" ]] && {
+					ammLog::Wrn "List end element '$end' (in group '$group') cannot be empty. Skipping"
+					continue
 				}
 
-				while [[ $i -lt $end ]]; do
-					values[$i]=$i
-					i+=1
-				done
+				! ammString::IsInteger "$bgn" && {
+					ammLog::Wrn "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
+					continue
+				}
+				! ammString::IsInteger "$end" && {
+					ammLog::Wrn "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
+					continue
+				}
 
-			# Same, so no group, just the same value
-			else
-				values[$bgn]=$bgn
-			fi
-			:
-		done
+				# Different int values means a group like "start-end"
+				if [[ "$bgn" != "$end" ]]; then
+					typeset -i i=$bgn
+
+					# We may want begin/end to be in ascending order.. or just swap them
+					[[ $bgn -gt $end ]] && {
+						i=$end
+						end=$bgn
+					}
+
+					while [[ $i -le $end ]]; do
+						values[$i]=$i
+						i+=1
+					done
+
+				# Same, so no group, just the same value
+				else
+					values[$bgn]=$bgn
+				fi
+			done
+		fi
 	done
 
 	# Show the final unique listing in a single echo
-	echo ${!values[@]}
+	echo -n ${values[@]}" "
 }
 
 # -----------------------------------------------------------------------------

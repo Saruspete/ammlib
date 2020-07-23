@@ -184,7 +184,7 @@ function ammOptparse::AddOpt {
 	done
 
 	# Validate the ID found
-	if [[ -z "$id" ]]; then
+	if [[ -z "${id:-}" ]]; then
 		ammLog::Err "You must at least provide one long option"
 		return 1
 	fi

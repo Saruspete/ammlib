@@ -24,6 +24,7 @@ function ammString::ContainsWord {
 	typeset want="$1"; shift
 
 	# Lazy: just check
+	typeset w
 	for w in "$@"; do
 		[[ "$w" == "$want" ]] && return 0
 	done

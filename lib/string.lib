@@ -577,13 +577,11 @@ function ammString::ListExpand {
 	typeset elem group
 	for elem in "$@"; do
 
-#set -x
 		group="$(echo "$elem"|tr '[]' '{}')"
-		group="${group//-/..}"
 
 		# bash-like expansion: pfx{g1,g2}sfx (with prefix/suffix & between {} )
 		#if [[ $group =~ ([a-zA-Z0-9_-]*)\{(.+)(,.*)}([a-zA-Z0-9_-]*) ]]; then
-		if [[ $group =~ ([-a-zA-Z0-9_/]*)\{(.+)}([-a-zA-Z0-9_/]*) ]]; then
+		if [[ $group =~ ([-a-zA-Z0-9_/\.]*)\{(.+)}([-a-zA-Z0-9_/\.]*) ]]; then
 
 			typeset pfx="${BASH_REMATCH[1]}"
 			typeset seq="${BASH_REMATCH[2]}"

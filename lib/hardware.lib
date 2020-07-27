@@ -10,10 +10,13 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammHardware::MetaCheck {
+	ammLib::Loadable string
 	ammExec::Require lspci
+
 }
-#function ammDevice::MetaInit {
-#}
+function ammDevice::MetaInit {
+	ammLib::Load string
+}
 
 # -----------------------------------------------------------------------------
 # List and manage local devices
@@ -21,13 +24,13 @@ function ammHardware::MetaCheck {
 
 
 function ammHardware::GetVendorFromId {
-                typeset vendor="$vendorid"
-                typeset pcidb="/usr/share/hwdata/pci.ids"
-                if [[ -n "$vendorid" ]] && [[ -e "$pcidb" ]]; then
-                    vendor="$(grep "^${vendorid#0x}" "$pcidb")"
-                    vendor="${vendor#* }"
-                fi
-                echo "vendor=\"${vendor# }\""
+	typeset vendor="$vendorid"
+	typeset pcidb="/usr/share/hwdata/pci.ids"
+	if [[ -n "$vendorid" ]] && [[ -e "$pcidb" ]]; then
+		vendor="$(grep "^${vendorid#0x}" "$pcidb")"
+		vendor="${vendor#* }"
+	fi
+	echo "vendor=\"${vendor# }\""
 
 }
 
@@ -131,6 +134,9 @@ function ammHardware::NumaSummary {
 	done
 }
 
+# -----------------------------------------------------------------------------
+# Memory
+# -----------------------------------------------------------------------------
 function ammHardware::MemoryDetail {
 	typeset showEmpty="${1:-false}"
 
@@ -152,7 +158,45 @@ function ammHardware::MemoryDetail {
 			Locator) ;;
 			Bank\ Locator) ;;
 		esac
-	done < <(dmidecode -t memory 2>/dev/null)
+	done < <(ammExec::AsUser root dmidecode -t memory 2>/dev/null)
 
 
 }
+
+# -----------------------------------------------------------------------------
+# Processors
+# -----------------------------------------------------------------------------
+
+typeset -gA __AMMHARDWARE_NUMA_TOPO=""
+typeset -gA __AMMHARDWARE_CPU_TOPO=""
+typeset -gA __AMMHARDWARE_MEM_TOPO=""
+function ammHardware::CpuTopologyDiscover {
+
+	# Scan /sys/devices/system/nodes/node*/cpulist
+	typeset numaid numapath
+	for numapath in /sys/devices/system/node/node[0-9]*/cpulist; do
+		numaid="${numapath%/*}"
+		numaid="${numaid##*/node}"
+		
+	done
+
+	# scan /sys/devices/system/cpu*
+
+}
+
+# @description  Returns the siblings (SMT) of a given processor
+function ammHardware::CpuSiblings {
+	typeset cpuid="$1"
+
+	# Init check
+	[[ -n "$__AMMHARDWARE_CPU_TOPO" ]] || ammHardware::CpuTopologyDiscover
+
+}
+
+function ammHardware::CpuNumaGet {
+	
+	# Init check
+	[[ -n "$__AMMHARDWARE_CPU_TOPO" ]] || ammHardware::CpuTopologyDiscover
+}
+
+

@@ -137,7 +137,7 @@ function ammFs::GetFsFromFile {
 
 	typeset path
 	for path in $(ammPath::Decompose "$file"); do
-		if [[ -n "${__AMMFS_MOUNT2TYPE_CACHE[$path]}" ]]; then
+		if (set +u; [[ -n "${__AMMFS_MOUNT2TYPE_CACHE[$path]}" ]]); then
 			echo "${__AMMFS_MOUNT2TYPE_CACHE[$path]}"
 			return 0
 		fi

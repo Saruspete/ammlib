@@ -14,6 +14,26 @@ fi
 #}
 
 # -----------------------------------------------------------------------------
+# Speedup seeking
+# -----------------------------------------------------------------------------
+
+typeset -gA __AMMFS_MOUNT2STORE_CACHE
+typeset -gA __AMMFS_MOUNT2OPTS_CACHE
+typeset -gA __AMMFS_MOUNT2TYPE_CACHE
+typeset -g  __AMMFS_CACHED=false
+function ammFs::_ParseMounts {
+
+	typeset src mnt typ opts i1 i2 _junk
+	while read src mnt typ opts i1 i2 _junk; do
+		__AMMFS_MOUNT2STORE_CACHE[$mnt]="$src"
+		__AMMFS_MOUNT2OPTS_CACHE[$mnt]="$opts"
+		__AMMFS_MOUNT2TYPE_CACHE[$mnt]="$typ"
+	done
+
+	__AMMFS_CACHED=true
+}
+
+# -----------------------------------------------------------------------------
 # Filesystem mount management
 # -----------------------------------------------------------------------------
 
@@ -84,6 +104,56 @@ function ammFs::Mount {
 }
 
 
+
+function ammFs::GetType {
+	typeset mnt="$1"
+
+	mnt="$(readlink -f "$mnt")"
+
+	$__AMMFS_CACHED || ammFs::_ParseMounts
+	if ( set +u; [[ -n "${__AMMFS_MOUNT2TYPE_CACHE[$mnt]}" ]] ); then
+		echo "${__AMMFS_MOUNT2TYPE_CACHE[$mnt]}"
+		return 0
+	fi
+
+	# Try refreshing the cache maybe
+	ammFs::_ParseMounts
+	if ( set +u; [[ -n "${__AMMFS_MOUNT2TYPE_CACHE[$mnt]}" ]] ); then
+		echo "${__AMMFS_MOUNT2TYPE_CACHE[$mnt]}"
+		return 0
+	fi
+
+	ammLog::Wrn "Requested type of non-existing fs: '$mnt'"
+	return 1
+}
+
+
+function ammFs::GetFsFromFile {
+	typeset file="$1"
+
+	file="$(readlink -f "$file")"
+
+	$__AMMFS_CACHED || ammFs::_ParseMounts
+
+	typeset path
+	for path in $(ammPath::Decompose "$file"); do
+		if [[ -n "${__AMMFS_MOUNT2TYPE_CACHE[$path]}" ]]; then
+			echo "${__AMMFS_MOUNT2TYPE_CACHE[$path]}"
+			return 0
+		fi
+	done
+
+	# Still there and no fs found ?! Fallback to standard df & tail
+	typeset mnt="$(df -hP "$file" 2>/dev/null|tail -n1)"
+	mnt="${mnt##*% }"
+
+	if (set +u; [[ -z "${__AMMFS_MOUNT2TYPE_CACHE[$mnt]}" ]] ); then
+		ammLog::Wrn "Stall cache (Missing entry '$mnt')"
+		ammFs::_ParseMounts
+	fi
+
+	echo "$mnt"
+}
 # -----------------------------------------------------------------------------
 # Filesystem creation
 # -----------------------------------------------------------------------------

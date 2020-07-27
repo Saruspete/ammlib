@@ -54,9 +54,12 @@ function ammString::IsFile {
 # @arg $2  (int) The minimal value of the integer
 # @arg $3  (int) The maximal value of the integer
 function ammString::IsInteger {
-	typeset str="$1"
+	typeset str="${1:-}"
 	typeset min="${2:-}"
 	typeset max="${3:-}"
+
+	# Empty is not an int
+	[[ -z "$str" ]] && return 1
 
 	# R emove leading minus
 	str="${str#-}"

@@ -28,7 +28,7 @@ function ammFs::_ParseMounts {
 		__AMMFS_MOUNT2STORE_CACHE[$mnt]="$src"
 		__AMMFS_MOUNT2OPTS_CACHE[$mnt]="$opts"
 		__AMMFS_MOUNT2TYPE_CACHE[$mnt]="$typ"
-	done
+	done < /proc/self/mounts
 
 	__AMMFS_CACHED=true
 }

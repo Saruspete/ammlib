@@ -371,6 +371,11 @@ function _ammLib::TrapHandler {
 		done
 	fi
 
+	# Try last hook there
+	if [[ "$retaction" == "exit" ]]; then
+		ammLib::HookTrigger "exit"
+	fi
+
 	# Do the exit or return
 	$retaction $retcode
 }

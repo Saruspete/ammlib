@@ -1446,7 +1446,7 @@ function ammExec::AsUser {
 
 		# Maybe handle sudo ?
 		#elif stmp="$(sudo -nll 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$stmp" ]]; then
-		elif ammExec::Exists "sudo" && ammExec::SudoIsAble "$__AMMLIB_CALLNAME" "$userrunas"; then
+		elif ammExec::Exists "sudo" && ammExec::SudoIsAble "$@" "$userrunas"; then
 			ammLog::Dbg "Using sudo to run as '$userrunas' cmd: '$@'"
 			# TODO: parse $stmp output more...
 			sudo -n -u "$userrunas" "$@" 98>&- 99>&-

@@ -73,10 +73,8 @@ function ammHttp::Fetch {
 		done
 
 		# Do the fetch
-		set -x
 		\wget 2>&1 $wgetopts -O "$dst" "$src"
 		ret=$?
-		set +x
 		return $ret
 
 	else

@@ -118,7 +118,7 @@ function _ammLib::PathGetForCaller {
 
 	# Get name and path from caller
 	typeset callingstr="$(ammLog::Stackdump 2 1)"
-	typeset callingfile="${callingstr%%::*}"
+	typeset callingfile="${callingstr%%:*}"
 
 	typeset dir="$prefix/$callingfile/$suffix"
 	! [[ -d "$dir" ]] && mkdir -p "$dir"
@@ -986,7 +986,7 @@ function ammLog::Stackdump {
 		fi
 		[[ $i -ge $(($skip + $cnt)) ]] && break
 
-		echo -n "${BASH_SOURCE[$i]##*/}::${FUNCNAME[$i]}::${BASH_LINENO[$(($i-1))]} "
+		echo -n "${BASH_SOURCE[$i]##*/}:${BASH_LINENO[$(($i-1))]} ${FUNCNAME[$i]}() "
 		if [[ "$extdbg" == "on" ]]; then
 			j=$(($argoff + ${BASH_ARGC[$i]:-0} -1))
 			while [[ $j -ge $argoff ]]; do

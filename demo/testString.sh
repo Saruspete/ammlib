@@ -87,4 +87,5 @@ ammTest::Function ammString::IsUri "file:///tmp/toto"
 ammTest::Function ammString::IsUri "git+ssh://hostname.domain.tld:123"
 
 ammTest::Group "Parsing - List Expand"
-ammTest::Function ammString::ListExpand "1,2,10-30,34,34,30-35,9-4"
+ammTest::Function ammString::ExpandIntegerList "1,2,10-30,34,34,30-35,9-4"
+ammTest::Function ammString::ExpandStringBash  "host{01..12}-sp.mgt"

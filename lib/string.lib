@@ -10,6 +10,15 @@ function ammString::MetaCheck {
 	ammExec::Require seq tr
 }
 
+function ammString::MetaInit {
+	typeset -g __AMMSTRING_UUID_MACADDR=""
+
+	# Days diff in Julian Calendar between 15 oct 1582 (uuid) and 1jan 1970 (epoch)
+	#typeset -g __AMMSTRING_UUID_CALJUL2UNX=$(( (2440587 - 2299160) ))
+	typeset -g __AMMSTRING_UUID_TS1582=$(( (2440587 - 2299160) * 86400 ))
+
+}
+
 # -----------------------------------------------------------------------------
 # Tests of string content, types and values
 # -----------------------------------------------------------------------------
@@ -667,6 +676,168 @@ function ammString::ListExpand {
 	# Show the final unique listing in a single echo
 	echo -n ${values[@]}" "
 }
+
+# -----------------------------------------------------------------------------
+# UUID
+# -----------------------------------------------------------------------------
+
+function ammString::UUIDVersionGet {
+	typeset uuid="$1"
+
+	# Remove optionnal -
+	uuid="${uuid//-/}"
+
+	# Look for bits 12 to 15 of time_high field
+	echo ${uuid:12:1}
+}
+
+
+# @description  Generate a UUID depending on the version requested
+function ammString::UUIDGenerate {
+	typeset version="${1:-4}"
+	typeset namespace="${2:-ammlib}"
+
+	# Some inpiration taken from https://github.com/lowerpower/UUID-with-bash/blob/master/uuid.sh
+
+	# Init first time for v1 & v2
+	if [[ -z "${__AMMSTRING_UUID_MACADDR:-}" ]]; then
+		# QnD, but less than most implementation on the net..
+		typeset iface="$(ip -o route get 1.0.0.0 2>/dev/null| awk 'NR==1{for(i=1; i<NF; i++) { if($i=="dev"){print $(i+1); }}}')"
+		typeset macaddr="$(cat /sys/class/net/$iface/address 2>/dev/null)"
+		if [[ -z "$macaddr" ]]; then
+			macaddr="00:11:22:33:44:55"
+			ammLog::Wrn "Unable to get real MAC Interface. Using dummy $macaddr"
+		fi
+		__AMMSTRING_UUID_MACADDR="${macaddr//:/}"
+	fi
+
+	# General format of UUID, as per RFC 4122: https://www.ietf.org/rfc/rfc4122.txt
+	# time-low "-" time-mid "-" time-high-and-version "-" clock-seq-and-reserved clock-seq-low "-" node
+
+	typeset -a timenow=($(date -u +"%s %N"))
+	# (EpochNow + Offset for Julian Cal) * 10000000 + NanoNow/100
+	typeset timeuuid="$(( (${timenow[0]} + $__AMMSTRING_UUID_TS1582) ))${timenow[1]:0:7}"
+	typeset timeuuidhex="$( ammString::DecToHex "$timeuuid" )"
+
+	case $version in
+		# NULL UUID
+		0)
+			echo "00000000-0000-0000-0000-000000000000"
+			;;
+
+		# UUIDv1: based on Time & MAC Addr
+		1)
+			typeset -l macaddr="$__AMMSTRING_UUID_MACADDR"
+			typeset -l uuidstr="1${timeuuidhex}"
+			# timelow / mid / high
+			typeset uuid="${uuidstr: -8}-${uuidstr: -12:4}-${uuidstr: -16:4}"
+			# TODO: clk_seq_hi_res clk_seq_low. Using PID for now
+			uuid+="$(printf "%-4.4x" "$$")"
+			# MAC Address
+			uuid+="-$macaddr"
+
+			echo "$uuid"
+			;;
+
+		# UUIDv3 (MD5) & UUIDv5 (SHA1)
+		3|5)
+			typeset -l uuid=""
+			[[ "$version" == "3" ]] && uuid="$(ammString::HashMD5 "$namespace")"
+			[[ "$version" == "5" ]] && uuid="$(ammString::HashSHA1 "$namespace")"
+
+			echo "${uuid:0:8}-${uuid:8:4}-${version}${uuid:13:3}-${uuid:16:4}-${uuid:20:12}"
+
+			;;
+
+		# UUIDv4: Pure random
+		4)
+			# Use kernel if available
+			if [[ -r "/proc/sys/kernel/random/uuid" ]]; then
+				cat /proc/sys/kernel/random/uuid
+			elif ammExec::Exists uuidgen; then
+				uuidgen
+			else
+				typeset -l uuid="" str=""
+				# 128 bits = 16 bytes = 32 hex chars
+				for i in {1..16}; do
+					str="$(ammString::DecToHex "$(( $RANDOM+256))" )"
+					uuid+="${str:0:2}"
+				done
+				# After v4, there should be the variant on 2 or 3 bits... don't care here
+				echo "${uuid:0:8}-${uuid:8:4}-4${uuid:12:3}-${uuid:16:4}-${uuid:20:12}"
+			fi
+			;;
+		*)
+			ammLog::Wrn "Unmanaged UUID Version '$version'"
+			;;
+	esac
+}
+
+
+# -----------------------------------------------------------------------------
+# Hash and crypto
+# -----------------------------------------------------------------------------
+
+function ammString::HashMD5 {
+	typeset str="${1:--}"
+	typeset salt="${2:-}"
+
+	if [[ "$str" == "-" ]] && [[ -n "$salt" ]]; then
+		ammLog::Wrn "$FUNCNAME: Cannot set a salt when reading from stdin"
+	fi
+
+	if ammExec::Exists "md5sum"; then
+		if [[ -r "$str" ]] || [[ "$str" == "-" ]]; then
+			(echo -n "$salt"; cat "$str") | md5sum "-" | cut -f 1 -d " "
+		else
+			echo -n "${salt}${str}" | md5sum | cut -f 1 -d " "
+		fi
+	elif ammExec::Exists "openssl"; then
+		if [[ -r "$str" ]]; then
+			(echo -n "$salt"; cat "$str") | openssl md5 | cut -f 2 -d " "
+		elif [[ "$str" == "-" ]]; then
+			openssl md5 | cut -f 2 -d " "
+		else
+			echo -n "${salt}${str}" | openssl md5 | cut -f 2 -d " "
+		fi
+	else
+		ammLog::Err "No MD5 generator available (openssl or md5sum)"
+		return 1
+	fi
+
+	return 0
+}
+
+function ammString::HashSHA1 {
+	typeset str="${1:--}"
+	typeset salt="${2:-}"
+
+	if [[ "$str" == "-" ]] && [[ -n "$salt" ]]; then
+		ammLog::Wrn "$FUNCNAME: Cannot set a salt when reading from stdin"
+	fi
+
+	if ammExec::Exists "sha1sum"; then
+		if [[ -r "$str" ]] || [[ "$str" == "-" ]]; then
+			(echo -n "$salt"; cat "$str") | sha1sum "-" | cut -f 1 -d " "
+		else
+			echo -n "${salt}${str}" | sha1sum | cut -f 1 -d " "
+		fi
+	elif ammExec::Exists "openssl"; then
+		if [[ -r "$str" ]]; then
+			(echo -n "$salt"; cat "$str") | openssl sha1 | cut -f 2 -d " "
+		elif [[ "$str" == "-" ]]; then
+			openssl sha1 | cut -f 2 -d " "
+		else
+			echo -n "${salt}${str}" | openssl sha1 | cut -f 2 -d " "
+		fi
+	else
+		ammLog::Err "No SHA1 generator available (openssl or sha1sum)"
+		return 1
+	fi
+
+	return 0
+}
+
 
 # -----------------------------------------------------------------------------
 # Pretty print and display helpers

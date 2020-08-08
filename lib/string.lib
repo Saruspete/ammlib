@@ -576,7 +576,8 @@ function ammString::SortWords {
 # -----------------------------------------------------------------------------
 
 # @description Expand a composite list to its full expression
-function ammString::ListExpand {
+function ammString::ExpandStringBash {
+
 	typeset    listFull=""
 	typeset -i err=0
 
@@ -603,15 +604,17 @@ function ammString::ListExpand {
 
 				# Composite or final seq
 				if [[ "${seq//,/}" != "$seq" ]] || [[ "${seq//../}" != "${seq}" ]]; then
-					ammString::ListExpand "$pfx{$seq}$sfx"
+					$FUNCNAME "$pfx{$seq}$sfx"
 				else
+					ammLog::Dbg "Adding '${pfx}${seq}${sfx}'"
 					values+=("${pfx}${seq}${sfx}")
 				fi
 
 				# Composite or final seq2
 				if [[ "${seq2//,/}" != "$seq2" ]] || [[ "${seq2//../}" != "${seq2}" ]]; then
-					ammString::ListExpand "$pfx{$seq2}$sfx"
+					$FUNCNAME "$pfx{$seq2}$sfx"
 				else
+					ammLog::Dbg "Adding '${pfx}${seq2}${sfx}'"
 					values+=("${pfx}${seq2}${sfx}")
 				fi
 			# No seq2, only seq try to expand it maybe
@@ -619,58 +622,81 @@ function ammString::ListExpand {
 				# WARNING / TODO: This may be nasty here... Securization needed
 				typeset i=""
 				for i in $(eval echo $pfx{$seq}$sfx); do
+					ammLog::Dbg "Adding '$i' from '$seq'"
 					values+=("$i")
 				done
 			fi
-
-		# Simple list of elements without '{}' like '1,2,4-10,11'
+		# Not a bash composite group, just use it raw
 		else
-			# Split the g1,g2,g3 parts
-			for group in ${elem//,/ }; do
-				# Split the groups (if any)
-				typeset bgn="${group%-*}"
-				typeset end="${group#*-}"
-
-				# Some checks
-				[[ -z "$bgn" ]] && {
-					ammLog::Wrn "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
-					continue
-				}
-				[[ -z "$end" ]] && {
-					ammLog::Wrn "List end element '$end' (in group '$group') cannot be empty. Skipping"
-					continue
-				}
-
-				! ammString::IsInteger "$bgn" && {
-					ammLog::Wrn "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
-					continue
-				}
-				! ammString::IsInteger "$end" && {
-					ammLog::Wrn "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
-					continue
-				}
-
-				# Different int values means a group like "start-end"
-				if [[ "$bgn" != "$end" ]]; then
-					typeset -i i=$bgn
-
-					# We may want begin/end to be in ascending order.. or just swap them
-					[[ $bgn -gt $end ]] && {
-						i=$end
-						end=$bgn
-					}
-
-					while [[ $i -le $end ]]; do
-						values[$i]=$i
-						i+=1
-					done
-
-				# Same, so no group, just the same value
-				else
-					values[$bgn]=$bgn
-				fi
-			done
+			if [[ -n "$group" ]]; then
+					ammLog::Dbg "Adding '$seq'"
+				values+=($group)
+			fi
 		fi
+	done
+
+	echo -n ${values[@]}" "
+}
+
+function ammString::ListExpand {
+	ammLog::Deprecated "ammString::ExpandIntegerList" "$@"
+}
+
+function ammString::ExpandIntegerList {
+	typeset    listFull=""
+	typeset -i err=0
+
+	# Using a simple indexed array allows final ordering
+	typeset -a values
+
+	typeset elem group
+	# Simple list of elements like '1,2,4-10,11'
+	for elem in "$@"; do
+		# Split the g1,g2,g3 parts
+		for group in ${elem//,/ }; do
+			# Split the groups (if any)
+			typeset bgn="${group%-*}"
+			typeset end="${group#*-}"
+
+			# Some checks
+			if [[ -z "$bgn" ]]; then
+				ammLog::Wrn "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
+				continue
+			fi
+			if [[ -z "$end" ]]; then
+				ammLog::Wrn "List end element '$end' (in group '$group') cannot be empty. Skipping"
+				continue
+			fi
+
+			if ! ammString::IsInteger "$bgn"; then
+				ammLog::Wrn "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
+				continue
+			fi
+			if ! ammString::IsInteger "$end"; then
+				ammLog::Wrn "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
+				continue
+			fi
+
+			# Different int values means a group like "start-end"
+			if [[ "$bgn" != "$end" ]]; then
+				typeset -i i=$bgn
+
+				# We may want begin/end to be in ascending order.. or just swap them
+				if [[ $bgn -gt $end ]]; then
+					i=$end
+					end=$bgn
+				fi
+
+				while [[ $i -le $end ]]; do
+					values[$i]=$i
+					i+=1
+				done
+
+			# Same, so no group, just the same value
+			else
+				values[$bgn]=$bgn
+			fi
+		done
 	done
 
 	# Show the final unique listing in a single echo

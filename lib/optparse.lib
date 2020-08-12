@@ -321,6 +321,9 @@ function ammOptparse::Parse {
 	typeset prefix=""
 	typeset -i optidstart=0
 
+	# Trigger hook for other modules to register
+	ammLib::HookTrigger "before:optparse:parse"
+
 	# Call data expansion
 	_ammOptparse::Expand
 
@@ -569,6 +572,7 @@ function ammOptparse::Parse {
 		exit 0
 	fi
 
+	ammLib::HookTrigger "after:optparse:parse"
 	return $r
 }
 

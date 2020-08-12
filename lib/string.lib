@@ -489,6 +489,26 @@ function ammString::HexToIPv4 {
 	echo $ip4str
 }
 
+
+function ammString::IntegerMin {
+
+	typeset -i min="${1:-1}" v
+	for v in "$@"; do
+		[[ "$v" -lt $min ]] && min=$v
+	done
+	echo $min
+}
+
+function ammString::IntegerMax {
+
+	typeset -i max="${1:-0}" v
+	for v in "$@"; do
+		[[ "$v" -gt $max ]] && max=$v
+	done
+	echo $max
+}
+
+
 # -----------------------------------------------------------------------------
 # Search and filter
 # -----------------------------------------------------------------------------

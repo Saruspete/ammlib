@@ -508,6 +508,16 @@ function ammString::IntegerMax {
 	echo $max
 }
 
+function ammString::IntegerAverage {
+
+	typeset -i cnt=0 sum=0 v
+	for v in "$@"; do
+		sum+=$v
+		cnt+=1
+	done
+	echo $(( sum / cnt ))
+}
+
 
 # -----------------------------------------------------------------------------
 # Search and filter

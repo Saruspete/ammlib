@@ -450,6 +450,20 @@ function ammLib::IsSublib {
 	[[ "${libname//./}" != "$libname" ]]
 }
 
+# @description  Check if a given libname is loaded
+# @exitcode  0 if loaded
+function ammLib::IsLoaded {
+	typeset libname="$1"
+
+	typeset l=""
+	for l in $__AMMLIB_LOADED; do
+		[[ "$l" == "$libname" ]] && return 0
+	done
+
+	return 1
+}
+
+
 # @description  Get the function name for the library' constructor
 # @arg $1  (string) library name
 function ammLib::MetaGetPrefix {
@@ -538,13 +552,12 @@ function ammLib::Loadable {
 function ammLib::Load {
 	typeset -i r=0
 
-	ammLib::HookTrigger libload "$@"
-
 	typeset libfile="" libname= l=
 	for libname in "$@"; do
 
 		libname="${libname//\"/}"
 		libname="${libname//\'/}"
+
 
 		# For submodule, you need to load parent module first
 		if ammLib::IsSublib "$libname"; then
@@ -555,9 +568,7 @@ function ammLib::Load {
 			if [[ -n "$parentlibpath" ]]; then
 
 				typeset parentloaded=
-				for l in $__AMMLIB_LOADED; do
-					[[ "$l" == "$parentlib" ]] && parentloaded="$l"
-				done
+				ammLib::IsLoaded "$parentlib" && parentloaded="$parentlib"
 
 				if [[ -z "$parentloaded" ]]; then
 					ammLog::Err "Cannot load '$libname' with ammLib::Load: look like a sub-lib of '$parentlib' and its parent '$parentlib' is not loaded"
@@ -568,10 +579,7 @@ function ammLib::Load {
 		fi
 
 		# Skip already loaded libraries
-		for l in $__AMMLIB_LOADED; do
-			# Already loaded
-			[[ "$libname" == "$l" ]] && continue 2
-		done
+		ammLib::IsLoaded "$libname" && continue 2
 
 		# Check if we can load requested lib
 		libfile="$(ammLib::Loadable "$libname")"
@@ -582,12 +590,16 @@ function ammLib::Load {
 			# Add lib early to avoid within-module reloading
 			__AMMLIB_LOADED+=" $libname"
 
+			ammLib::HookTrigger "before:libload:$libname"
+
 			# Init was ok, source and use lib
 			. $libfile
 
 			# Call init
 			typeset metapref="$(ammLib::MetaGetPrefix "$libname")"
 			ammEnv::IsFunc ${metapref}Init && ${metapref}Init
+
+			ammLib::HookTrigger "after:libload:$libname"
 
 			continue
 
@@ -609,8 +621,6 @@ function ammLib::Load {
 # @arg $@   (string[]) List of modules to unload
 function ammLib::Unload {
 	typeset -i r=0
-
-	ammLib::HookTrigger libunload "$@"
 
 	# Find 
 	typeset libname

@@ -1229,35 +1229,143 @@ function ammPath::IsWritable {
 # @arg $1  (path) Source path where to find the content
 # @arg $2  (path) Destination path where to copy content
 # @arg $@  (string) files or patterns to copy from source to destination
-function ammPath::CopyStructure {
-	typeset pathsrc="$1"
-	typeset pathdst="$2"
-	shift 2
+function _ammPath::RecurseFolders {
+	typeset srcpath="$1"
+	typeset dstpath="$2"
+	typeset callback="$3"
+	typeset force="$4"
+	shift 4
 
-	typeset -i r=0
-	typeset pattern srcfile
+	typeset -i r=0 rl=0
+	typeset pattern srcdentry
 	for pattern in "$@"; do
 		# Remove srcpath from pattern, we'll add it after to ensure its present
-		pattern="${pattern#$pathsrc/}"
-		for srcfile in $pathsrc/$pattern; do
-			typeset srcdir="${srcfile%/*}"
-			typeset dstdir="$pathdst${srcdir#$pathsrc}"
-			if ! [[ -d "$dstdir" ]]; then
-				typeset out="$(mkdir -p "$dstdir" 2>&1)"
-				if ! [[ -d "$dstdir" ]]; then
-					ammLog::Wrn "Cannot create target folder '$dstdir' for '$srcfile'"
-					r+=1
-					continue
+		pattern="${pattern#$srcpath/}"
+		for srcdentry in "$srcpath/"$pattern; do
+			typeset srcdir="${srcdentry%/*}"
+			typeset dstdentry="${dstpath}${srcdentry#$srcpath}"
+			typeset dstdir="${dstdentry%/*}"
+
+			{ [[ "$srcdentry" == "." ]] || [[ "$dstdentry" == ".." ]]; } && continue
+
+			# Do the operation by callback
+			$callback "$srcdentry" "$dstdentry"
+			rl=$?
+
+			# If the callback returned false (operation failed) maybe log something
+			if [[ $rl -ne 0 ]]; then
+				ammLog::Wrn "callback '$callback' failed to process '$srcdentry'"
+				# If current pattern is a folder, recurse ourself into it
+				if [[ -d "$srcdentry" ]]; then
+				ammLog::Wrn "Recursing into folder '$srcdentry' to process its elements"
+				$FUNCNAME "$srcdentry" "$dstdentry" "$callback" "$force" "*" ".*"
+					rl+=$?
 				fi
 			fi
 
-			\cp -a "$srcfile" "$dstdir"
-			r+=$?
+			r+=$rl
 		done
 	done
 
 	return $r
 }
+
+function _ammPath::CallbackCopy {
+	typeset src="$1" dst="$2" force="${3:-false}"
+
+	\cp -a "$srcfile" "$dstdir"
+}
+
+function _ammPath::CallbackHardlink {
+	typeset src="$1" dst="$2" force="${3:-false}"
+	# Dest exists, check if same file for early return
+	[[ -e "$dst" ]] && [[ "$src" -ef "$dst" ]] && return 0
+
+	# Dest exists, but is not the target we want, move it or bail out
+	if [[ -e "$dst" ]] && ! [[ -d "$dst" ]]; then
+		if $force; then
+			\mv "$dst" "$dst.old_$$_$(date +%s)"
+		else
+			return 1
+		fi
+	fi
+
+	# Try to create the target as close as the source
+	typeset -i r=0
+	if [[ -d "$src" ]]; then
+		mkdir --parents "$dst"
+		r=$?
+		chown --reference="$src" "$dst"
+		chmod --reference="$src" "$dst"
+	else
+		ln "$src" "$dst"
+		r=$?
+	fi
+
+	return $r
+}
+
+function _ammPath::CallbackSymlink {
+	typeset src="$1" dst="$2" force="${3:-false}"
+	# Dest exists, check if same file for early return
+	[[ -e "$dst" ]] && [[ "$src" -ef "$dst" ]] && return 0
+
+	# Move destination if exists
+	if [[ -e "$dst" ]]; then
+		if $force; then
+			mv "$dst" "$dst.old.$$.$(date +%s)"
+		else
+			return 1
+		fi
+	fi
+
+	# Create parent folder is not exists
+	if ! [[ -d "${dst%/*}" ]]; then
+		mkdir --parents "${dst%/*}" || return 1
+	fi
+
+	ln -s "$src" "$dst"
+}
+
+# @description  Copy a structure to another
+# @arg $1
+function ammPath::CopyStructure {
+	typeset src="$1"
+	typeset dst="$2"
+	typeset clean="$3"
+	shift 3
+
+	typeset -a patterns=("$@")
+	[[ ${#patterns[@]} -eq 0 ]] && patterns+=(".")
+	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackCopy" "$clean" "${patterns[@]}"
+}
+
+function ammPath::CopyStructureHardlinks {
+	typeset src="$1"
+	typeset dst="$2"
+	typeset clean="$3"
+	shift 3
+
+	typeset -a patterns=("$@")
+	[[ ${#patterns[@]} -eq 0 ]] && patterns+=("*")
+	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackHardlink" "$clean" "${patterns[@]}"
+}
+
+function ammPath::CopyStructureSymlinks {
+	typeset src="$1"
+	typeset dst="$2"
+	typeset clean="$3"
+	shift 3
+
+	typeset -a patterns=("$@")
+	[[ ${#patterns[@]} -eq 0 ]] && patterns+=("*")
+	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackSymlink" "$clean" "${patterns[@]}"
+}
+
+## Rsync for all in one
+#if ammExec::Exists rsync; then
+#	\rsync --perms --xattrs --owner --group --acls "$dentrysrc" "$dentrydst" 2>/dev/null
+# Multi-bin call for safety
 
 # -----------------------------------------------------------------------------
 # Execution helpers

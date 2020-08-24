@@ -510,14 +510,33 @@ function ammString::IntegerMax {
 
 function ammString::IntegerAverage {
 
-	typeset -i cnt=0 sum=0 v
-	for v in "$@"; do
-		sum+=$v
-		cnt+=1
-	done
-	echo $(( sum / cnt ))
+	if ammExec::Exists awk; then
+		echo "$@" | awk '{
+			sum=0
+			for(i=1;i<=NF;i++)
+				sum+=$i
+			print sum/NF 
+		}'
+
+	else
+
+		typeset -i cnt=0 sum=0 v
+		for v in "$@"; do
+			sum+=$v
+			cnt+=1
+		done
+		echo $(( sum / cnt ))
+	fi
 }
 
+function ammString::IntegerSum {
+
+	typeset -i v s=0
+	for v in "$@"; do
+		s+=$v
+	done
+	echo $s
+}
 
 # -----------------------------------------------------------------------------
 # Search and filter

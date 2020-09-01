@@ -20,7 +20,7 @@ ammOptparse::AddOptGroupDesc "Complex values (array and boolean)"
 ammOptparse::AddOpt "-A|--arr@"     "Push values into an array"
 ammOptparse::AddOpt "-D|--debug!"   "Set or unset the debug mode"
 
-ammOptparse::AddSpecialWord "woot"
+ammOptparse::AddActionWord "woot"
 
 
 if ! ammOptparse::Parse --no-unknown; then

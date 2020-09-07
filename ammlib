@@ -398,10 +398,10 @@ function ammLib::Locate {
 	typeset searchoverride="${AMMLIB_SEARCHPATH_OVERRIDE:-}"
 	for libpath in ${searchoverride//:/ } $__AMMLIB_SEARCHPATH ${searchextra//:/ }; do
 			typeset nlib="${libpath}/${libname}.lib"
-			[[ -r "$nlib" ]] && {
+			if [[ -f "$nlib" ]] && [[ -r "$nlib" ]]; then
 				echo "$nlib"
 				return
-			}
+			fi
 	done
 }
 
@@ -496,10 +496,10 @@ function ammLib::Loadable {
 	typeset -i r=0
 
 	for libname in "$@"; do
-		typeset libfile="$libname"
+		typeset libfile="$libname.lib"
 
 		# If the given path was a file, find its libname from path
-		if [[ -e "$libfile" ]]; then
+		if [[ -f "$libfile" ]]; then
 			libname="$(ammLib::NameFromPath $libfile)"
 			#libname="${libfile##*/}"
 			#libname="${libname%.lib}"
@@ -509,7 +509,8 @@ function ammLib::Loadable {
 		fi
 
 		# If the lib exists, load it
-		if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
+		ammLog::Dbg "Checking if '$libfile' is a valid library"
+		if [[ -n "$libfile" ]] && [[ -f "$libfile" ]] && [[ -s "$libfile" ]]; then
 
 			# try to load it in a subshell to check init
 			typeset metapref="$(ammLib::MetaGetPrefix "$libname")"
@@ -792,6 +793,10 @@ function _ammLog::Log {
 			elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
 				echo "[$date][$tag][$$]$pad $line"
 			fi
+
+			if [[ -n "${__AMMLOG_LOGFILE:-}" ]] && [[ -w "$__AMMLOG_LOGFILE" ]]; then
+				echo >>"$__AMMLOG_LOGFILE"  "[$date][$tag][$$]$pad $line"
+			fi
 		done
 
 	# Standard args
@@ -801,6 +806,10 @@ function _ammLog::Log {
 			echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $@${colorrst}"
 		elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
 			echo "[$date][$tag][$$]$pad $@"
+		fi
+
+		if [[ -n "${__AMMLOG_LOGFILE:-}" ]] && [[ -w "$__AMMLOG_LOGFILE" ]]; then
+			echo >>"$__AMMLOG_LOGFILE"  "[$date][$tag][$$]$pad $@"
 		fi
 	fi
 

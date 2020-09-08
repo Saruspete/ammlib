@@ -17,21 +17,24 @@ function ammInput::MetaInit {
 }
 
 # Prefix to look for
-typeset -g  __ammInputPrefix="input."
+typeset -g  __AMMINPUT_PREFIX="input."
 # List of registered questions from InputRegister
-typeset -gA __ammInputIds=()
-typeset -gA __ammInputDefaults=()
-typeset -gA __ammInputValidationCB=()
-typeset -gA __ammInputHelp=()
+typeset -ga __AMMINPUT_ORDER=()
+typeset -gA __AMMINPUT_IDS=()
+typeset -gA __AMMINPUT_DEFAULTS=()
+typeset -gA __AMMINPUT_VALIDATIONCB=()
+typeset -gA __AMMINPUT_HELP=()
 
 # State for blueprint
-typeset -gA __ammInputReplies=()
-typeset -gA __ammInputRepliesUsed=()
-typeset -gA __ammInputRepliesUnknownId=()
+typeset -gA __AMMINPUT_REPLIES=()
+typeset -gA __AMMINPUT_REPLIES_USED=()
+typeset -gA __AMMINPUT_REPLIES_UNKNOWNID=()
 
-typeset -g __ammInputBatchAutoTry=false
-typeset -g __ammInputBatchDieOnErr=false
-typeset -g __ammInputBatchSilentOk=false
+typeset -g __AMMINPUT_BATCH_AUTOTRY=false
+typeset -g __AMMINPUT_BATCH_DIE_ON_ERR=false
+typeset -g __AMMINPUT_BATCH_SILENTOK=false
+
+
 
 # -----------------------------------------------------------------------------
 # Registration
@@ -45,14 +48,15 @@ function ammInput::Register {
 	#typeset caller="${BASH_SOURCE[1]}:${FUNCNAME[1]}"
 
 	# Fill registration values
-	#__ammInputIds[$id]="$caller"
-	__ammInputIds[$id]=""
-	__ammInputDefaults[$id]="$default"
-	__ammInputHelp[$id]="$helptext"
+	#__AMMINPUT_IDS[$id]="$caller"
+	__AMMINPUT_ORDER[${#__AMMINPUT_ORDER[@]}]="$id"
+	__AMMINPUT_IDS[$id]=""
+	__AMMINPUT_DEFAULTS[$id]="$default"
+	__AMMINPUT_HELP[$id]="$helptext"
 
 	# Only call if internal function
 	if [[ -n "$validcb" ]] && ammEnv::IsFunc "$validcb"; then
-		__ammInputValidationCB[$id]="$validcb"
+		__AMMINPUT_VALIDATIONCB[$id]="$validcb"
 	fi
 }
 
@@ -76,9 +80,9 @@ function ammInput::Batch {
 		# No prefix: reset all values and set only provided features
 		else
 			if ! $resetDone; then
-				__ammInputBatchAutoTry=false
-				__ammInputBatchDieOnErr=false
-				__ammInputBatchSilentOk=false
+				__AMMINPUT_BATCH_AUTOTRY=false
+				__AMMINPUT_BATCH_DIE_ON_ERR=false
+				__AMMINPUT_BATCH_SILENTOK=false
 				resetDone=true
 			fi
 		fi
@@ -91,8 +95,8 @@ function ammInput::Batch {
 
 	# If we can't have user interaction, dont mind to ask for it
 	if ! $__AMMLIB_INTERACTIVE; then
-		__ammInputBatchAutoTry=true
-		__ammInputBatchDieOnErr=true
+		__AMMINPUT_BATCH_AUTOTRY=true
+		__AMMINPUT_BATCH_DIE_ON_ERR=true
 	fi
 }
 
@@ -109,8 +113,8 @@ function ammInput::Get {
 
 	# No prompt, check if one was registered beforehand
 	if [[ -z "$prompt" ]]; then
-		if [[ -n "$id" ]] && (set +u; [[ -n "${__ammInputHelp[$id]}" ]] ); then
-			prompt="${__ammInputHelp[$id]}"
+		if [[ -n "$id" ]] && (set +u; [[ -n "${__AMMINPUT_HELP[$id]}" ]] ); then
+			prompt="${__AMMINPUT_HELP[$id]}"
 		else
 			prompt="Value for '$id'"
 		fi
@@ -119,8 +123,8 @@ function ammInput::Get {
 	# Prettify the prompt
 	prompt="$(ammLog::Color bold underline)${prompt}$(ammLog::Color "reset"): "
 
-	if [[ -z "$default" ]] && [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputDefaults[$id]}" ]] ); then
-		default="${__ammInputDefaults[$id]}"
+	if [[ -z "$default" ]] && [[ -n "$id" ]] && ( set +u; [[ -n "${__AMMINPUT_DEFAULTS[$id]}" ]] ); then
+		default="${__AMMINPUT_DEFAULTS[$id]}"
 	fi
 
 	typeset -i ntries=0
@@ -136,12 +140,12 @@ function ammInput::Get {
 		#
 
 		# Check if the input was already provided in options
-		if [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputReplies[$id]:-}" ]] ); then
+		if [[ -n "$id" ]] && ( set +u; [[ -n "${__AMMINPUT_REPLIES[$id]:-}" ]] ); then
 			# Set the reply and consume it
-			default="${__ammInputReplies[$id]}"
-			unset __ammInputReplies[$id]
+			default="${__AMMINPUT_REPLIES[$id]}"
+			unset __AMMINPUT_REPLIES[$id]
 
-			ammLog::Dbg "Getting reply from filled list __ammInputReplies[$id] => '$reply'"
+			ammLog::Dbg "Getting reply from filled list __AMMINPUT_REPLIES[$id] => '$reply'"
 		fi
 
 
@@ -150,11 +154,11 @@ function ammInput::Get {
 		#
 
 		# Batch mode
-		if $__ammInputBatchAutoTry && [[ $ntries -eq 0 ]]; then
+		if $__AMMINPUT_BATCH_AUTOTRY && [[ $ntries -eq 0 ]]; then
 			reply="$default"
 
 			# If we are not in silent mode, display the prompt nonetheless
-			if ! $__ammInputBatchSilentOk; then
+			if ! $__AMMINPUT_BATCH_SILENTOK; then
 				ammLog::WriteTerm "${prompt}${reply}"
 			fi
 		# Read from user input
@@ -179,9 +183,9 @@ function ammInput::Get {
 					ammLog::Wrn "Reply '$reply' is invalid (callback '$validcb')"
 
 					# If we are in silent ok, and had error, display it now
-					$__ammInputBatchSilentOk && ammLog::WriteTerm "${prompt}${reply}"
+					$__AMMINPUT_BATCH_SILENTOK && ammLog::WriteTerm "${prompt}${reply}"
 
-					if $__ammInputBatchDieOnErr; then
+					if $__AMMINPUT_BATCH_DIE_ON_ERR; then
 						ammLog::Die "Dying due to DieOnErr requested"
 					fi
 				else
@@ -194,13 +198,13 @@ function ammInput::Get {
 			fi
 
 		# Validation (registration)
-		elif [[ -n "$id" ]] && ( set +u; [[ -n "${__ammInputValidationCB[$id]}" ]] ); then
-			typeset func="${__ammInputValidationCB[$id]}"
+		elif [[ -n "$id" ]] && ( set +u; [[ -n "${__AMMINPUT_VALIDATIONCB[$id]}" ]] ); then
+			typeset func="${__AMMINPUT_VALIDATIONCB[$id]}"
 			if ammEnv::IsFunc "$func"; then
 				if ! $func "$reply"; then
 
 					# If we are in silent ok, and had error, display it now
-					$__ammInputBatchSilentOk && ammLog::WriteTerm "${prompt}${reply}"
+					$__AMMINPUT_BATCH_SILENTOK && ammLog::WriteTerm "${prompt}${reply}"
 
 					ammLog::Wrn "Reply '$reply' is invalid (callback '$func')"
 				else
@@ -209,7 +213,7 @@ function ammInput::Get {
 				fi
 			else
 				ammLog::Err "Validation callback '$func' is not a function. Please retry"
-				unset __ammInputValidationCB[$id]
+				unset __AMMINPUT_VALIDATIONCB[$id]
 			fi
 
 		# No validation requested
@@ -228,7 +232,7 @@ function ammInput::Get {
 	# Register the input
 	typeset file="$__AMMLIB_DATATMP/input.blueprint"
 	if [[ -n "$id" ]]; then
-		echo -n >>$file " --${__ammInputPrefix}${id}='${reply}'"
+		echo -n >>$file " --${__AMMINPUT_PREFIX}${id}='${reply}'"
 	fi
 
 	echo "$reply"
@@ -244,13 +248,13 @@ function ammInput::SetPrefix {
 #		return 1
 #	fi
 
-	__ammInputPrefix="$pref"
+	__AMMINPUT_PREFIX="$pref"
 }
 
 # Populate the reply values from file, environment, options
 function ammInput::Populate {
 	typeset srcs="${1:-environment,options}"
-	typeset prefix="${2-$__ammInputPrefix}"
+	typeset prefix="${2-$__AMMINPUT_PREFIX}"
 
 	# Loop on all registered IDs
 	typeset src
@@ -271,9 +275,9 @@ function ammInput::Populate {
 						id="${id%%=*}"
 
 						# Save parsed var
-						__ammInputReplies[$id]="$val"
+						__AMMINPUT_REPLIES[$id]="$val"
 						# Map input with ID for replay, option style
-						__ammInputIds[$id]="--$var"
+						__AMMINPUT_IDS[$id]="--$var"
 					fi
 				done < <(printenv)
 				;;
@@ -297,9 +301,9 @@ function ammInput::Populate {
 						id="${id%%=*}"
 						typeset val="${var#*=}"
 						# Save reply without prefix
-						__ammInputReplies[$id]="$val"
+						__AMMINPUT_REPLIES[$id]="$val"
 						# Map input with ID for replay
-						__ammInputIds[$id]="$orig"
+						__AMMINPUT_IDS[$id]="$orig"
 					else
 						# Push back elemenets as they are read
 						args[${#args[@]}]="$var"
@@ -328,8 +332,8 @@ function ammInput::Populate {
 						fi
 					fi
 
-					__ammInputReplies[$var]="$val"
-					__ammInputIds[$var]="--kernel.$arg"
+					__AMMINPUT_REPLIES[$var]="$val"
+					__AMMINPUT_IDS[$var]="--kernel.$arg"
 				done
 				;;
 

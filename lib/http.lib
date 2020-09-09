@@ -67,6 +67,7 @@ function ammHttp::Fetch {
 				follow) ;;
 				nofollow) wgetopts+=" --max-redirect=0" ;;
 				silent) wgetopts+=" -sS" ;;
+				recursive) wgetopts+=" -r -np -e robots=off --wait 0.1" ;;
 				*) log_err "Unknown fetch_http option: $o" ;;
 			esac
 			shift

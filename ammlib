@@ -281,6 +281,9 @@ function ammLib::TrapRegister {
 }
 
 function ammLib::TrapClean {
+
+	ammLib::HookTrigger "exit"
+
 	# clean global temp vars
 	if [[ -n ${AMMLIB_DEBUG:-} ]]; then
 		if ( shopt -s nullglob dotglob; f=($__AMMLIB_DATATMP/*); [[ ${#f[@]} -gt 0 ]] ); then

@@ -182,6 +182,29 @@ typeset -A array=([banana]="yellow", [apple]="red")
 ( set +u; [[ -n "${array[pear]}" ]] )
 ```
 
+### Copying an array
+
+When copying an array, if you don't care about Index values, just copy it directly:
+
+```bash
+typeset -a arrSrc=("hello world" "Houson we got a problem" "there" "there")
+typeset -a arrDst=("${arraySrc[@]}")
+```
+
+If you care about index, do the following:
+```bash
+typeset -a arrSrc=("" "hello world" "hey" "bien le bonjour")
+typeset -a arrDst=($(ammEnv::VarExport arrSrc|cut -d'=' -f2-)
+for a in "${!arrDst[@]}"; do echo "$a => '${arrDst[$a]}'"; done
+
+# Will output:
+# 0 => ''
+# 1 => 'hello world'
+# 2 => 'hey'
+# 3 => 'bien le bonjour'
+```
+
+
 ### Locale impact character expansion and sorting results
 ```shell
 $ export LC_ALL=en_US.utf8

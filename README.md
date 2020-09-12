@@ -204,6 +204,25 @@ for a in "${!arrDst[@]}"; do echo "$a => '${arrDst[$a]}'"; done
 # 3 => 'bien le bonjour'
 ```
 
+If you want to return an array from a function, you must create a special format:
+
+```bash
+function testFunc {
+	typeset -a arrSrc=("hello world" "hey" "bien le bonjour")
+	echo "(";
+	for id in "${!arrSrc[@]}"; do
+		echo "[$id]='${arrSrc[$id]}' "
+	done
+	echo ")"
+}
+typeset -a arrDst=$(testFunc)
+for a in "${!arrDst[@]}"; do echo "$a => '${arrDst[$a]}'"; done
+
+# Will output as expected:
+# 0 => 'hello world'
+# 1 => 'hey'
+# 2 => 'bien le bonjour'
+```
 
 ### Locale impact character expansion and sorting results
 ```shell

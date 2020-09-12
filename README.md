@@ -31,7 +31,7 @@ The main library enforce some best practices:
 - `set -o noclobber`: Truncating existing non-empty files must be explicit, so instead of `echo > file` you must use `echo >| file` 
 - `LC_ALL=C`: avoids translation of commands messages, numeric and date format, string expansion and sorting. Test yourself:
 
-- `PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '`: This provides a more readable output to follow when tracing with `set -x`:
+- `PS4=' (${BASH_SOURCE##*/}:$LINENO ${FUNCNAME[0]:-main})  '`: This provides a more readable output to follow when tracing with `set -x`:
 
 
 - Although using bash, we should avoid "bash-only" keywords (like `declare`, `local` or `readonly`). declarations must be done using `typeset` to help portability
@@ -227,35 +227,35 @@ $ ls /usr/bin/[G-H]*
 
 When you do a `set -x`, the shell uses the value of PS4. the main library enforces this variable to
 
-`PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '`
+`PS4=' (${BASH_SOURCE##*/}:$LINENO ${FUNCNAME[0]:-main})  '`
 
 - The first char of PS4 (default `+`) will be repeated to the current call depth. A space makes a clean visual indent
 - `${BASH_SOURCE##*/}` is the file name of the currently processed file (leading folders being removed for conciseness)
-- `${FUNCNAME[0]:-main}` is the current function name, or `main` if not in a function
 - `$LINENO` is the current line number. Use `$BASH_LINENO` if you want to get the caller line
+- `${FUNCNAME[0]:-main}` is the current function name, or `main` if not in a function
 - `  ` 2 space to make a visual separation between this header and the code being executed
 
 This generates an output like this :
 ```
- (ammtestfunc.sh::main::23)  libname=kernel
- (ammtestfunc.sh::main::25)  ammLibLoad kernel
- (ammlib::ammLibLoad::180)  typeset -i r=0
- (ammlib::ammLibLoad::182)  typeset libfile=
- (ammlib::ammLibLoad::183)  for libname in "$@"
- (ammlib::ammLibLoad::186)  ammLibIsSublib kernel
- (ammlib::ammLibIsSublib::118)  typeset libname=kernel
- (ammlib::ammLibIsSublib::119)  [[ kernel != \k\e\r\n\e\l ]]
- (ammlib::ammLibLoad::206)  for l in $__AMMLIB_LOADED
- (ammlib::ammLibLoad::208)  [[ kernel == \a\m\l\i\b ]]
-  (ammlib::ammLibLoad::212)  ammLibLoadable kernel
-  (ammlib::ammLibLoadable::138)  typeset -i r=0
-  (ammlib::ammLibLoadable::140)  for libname in "$@"
-  (ammlib::ammLibLoadable::141)  typeset libfile=kernel
-  (ammlib::ammLibLoadable::144)  [[ -e kernel ]]
-   (ammlib::ammLibLoadable::149)  ammLibLocate kernel
-   (ammlib::ammLibLocate::84)  typeset libname=kernel
+ (ammtestfunc.sh:23 main)  libname=kernel
+ (ammtestfunc.sh:25 main)  ammLibLoad kernel
+ (ammlib:180 ammLib::Load)  typeset -i r=0
+ (ammlib:182 ammLib::Load)  typeset libfile=
+ (ammlib:183 ammLib::Load)  for libname in "$@"
+ (ammlib:186 ammLib::Load)  ammLibIsSublib kernel
+ (ammlib:118 ammLib::IsSublib)  typeset libname=kernel
+ (ammlib:119 ammLib::IsSublib)  [[ kernel != \k\e\r\n\e\l ]]
+ (ammlib:206 ammLib::Load)  for l in $__AMMLIB_LOADED
+ (ammlib:208 ammLib::Load)  [[ kernel == \a\m\l\i\b ]]
+  (ammlib:212 ammLib::Load)  ammLibLoadable kernel
+  (ammlib:138 ammLib::Loadable)  typeset -i r=0
+  (ammlib:140 ammLib::Loadable)  for libname in "$@"
+  (ammlib:141 ammLib::Loadable)  typeset libfile=kernel
+  (ammlib:144 ammLib::Loadable)  [[ -e kernel ]]
+   (ammlib:149 ammLib::Loadable)  ammLibLocate kernel
+   (ammlib:84 ammLib::Locate)  typeset libname=kernel
 ```
-
+Where you can clearly see the file:line being executed, the function it is in, and the code being executed.
 
 ## Extra naming convension for modules functions
 

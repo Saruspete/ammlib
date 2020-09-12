@@ -12,7 +12,7 @@ export LC_ALL=C
 
 # If no debug override has been done yet
 if [[ -n "$PS4" ]] && [[ "$PS4" == "+ " ]]; then
-	PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
+	PS4=' (${BASH_SOURCE##*/}:$LINENO ${FUNCNAME[0]:-main})  '
 fi
 
 

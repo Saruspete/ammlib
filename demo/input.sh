@@ -19,9 +19,9 @@ ammInput::Register "age" "Whats the age of the captain" "666" "ammInput::Validat
 
 ammOptparse::Parse
 
-echo toto = $(ammInput::Get "toto")
-echo host = $(ammInput::Get "hostname")
-echo titi = $(ammInput::Get "titi" "Any non empty value" "" "" "ammInput::ValidateNotEmpty")
-echo lvm  = $(ammInput::Get "rd.lvm.lv" "LVM LV To activate" "" "" "ammInput::ValidateNotEmpty")
+echo "toto = $(ammInput::Get "toto")"
+echo "host = $(ammInput::Get "hostname")"
+echo "titi = $(ammInput::Get "titi" "Any non empty value" "" "" "ammInput::ValidateNotEmpty")"
+echo "lvm  = $(ammInput::Get "rd.lvm.lv" "LVM LV To activate" "" "" "ammInput::ValidateNotEmpty")"
 
 echo "Done. Try to call this script again with '--input-blueprint' to see its blueprint"

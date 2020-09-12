@@ -13,6 +13,19 @@ This is an attempt to provide a quality common library, that can be :
 - packable: generates a single packed script with the required modules for embbedding
 
 
+## Why such a huge library in shell ?
+
+The most often heard misconception is *if your shell script is more than 100 lines, you should switch to another langage*.
+This is mostly because people don't read the man, don't check the underlying rules of a langage, and have a lazyness bias.
+
+The shell is the most common langage on any machine, created to call other executables and parsing strings.
+Because of its old age, availability and simplicity, its defaults differs from what we would expect from our moderns langages: if you think you must prefix your variables with the function name, it's because you don't declare them with "typeset" or "declare", which give them global visibility.
+
+There's a few of these habits to get, and you'll see bash is just like any other scripting langage.
+
+I wouldn't use Shell to create a web server, and I wouldn't use python or perl to call many other executables.
+
+
 ## General Requirements and targeted environment
 
 ### Target systems

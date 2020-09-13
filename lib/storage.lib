@@ -40,6 +40,7 @@ function ammStorage::GetRealName {
 	if [[ "${name:0:1}" != "/" ]]; then
 		# Simple case: already real name with dev (maj:min) file
 		if [[ -e "/sys/class/block/$name/dev" ]]; then
+			ammLog::Dbg "Device '$name' exists in /sys/class/block"
 			echo "$name"
 			return 0
 
@@ -47,14 +48,18 @@ function ammStorage::GetRealName {
 		else
 			if [[ -e "/dev/$name" ]]; then
 				realpath="$(readlink -f "/dev/$name")"
+				ammLog::Dbg "Device name '$name' (in /dev) maps to '$realpath'"
 			elif [[ -e "/dev/mapper/$name" ]]; then
 				realpath="$(readlink -f "/dev/mapper/$name")"
+				ammLog::Dbg "Device name '$name' (in /dev/mapper) maps to '$realpath'"
 			fi
 		fi
 	# Starts with / treat as absolute path
 	else
 		# Need real block device (dm-X instead of lvm "vgname-lvname" symlink)
 		realpath="$(readlink -f $name)"
+
+		ammLog::Dbg "Device path '$name' maps to '$realpath'"
 
 		if [[ -e "/sys/class/block/${realpath##*/}/dev" ]]; then
 			echo "${realpath##*/}"
@@ -93,6 +98,7 @@ function ammStorage::GetRealName {
 function ammStorage::GetMajorMinor {
 	typeset blockdev="$1"
 
+	# Cannot call GetRealName before, can create infinite loop
 	if ! ammStorage::Exists "$blockdev"; then
 		ammLog::Err "Invalid blockdev '$blockdev'. Cannot get Major/minor"
 		return 1

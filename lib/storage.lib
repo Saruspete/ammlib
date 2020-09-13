@@ -254,6 +254,8 @@ function ammStorage::Exists {
 		# Direct blockdev in /dev
 		[[ -b "/dev/$blockdev" ]] && return 0
 
+		[[ -b "/dev/mapper/$blockdev" ]] && return 0
+
 		# Folder in /sys
 		[[ -d "/sys/class/block/$blockdev" ]] && return 0
 	fi

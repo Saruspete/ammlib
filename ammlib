@@ -4,7 +4,9 @@
 # Main file, bootstrap and load dependencies
 #
 # To avoid uneeded library loading, some core / often used functions are here
-# (they should be in their respective library file)
+# (they should be in their respective library file). Namely:
+# Log Env Path Exec
+
 
 set -u
 

@@ -117,8 +117,11 @@ function ammFs::Mount {
 	__AMMFS_CACHED=false
 }
 
+# -----------------------------------------------------------------------------
+# Filesystem Query
+# -----------------------------------------------------------------------------
 
-function ammFs::GetType {
+function ammFs::TypeFromMountpoint {
 	typeset mnt="$1"
 
 	mnt="$(readlink -f "$mnt")"
@@ -136,7 +139,7 @@ function ammFs::GetType {
 		return 0
 	fi
 
-	ammLog::Wrn "Requested type of non-existing fs: '$mnt'"
+	ammLog::Wrn "Requested type of non-existing mountpoint: '$mnt'"
 	return 1
 }
 

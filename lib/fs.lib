@@ -9,18 +9,22 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-#function ammFs::MetaInit {
+function ammFs::MetaInit {
 #	ammExec::Require awk
-#}
+
+	typeset -gA __AMMFS_MOUNT2STORE_CACHE
+	typeset -gA __AMMFS_MOUNT2OPTS_CACHE
+	typeset -gA __AMMFS_MOUNT2TYPE_CACHE
+	typeset -gA __AMMFS_STORE2MOUNT_CACHE
+	typeset -gA __AMMFS_ABS2STORE_CACHE
+	typeset -g  __AMMFS_CACHED=false
+
+}
 
 # -----------------------------------------------------------------------------
 # Speedup seeking
 # -----------------------------------------------------------------------------
 
-typeset -gA __AMMFS_MOUNT2STORE_CACHE
-typeset -gA __AMMFS_MOUNT2OPTS_CACHE
-typeset -gA __AMMFS_MOUNT2TYPE_CACHE
-typeset -g  __AMMFS_CACHED=false
 function ammFs::_ParseMounts {
 
 	typeset src mnt typ opts i1 i2 _junk
@@ -28,6 +32,13 @@ function ammFs::_ParseMounts {
 		__AMMFS_MOUNT2STORE_CACHE[$mnt]="$src"
 		__AMMFS_MOUNT2OPTS_CACHE[$mnt]="$opts"
 		__AMMFS_MOUNT2TYPE_CACHE[$mnt]="$typ"
+		__AMMFS_STORE2MOUNT_CACHE[$src]="$mnt"
+
+		# Absolute path for the device
+		if [[ -b "$src" ]]; then
+			typeset abs="$(readlink -f "$src")"
+			__AMMFS_ABS2STORE_CACHE[$abs]="$src"
+		fi
 	done < /proc/self/mounts
 
 	__AMMFS_CACHED=true
@@ -83,26 +94,28 @@ function ammFs::Mount {
 	typeset mnttype=""
 
 	# If source is a folder, use bindmount
-	[[ -d "$mntsrc" ]] && {
+	if [[ -d "$mntsrc" ]]; then
 		mnttype+="-t none"
 		mntopts+="-o bind"
-	}
+	fi
 
 	# Mount the target
-	[[ -d "$mntdst" ]] || {
+	if ! [[ -d "$mntdst" ]]; then
 		ammLog::Inf "Target mount '$mntdst' does not exists. Creating"
 		mkdir -p "$mntdst"
-	}
+	fi
 
-	ammFs::Mounted "$mntdst" && {
+	if ammFs::Mounted "$mntdst"; then
 		ammLog::Inf "Mountpoint '$mntdst' already mounted"
 		return 0
-	}
+	fi
 
 	# Do the mount
 	mount $mnttype $mntopts "$mntsrc" "$mntdst"
-}
 
+	# And invalidate the cache
+	__AMMFS_CACHED=false
+}
 
 
 function ammFs::GetType {

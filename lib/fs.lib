@@ -143,8 +143,56 @@ function ammFs::TypeFromMountpoint {
 	return 1
 }
 
+# @description  Get FS type from block device
+# @ærg $1  path to Block Device
+function ammFs::TypeFromBlockdev {
+	typeset blockdev="$1"
 
-function ammFs::GetFsFromFile {
+	if ! [[ -b "$blockdev" ]]; then
+		ammLog::Err "Path '$blockdev' is not a blockdevice"
+		return  1
+	fi
+
+	typeset mnt="" typ="" dev="$blockdev" abs="$(readlink -f $blockdev)"
+
+	$__AMMFS_CACHED || ammFs::_ParseMounts
+
+	# Check for store-name from absolute path (aliases, /dev/mapper/vg-lv or /dev/vg/lv, /dev/mdxx)
+	if (set +u; [[ -n "${__AMMFS_ABS2STORE_CACHE[$abs]}" ]] ); then
+		dev="${__AMMFS_ABS2STORE_CACHE[$abs]}"
+	fi
+
+	# If mounted, easy:
+	if (set +u; [[ -n "${__AMMFS_STORE2MOUNT_CACHE[$dev]}" ]] ); then
+		mnt="${__AMMFS_STORE2MOUNT[$dev]}"
+		typ="${__AMMFS_MOUNT2TYPE[$mnt]}"
+		if [[ -n "$typ" ]]; then
+			echo "$typ"
+			return
+		fi
+	fi
+
+	# Not mounted, gotta guess or call helpers
+	# if udev, some info exported in /run/udev/data/b{maj}:{min}
+	typeset sysdev="/sys/class/block/${dev##*/}"
+	if [[ -d "/run/udev/data" ]] && [[ -r "$sysdev/dev" ]]; then
+		typeset majmin="$(cat "$sysdev/dev" 2>/dev/null)"
+		typeset udevfile="/run/udev/data/b${majmin}"
+		if [[ -r "$udevfile" ]]; then
+			typtmp="$(grep '^E:ID_FS_TYPE=' "$udevfile")"
+			typtmp="${typtmp#*=}"
+			[[ -n "$typtmp" ]] && echo "$typtmp" && return
+		fi
+	fi
+
+	# Other tools require root access: fsadm, dd, fsck...
+	# TODO
+	return 1
+}
+
+
+
+function ammFs::MountpointFromFile {
 	typeset file="$1"
 
 	file="$(readlink -f "$file")"
@@ -173,3 +221,6 @@ function ammFs::GetFsFromFile {
 # -----------------------------------------------------------------------------
 # Filesystem creation
 # -----------------------------------------------------------------------------
+
+# @description  Create a new filesystem
+# 

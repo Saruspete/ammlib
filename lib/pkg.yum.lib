@@ -59,7 +59,7 @@ function _ammPkgYum::Yum {
 	done
 
 	ammLog::Dbg "Executing yum with args: $act $opts $@"
-	if [[ "$act" =~ (.+install|.+remove|erase|clean|update.+|.+grade.+)$ ]] && [[ "$__AMMLIB_USERID" != 0 ]]; then
+	if [[ "$act" =~ (.*install|.*remove|erase|clean|update.*|.+grade.*)$ ]] && [[ "$__AMMLIB_USERID" != 0 ]]; then
 		ammLog::Inf "Trying to execute 'yum $act $opts $@' as root"
 		ammExec::AsUser "root" yum --quiet $act $opts "$@"
 	else

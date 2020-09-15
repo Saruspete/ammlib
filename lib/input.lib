@@ -275,7 +275,7 @@ function ammInput::Get {
 	return 0
 }
 
-# @description: 
+# @description 
 function ammInput::SetPrefix {
 	typeset pref="${1:-}"
 

@@ -79,7 +79,7 @@ function ammSyscfgNetwork::NicEnable {
 	ip link set "$iface" up
 }
 
-# @description: Display information about a given NIC
+# @description Display information about a given NIC
 # @arg $1  Name of the NIC
 function ammSyscfgNetwork::NicInfo {
 	typeset iface="$1"

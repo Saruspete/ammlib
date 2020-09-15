@@ -229,7 +229,7 @@ typeset -A __AMMLIB_TRAP_REGISTERED
 typeset -i __AMMLIB_TRAP_WAITMAX=30
 typeset    __AMMLIB_TRAP_WAITSTEP=1
 
-# @description:  Initialize and registers the signal handling trap
+# @description  Initialize and registers the signal handling trap
 # @arg $@  Signals to be traped
 function _ammLib::TrapInit {
 
@@ -253,7 +253,7 @@ function _ammLib::TrapInit {
 	done
 }
 
-# @description:  Registers a callback
+# @description  Registers a callback
 # @arg $1  The callback to call upon trap
 # @arg $@  The signals to register on. Can be alises: EXITALL or EXITERR
 function ammLib::TrapRegister {
@@ -993,7 +993,7 @@ function ammLog::StepEnd {
 	__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]=0
 }
 
-# @description:  Display the stackdump of current script
+# @description  Display the stackdump of current script
 # @arg $1  (int) Stack levels to skip. Default 1 (= skip this function)
 # @arg $2  (int) Max levels to return. Default 255
 function ammLog::Stackdump {

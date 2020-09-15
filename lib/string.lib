@@ -59,7 +59,7 @@ function ammString::IsFile {
 	[[ -f "$file" ]]
 }
 
-# @description: Check if the string is an integer. Optionnaly, check its value
+# @description Check if the string is an integer. Optionnaly, check its value
 # @arg $1  (string) The string to check if it's an int
 # @arg $2  (int) The minimal value of the integer
 # @arg $3  (int) The maximal value of the integer

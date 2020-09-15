@@ -88,7 +88,7 @@ function _ammOptparse::OptToId {
 }
 
 
-# @description: Expand short options and var=val to independant elements
+# @description Expand short options and var=val to independant elements
 function _ammOptparse::Expand {
 
 	typeset optid skipall=false
@@ -576,7 +576,7 @@ function ammOptparse::Parse {
 	return $r
 }
 
-# @description: Get value for a parameter that was parsed
+# @description Get value for a parameter that was parsed
 # @arg $1  (string) A short, long or id option value
 function ammOptparse::Get {
 	typeset elem="$1"
@@ -628,7 +628,7 @@ function ammOptparse::GetUnparsedOpts {
 }
 
 
-# @description: Generate the help from registered options
+# @description Generate the help from registered options
 # @noarg
 function ammOptparse::Help {
 

@@ -619,6 +619,11 @@ function ammOptparse::Get {
 	fi
 }
 
+function ammOptparse::GetAll {
+	ammEnv::VarExport _AMMOPTPARSE_VALUE|cut -d'=' -f2-
+}
+
+
 # @description Get unparsed options. To be used as 'eval set $(ammOptparse::GetUnparsedOpts)'
 # @noarg
 function ammOptparse::GetUnparsedOpts {

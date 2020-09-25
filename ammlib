@@ -1163,6 +1163,11 @@ function ammEnv::VarExport {
 	done
 }
 
+function ammEnv::VarReturnArray {
+	typeset varexp="$(ammEnv::VarExport "$1")"
+	echo "${varexp#*=}"
+}
+
 function ammEnv::PathDecompose {
 	ammLog::Deprecated "ammPath::Decompose"
 	ammPath::Decompose "$@"

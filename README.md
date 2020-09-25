@@ -237,6 +237,15 @@ for a in "${!arrDst[@]}"; do echo "$a => '${arrDst[$a]}'"; done
 # 2 => 'bien le bonjour'
 ```
 
+Or you can just use the provided helper `ammEnv::VarReturnArray varname`:
+```bash
+function testFunc {
+	typeset -a arrSrc=("hello world" "hey" "bien le bonjour")
+	ammEnv::VarReturnArray arrSrc
+}
+```
+
+
 ### Locale impact character expansion and sorting results
 ```shell
 $ export LC_ALL=en_US.utf8

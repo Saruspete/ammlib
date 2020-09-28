@@ -1678,3 +1678,8 @@ function ammExec::RequireOne {
 	return 0
 }
 
+# @description  Check if provided path is executable
+# @arg $1  Path to the file to be tested
+function ammExec::IsExecutable {
+	[[ -f "$1" ]] && [[ -x "$1" ]]
+}

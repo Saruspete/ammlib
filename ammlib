@@ -90,7 +90,7 @@ typeset -r  __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
 
 typeset -r  __AMMLIB_USERNAME="$(\id -nu)"
 typeset -r  __AMMLIB_USERID="$(\id -u)"
-
+typeset -r  __AMMLIB_HOSTNAME="$(uname -n)"
 #
 # Set and create base folders to be used by library
 #

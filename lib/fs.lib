@@ -159,6 +159,7 @@ function ammFs::TypeFromBlockdev {
 
 	# Check for store-name from absolute path (aliases, /dev/mapper/vg-lv or /dev/vg/lv, /dev/mdxx)
 	if (set +u; [[ -n "${__AMMFS_ABS2STORE_CACHE[$abs]}" ]] ); then
+		ammLog::Dbg ""
 		dev="${__AMMFS_ABS2STORE_CACHE[$abs]}"
 	fi
 
@@ -185,8 +186,20 @@ function ammFs::TypeFromBlockdev {
 		fi
 	fi
 
-	# Other tools require root access: fsadm, dd, fsck...
-	# TODO
+	# Try blkid
+	if ammExec::Exists blkid; then
+		# Try with cache value (if any)
+		typ="$(blkid -s TYPE -o value "$blockdev")"
+		[[ -n "$typ" ]] && echo "$typ" && return
+
+		if [[ "$__AMMLIB_USERID" != "0" ]]; then
+			typ="$(ammExec::AsUser "root" "blkid -s TYPE -o value '$blockdev'")"
+			[[ -n "$typ" ]] && echo "$typ" && return
+		fi
+	fi
+
+	# Well... just dd now
+
 	return 1
 }
 

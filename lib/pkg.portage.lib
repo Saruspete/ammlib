@@ -1,0 +1,240 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Meta init
+# -----------------------------------------------------------------------------
+
+#typeset -g AMMPKGYUM_AVAIL_
+
+# Some tools are required for this module to work
+function ammPkgPortage::MetaCheck {
+	ammLib::Require "string"
+	ammExec::Require "gzip" "awk"
+}
+function ammPkgPortage::MetaInit {
+	ammLib::Require "string"
+}
+
+function ammPkgPortage::IsAvailable {
+	typeset rootpath="${1:-}"
+
+	[[ -x "$rootpath/usr/bin/emerge" ]]
+}
+
+# -----------------------------------------------------------------------------
+# Standard operations
+# -----------------------------------------------------------------------------
+
+# @description  (private) proxy for rpm executable
+#
+# @arg $1  (string) Action for RPM to exec
+function _ammPkgPortage::Portage {
+	typeset opts=""
+
+	# Check if input contains options
+	while [[ -n "${1:-}" ]]; do
+		if ammString::IsOption "$1"; then
+			opts+="$1 "
+			shift
+		else
+			break
+		fi
+	done
+
+	ammLog::Dbg "Executing yum with args: $opts $@"
+
+	typeset out=""
+	typeset -i r=0
+	# Some commands don't need root
+	if [[ "$opts" =~ (--search|-s|--searchdesc|-S|--info|--list-sets) ]] || [[ "$__AMMLIB_USERID" == 0 ]]; then
+		out="$(\emerge $opts "$@")"
+		r=$?
+
+	# Sudo required
+	else
+		if [[ $__AMMLIB_USERID != 0 ]]; then
+			ammLog::Inf "Trying to execute 'emerge $opts $@' as root"
+			out="$(ammExec::AsUser "root" emerge $opts "$@")"
+			r=$?
+			[[ $r -ne 0 ]] && ammLog::Err "Cannot execute 'emerge $opts' as root: return code $r"
+		fi
+	fi
+
+	if [[ $r -ne 0 ]]; then
+		ammLog::Err "An error occured during emerge execution"
+		echo "$out" | ammLog::Err "-"
+	fi
+	return $r
+}
+
+function _ammPkgPortage::Equery {
+
+	ammExec::Exists "equery" >/dev/null || return 1
+
+	typeset opts="--no-color --no-pipe"
+
+	# Check if input contains options
+	while [[ -n "${1:-}" ]]; do
+		if ammString::IsOption "$1"; then
+			opts+=" $1"
+			shift
+		else
+			break
+		fi
+	done
+
+	ammLog::Dbg "Executing equery with args: $opts $@"
+	\equery $opts "$@"
+}
+
+function _ammPkgPortage::Eix {
+
+	ammExec::Exists "eix" >/dev/null || return 1
+
+	typeset opts="--compact --nocolor"
+
+	# Check if input contains options
+	while [[ -n "${1:-}" ]]; do
+		if ammString::IsOption "$1"; then
+			opts+=" $1"
+			shift
+		else
+			break
+		fi
+	done
+
+	ammLog::Dbg "Executing eix with args: $opts $@"
+	EIX_LIMIT=0 EIX_LIMIT_COMPACT=0 \eix $opts "$@" 2>/dev/null
+}
+
+
+
+function ammPkgPortage::Install {
+	_ammPkgPortage::Portage "--newuse --deep" "$@"
+}
+
+function ammPkgPortage::Remove {
+	_ammPkgPortage::Portage "--depclean" "$@"
+}
+
+function ammPkgPortage::Purge {
+	
+	_ammPkgPortage::Portage "--unmerge --rage-clean" "$@"
+}
+
+function ammPkgPortage::Search {
+	if ammExec::Exists "eix"; then
+		_ammPkgPortage::Eix "$@"
+	else
+		ammLog::Dbg "eix is not installed. Consider installing 'app-portage/eix' to speedup search"
+		_ammPkgPortage::Portage "--search" "$@"
+	fi
+}
+
+function ammPkgPortage::Installed {
+	_ammPkgPortage::Equery "list" "$@"
+}
+
+function ammPkgPortage::InfoRequirements {
+	:
+}
+
+function ammPkgPortage::InfoWhatProvides {
+
+	ammLib::Require "http" || return 1
+
+	# Check for all input
+	typeset element
+	for element in "$@"; do
+		typeset -A secondchoice foundfiles
+		while read catg pkg path file misc vers; do
+			[[ "$catg" == "category" ]] && continue
+			typeset filepath="$path/$file"
+			# push element not obj (like symlink) as second choice
+			if [[ "$misc" != "obj" ]]; then
+				secondchoice[$filepath]="$catg/$pkg $vers"
+				continue
+			fi
+			foundfiles[$filepath]="$catg/$pkg"
+			echo "$catg/$pkg" "$vers" "$path/$file"
+		done < <(ammHttp::Fetch "https://www.portagefilelist.de/site/query/filecsv?file=$element" "-")
+
+		# Parse second-choice
+		if (set +u; [[ -n "${secondchoice[@]}" ]] ); then
+			typeset file
+			for file in "${!secondchoice[@]}"; do
+				if (set +u; [[ -n "${foundfiles[$file]}" ]] ); then
+					ammLog::Dbg "Skipping second-choice '${secondchoice[$file]}' as $file is already provided by '${foundfiles[$file]}'"
+					continue
+				fi
+				echo "${secondchoice[$file]}"
+			done
+		fi
+
+	done
+}
+
+function ammPkgPortage::InfoContents {
+	# Check for all input
+	for pkg in "$@"; do
+		# For each pkg, list content
+		_ammPkgPortage::Equery "files" "$@"
+	done
+}
+
+# What versions are available for a package
+function ammPkgPortage::InfoVersions {
+	typeset pkg="$1"
+	_ammPkgPortage::Equery "list" $pkg
+}
+
+
+# -----------------------------------------------------------------------------
+# Data extraction
+# -----------------------------------------------------------------------------
+
+# @description  Download an archive from configured yum repositories and all dependencies
+#
+# @arg $1  (path)     Path where to download the packages (will be created if does not exists)
+# @arg $@  (string[]) Packages to download
+#
+# @stdout  (path[]) List of archives downloaded
+function ammPkgPortage::DownloadRecursive {
+	typeset outdir="$1"; shift
+
+	[[ -d "$outdir" ]] || mkdir -p "$outdir"
+
+	ammLog::Dbg "Downloading into '$outdir' packages: $@"
+	:
+}
+# @description  Download an archive from configured yum repositories
+#
+# @arg $1  (path)     Path where to download the packages (will be created if does not exists)
+# @arg $@  (string[]) Packages to download
+#
+# @stdout  (path[]) List of archives downloaded
+function ammPkgPortage::Download {
+	typeset outdir="$1"; shift
+
+	[[ -d "$outdir" ]] || mkdir -p "$outdir"
+
+	ammLog::Dbg "Downloading into '$outdir' packages: $@"
+	:
+}
+
+# @description  Extract one or more packages into provided path
+#
+# @arg $1  (path)     Where to extract the archives
+# @arg $@  (string[]) Archives or package names to be extracted
+function ammPkgPortage::Extract {
+	typeset dst="$1"; shift
+
+	ammLog::Dbg "Extracting into '$dst' packages: $@"
+	:
+}
+

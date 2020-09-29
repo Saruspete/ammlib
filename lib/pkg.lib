@@ -169,6 +169,72 @@ function ammPkg::InfoWhatProvides {
 	_ammPkg::Proxy "InfoWhatProvides" "$@"
 }
 
+
+# @description  Install packages that provides specified file
+function ammPkg::InstallWhatProvides {
+
+	# Order of preference when multiple packages match a given file. Prefer binaries and include files
+	typeset -a preferences=(/usr/sbin /usr/bin /sbin /bin /usr/libexec /usr/include /opt /usr /var /)
+	typeset -a pkgs
+	typeset -i r=0
+	typeset file
+	for file in "$@"; do
+		typeset pkg vers file
+		typeset -A provides
+
+		# List all provided packages
+		while read pkg vers file; do
+			provides[$file]="$pkg"
+		done < <(ammPkg::InfoWhatProvides "$file")
+
+		# check all reported packages
+		case "${#provides[@]}" in
+			# None found...
+			0)
+				ammLog::Wrn "Unable to find package providing '$file'"
+				r+=1
+				;;
+			# Only 1 pkg, use it directly
+			1)
+				pkgs+=("${provides[@]}")
+				;;
+			# We need to select one
+			*)
+				typeset pref selected=""
+				# Check our preferences in order
+				for pref in "${preferences[@]}"; do
+					ammLog::Dbg "Checking for a file in '$pref'"
+					for pkgfile in "${!provides[@]}"; do
+						typeset pkg="${provides[$pkgfile]}"
+						# If the file starts with our current prefix, select it
+						if [[ "${pkgfile#$pref}" != "$pkgfile" ]]; then
+							ammLog::Dbg "Selecting '$pkg' providing file '$pkgfile' from preference '$pref'"
+							selected="$pkg"
+							break 2
+						fi
+					done
+				done
+				if [[ -n "$selected" ]]; then
+					pkgs+=("$selected")
+				else
+					ammLog::Wrn "No package selected from list '${provides[@]}. Very strange..."
+					r+=1
+				fi
+				;;
+		esac
+	done
+
+	# Do installation for pkgs
+	if (set +u; [[ "${#pkgs[@]}" -gt 0 ]] ); then
+		ammPkg::Install "${pkgs[@]}"
+	else
+		ammLog::Wrn "No package to install"
+	fi
+	r+=$?
+
+	return $r
+}
+
 # -----------------------------------------------------------------------------
 # Less used package manager operations
 # -----------------------------------------------------------------------------

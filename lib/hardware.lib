@@ -170,6 +170,7 @@ function ammHardware::MemoryDetail {
 typeset -gA __AMMHARDWARE_NUMA_TOPO=""
 typeset -gA __AMMHARDWARE_CPU_TOPO=""
 typeset -gA __AMMHARDWARE_MEM_TOPO=""
+typeset -g  __AMMHARDWARE_SYS_CPU="/sys/devices/system/cpu"
 function ammHardware::CpuTopologyDiscover {
 
 	# Scan /sys/devices/system/nodes/node*/cpulist
@@ -199,4 +200,116 @@ function ammHardware::CpuNumaGet {
 	[[ -n "$__AMMHARDWARE_CPU_TOPO" ]] || ammHardware::CpuTopologyDiscover
 }
 
+function ammHardware::CpuFrequencyGetDriver {
+	typeset src="$__AMMHARDWARE_SYS_CPU/cpu0/cpufreq/scaling_driver"
+	if [[ -e "$src" ]]; then
+		echo $(< "$src")
+	else
+		echo "none"
+	fi
+	return 0
+}
 
+function ammHardware::CpuFrequencyGetGovernor {
+	:
+}
+
+function ammHardware::CpuFrequencyGetCurrent {
+	:
+}
+
+# @description  List all available frequencies
+# @arg $1  (string) Type of frequencies: supported by CPU (hard) or by governor (soft)
+function ammHardware::CpuFrequencyGetAvailable {
+	typeset typ="${1:-soft}"
+	
+	typeset filepfx=""
+	if [[ "$typ" == "hard" ]]; then
+		filepfx="cpuinfo"
+	elif [[ "$typ" == "soft" ]]; then
+		filepfx="scaling"
+	else
+		ammLog::Err "Unknown type of frequency: $typ. Must be 'hard' or 'soft'"
+		return 1
+	fi
+
+	typeset sys="$__AMMHARDWARE_SYS_CPU/cpu0/cpufreq"
+
+	# Try to use provided avilable frequencies (if available)
+	typeset avail="$sys/${filepfx}_available_frequencies"
+	if [[ -s "$avail" ]] && [[ -r "$avail" ]]; then
+		$(<$avail)
+		return 0
+	fi
+
+	# Assert frequencies ourselves (assume 100MHz step)
+	typeset -i fmin="$(< $sys/${filepfx}_min_freq)" fmax="$(< $sys/${filepfx}_max_freq)"
+	case $(ammHardware::CpuFrequencyGetDriver) in
+		intel_pstate)
+			# Assume 100MHz step
+			typeset -i step=100000 i=0
+			for (( i=$fmin; i<=$fmax; i+=$step )); do
+				echo -n "$i "
+			done
+			;;
+		acpi-cpufreq)
+			# Should have been provided by available_frequencies. cpupower should provide more
+			typeset cpout="$(ammExec::AsUser "root" "cpupower frequency-info")"
+			if [[ -n "$cpout" ]]; then
+				#echo "$cpout" | grep
+				:
+
+			fi
+			
+			;;
+		*)
+			echo "$fmin" "$fmax"
+			;;
+	esac
+}
+
+function ammHardware::CpuFrequencyGetBasefreq {
+
+	typeset syscpu0="$__AMMHARDWARE_SYS_CPU/cpu0"
+	# CPUFreq handling
+	if [[ -d "$syscpu0/cpufreq" ]]; then
+		# try multiple sources depending on cpu vendor
+		typeset src
+		for src in base_frequency bios_limit; do
+			typeset cpusrc="$syscpu0/cpufreq/$src"
+			[[ -r "$cpusrc" ]] && echo $(< "$cpusrc") && return 0
+		done
+	fi
+
+	# No CPUFreq: cpuinfo parsing
+	typeset f= fprev=
+	for f in $(ammString::Filter "/proc/cpuinfo" "cpu MHz" "[0-9]" "4"); do
+		# Remove the . to have freq in KHz, used by cpufreq
+		f=${f//./}
+		if [[ -n "$fprev" ]] && [[ "$fprev" != "$f" ]]; then
+			ammLog::Wrn "Different frequencies found in cpuinfo: '$f' != '$fprev'"
+		fi
+		fprev=$f
+	done
+	echo "$f"
+}
+
+
+function ammHardware::CpuFrequencyReset {
+	#
+	typeset -a flist=($(ammHardware::CpuFrequencyGetAvailable "hard"))
+	typeset fmin=${flist[0]}
+	typeset fmax=${flist[-1]}
+	ammHardware::CpuFrequencySet "$fmin" "$fmax"
+}
+
+function ammHardware::CpuFrequencySet {
+	typeset fmin="$1"
+	typeset fmax="${2:-$fmin}"
+
+	if ! ammExec::AsUser "root" "cpupower frequency-set --min $fmin --max $fmax"; then
+		ammLog::Err "Unable to set frequency to min/max: $fmin/$fmax"
+		return 1
+	fi
+	return 0
+}

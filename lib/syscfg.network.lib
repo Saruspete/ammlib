@@ -97,7 +97,7 @@ function ammSyscfgNetwork::NicInfo {
 			mac)     echo "mac=$(cat $ifpath/address 2>/dev/null)" ;;
 			#index)   echo "index=$(awk -F= '$1=="IFINDEX" {print $2}' $ifpath/uevent)" ;;
 			index)   echo "index=$(<$ifpath/iflink)" ;;
-			ipv4)    echo "ipv4=\"$(ip address show dev $iface|ammString::Filter "inet" "^inet$" "+1")\"" ;;
+			ipv4)    echo "ipv4=\"$(ip address show dev $iface|ammString::Filter "-" "inet" "^inet$" "+1")\"" ;;
 			# More complex processing
 			type)    echo "type=$(awk -F= '$1=="DEVTYPE"{print $2}' $ifpath/uevent)" ;;
 			master)  echo "master=" ;;

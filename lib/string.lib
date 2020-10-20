@@ -543,11 +543,17 @@ function ammString::IntegerSum {
 # -----------------------------------------------------------------------------
 # Search and filter
 # -----------------------------------------------------------------------------
+
+# @description  Filter a file to filter lines and columns
+# @arg $1  (file)  File to filter, or - for stdin
+# @arg $2  (regex) Keep lines matching this regex
+# @arg $3  (regex) Keep columns 
+# @arg $4  (int)   Column number, or offset to the matched column if starting by + or -
 function ammString::Filter {
-	typeset filterline="${1:-.+}"
-	typeset filtercolumn="${2:-}"
-	typeset displaycolumn="${3:-0}"
-	typeset file="${4:-}"
+	typeset file="${1:-}"
+	typeset filterline="${2:-.+}"
+	typeset filtercolumn="${3:-}"
+	typeset displaycolumn="${4:-0}"
 
 	ammLog::Dbg "fl=$filterline fc=$filtercolumn dc=$displaycolumn file=$file"
 	awk -v fl="$filterline" -v fc="$filtercolumn" -v dc="$displaycolumn" '

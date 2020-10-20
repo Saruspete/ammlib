@@ -107,7 +107,7 @@ function ammBootloaderIsolinux::Find {
 
 typeset -g  __ammBootloaderIsolinuxLocation="$(ammBootloaderIsolinuxFind isolinux.bin)"
 #typeset -g  __ammBootloaderIsolinux::Version="$(awk '/ISOLINUX/{for(i=1;i<=NF; i++){ if($i=="ISOLINUX"){ print $(i+1);} } }' "$__ammBootloaderIsolinuxLocation")"
-typeset -g  __ammBootloaderIsolinuxVersion="$(strings "$__ammBootloaderIsolinuxLocation"| ammString::Filter "ISOLINUX" "ISOLINUX" "+1" )"
+typeset -g  __ammBootloaderIsolinuxVersion="$(strings "$__ammBootloaderIsolinuxLocation"| ammString::Filter "-" "ISOLINUX" "ISOLINUX" "+1" )"
 
 # -----------------------------------------------------------------------------
 # Set configuration values

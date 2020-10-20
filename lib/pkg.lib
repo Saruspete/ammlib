@@ -15,20 +15,27 @@ function ammPkg::MetaCheck {
 }
 
 function ammPkg::MetaInit {
+	typeset -gA __AMMPKG_PATHTOTYPE
+
 	# Try to load the local package manager to avoid redundancy
 	typeset localpkgmgr="$(ammPkg::ManagerDetect)"
 	if [[ -n "$localpkgmgr" ]]; then
 		ammLib::Load "pkg.$localpkgmgr" && __AMMPKG_PATHTOTYPE[/]="$localpkgmgr"
 	fi
 
+
 	return 0
 }
+
+# Interesting links for sub-modules:
+# https://www.linuxtricks.fr/wiki/rosetta-tableau-comparatif-des-outils-urpm-yum-zypper-emerge-et-apt
+# https://wiki.archlinux.org/index.php/Pacman/Rosetta
+
 
 # -----------------------------------------------------------------------------
 # Sub-libraries managment
 # -----------------------------------------------------------------------------
 
-typeset -gA __AMMPKG_PATHTOTYPE
 
 # @description Detect the package manager for a given path
 #
@@ -181,6 +188,12 @@ function ammPkg::InstallWhatProvides {
 	for file in "$@"; do
 		typeset pkg vers file
 		typeset -A provides
+
+		# If it's an absolute path, fast-skip
+		if [[ "${file:0:1}" == "/" ]] && [[ -e "$file" ]]; then
+			ammLog::Dbg "Skipping already installed absolute path '$file'"
+			continue
+		fi
 
 		# List all provided packages
 		while read pkg vers file; do

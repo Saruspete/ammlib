@@ -204,7 +204,8 @@ function ammFs::TypeFromBlockdev {
 }
 
 
-
+# @description  Returns the base mountpoint of a given file
+# @arg $1 (path) Path to a file or folder
 function ammFs::MountpointFromFile {
 	typeset file="$1"
 
@@ -231,6 +232,28 @@ function ammFs::MountpointFromFile {
 
 	echo "$mnt"
 }
+
+function ammFs::StoreFromMountpoint {
+	typeset mnt="$1"
+
+	$__AMMFS_CACHED || ammFs::_ParseMounts
+
+	# Use parsed data
+	if (set +u; [[ -n "${__AMMFS_MOUNT2STORE_CACHE[$mnt]}" ]] ); then
+		echo "${__AMMFS_MOUNT2STORE_CACHE[$mnt]}"
+		return
+	fi
+
+	# Retry with absolute path to mountpoint
+	mnt="$(readlink -f "$mnt")"
+	if (set +u; [[ -n "${__AMMFS_MOUNT2STORE_CACHE[$mnt]}" ]] ); then
+		echo "${__AMMFS_MOUNT2STORE_CACHE[$mnt]}"
+		return
+	fi
+
+	return 1
+}
+
 # -----------------------------------------------------------------------------
 # Filesystem creation
 # -----------------------------------------------------------------------------

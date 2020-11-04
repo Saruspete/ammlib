@@ -53,6 +53,14 @@ function ammString::EndsWith {
 	[[ "${check%$want}" != "$check" ]]
 }
 
+function ammString::IsNotEmpty {
+	[[ -n "$1" ]]
+}
+
+function ammString::IsEmpty {
+	[[ -z "$1" ]]
+}
+
 function ammString::IsFile {
 	typeset file="$1"
 

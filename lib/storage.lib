@@ -11,33 +11,37 @@ fi
 
 function ammStorage::MetaCheck {
 	# Should be in util-linux
-	ammExec::RequireOne lsblk blkid
+	#ammExec::RequireOne lsblk blkid
 }
 
 function ammStorage::MetaInit {
 
-	# MD should always be 9 (defined in major.h)
-	typeset -gi AMMSTORAGE_MAJOR_MD="$(ammStorage::_GetModuleMajor "md")"
+	# Some values are fixed in include/uapi/linux/major.h, some are dynamics
 	typeset -gi AMMSTORAGE_MAJOR_DM="$(ammStorage::_GetModuleMajor "device-mapper")"
+	typeset -gi AMMSTORAGE_MAJOR_MD=9
+	typeset -gi AMMSTORAGE_MAJOR_LOOP=7
+	typeset -gi AMMSTORAGE_MAJOR_DRBD=147
 
+	typeset -g  AMMSTORAGE_UDEV_DATAPATH="/run/udev/data"
+	typeset -gA AMMSTORAGE_UDEV_CACHE=  AMMSTORAGE_UDEV_PARSED=
 
 	typeset -ga AMMSTORAGE_LSBLKFIELDS=(
 		# Identifiers & HW Spec
-		"NAME" "KNAME" "PATH" "MAJMIN" "UUID" "VENDOR" "MODEL" "SERIAL" "SIZE"
+		"NAME" "KNAME" "PATH" "MAJ:MIN" "UUID" "VENDOR" "MODEL" "SERIAL" "SIZE"
 		# Partition
 		"PTUUID" "PTTYPE" "PARTTYPE" "PARTTYPENAME" "PARTLABEL" "PARTUUID" "PARTFLAGS"
 		# Filesystem
-		"FSTYPE" "FSAVAIL" "FSSIZE" "FSUSED" "FSUSE" "FSVER" "LABEL" "MOUNTPOINT" 
+		"FSTYPE" "FSAVAIL" "FSSIZE" "FSUSED" "FSUSE%" "FSVER" "LABEL" "MOUNTPOINT" 
 		"OWNER" "GROUP" "MODE"
 		# Flags and state
 		"RA" "RO" "RM" "HOTPLUG" "STATE"
-		"ALIGNMENT" "MINIO" "OPTIO" "PHYSEC" "LOGSEC" "ROTA"
+		"ALIGNMENT" "MIN-IO" "OPT-IO" "PHY-SEC" "LOG-SEC" "ROTA"
 		# Queue size
-		"SCHED" "RQSIZE" "DISCALN" "DISCGRAN" "DISCMAX" "DISCZERO"
+		"SCHED" "RQ-SIZE" "DISC-ALN" "DISC-GRAN" "DISC-MAX" "DISC-ZERO"
 		"TYPE" "RAND" "PKNAME" "WSAME" "WWN" "HCTL" "TRAN" "SUBSYSTEMS" "REV" "ZONED"
 	)
-	# Will create associative arrays from the fields list
-	eval "typeset -gA AMMSTORAGE_BLK2{$(export IFS=,; echo "${AMMSTORAGE_LSBLKFIELDS[*]}")}"
+	# Will create associative arrays from the fields list, and removes invalid chars
+	eval "typeset -gA AMMSTORAGE_BLK2{$(export IFS=,; echo "${AMMSTORAGE_LSBLKFIELDS[*]//[-%:]/}")}"
 
 }
 
@@ -45,17 +49,68 @@ function ammStorage::MetaInit {
 # Internal helpers
 # -----------------------------------------------------------------------------
 
-function ammStorage::_GetFromSysfs {
+# @description  Get an information from udev
+# @arg  $1 (string)   Blockdevice to query, identifiable by ammStorage::GetKernelName
+# @arg  $@ (string[]) List of environment fields provided by udev to be fetched
+function ammStorage::_GetFromUdev {
+	typeset blockdev="$(ammStorage::GetKernelName "$1")"
+
+	typeset majmin="$(ammStorage::GetMajorMinor "$blockdev" ":")"
+	typeset udevpath="$AMMSTORAGE_UDEV_DATAPATH/b${majmin}"
+
+	if [[ -s "$udevpath" ]]; then
+		typeset -u field
+		# Populate cache if needed
+		if (set +u; [[ -z "${AMMSTORAGE_UDEV_PARSED[$majmin]}" ]]); then
+			typeset line
+			while read line; do
+				case "$line" in
+					# Environment ID
+					E:*=*)
+						field="${line%%=*}"
+						AMMSTORAGE_UDEV_CACHE["${majmin}_${field#E:}"]="${line#*=}"
+						;;
+					S:*/by-id*/*) AMMSTORAGE_UDEV_CACHE["${majmin}_path"]="/dev/${line#S:}"
+						;;
+				esac
+			done < "$udevpath"
+
+			AMMSTORAGE_UDEV_PARSED[$majmin]="$(stat --format "%Y" "$udevpath")"
+		fi
+
+		for field in "$@"; do
+			typeset -u varname="$majmin_${field}"
+			if (set +u; [[ -v AMMSTORAGE_UDEV_CACHE[$varname] ]] ); then
+				echo "$field='${AMMSTORAGE_UDEV_CACHE[$varname]}'"
+			fi
+		done
+	fi
+}
+
+function ammStorage::_GetFromSysBlock {
 	typeset blockdev="$1"
 	typeset part="$2"
 
-	if [[ -r "/sys/class/block/$blockdev/$part" ]]; then
-		echo $(</sys/class/block/$blockdev/$part)
-		return 0
+	typeset sysfs="/sys/class/block/$blockdev"
+	if [[ -r "$sysfs" ]]; then
+		if [[ -e "$sysfs/$part" ]]; then
+			echo $(<$sysfs/$part)
+			return 0
+		fi
 	else
 		ammLog::Dbg "Invalid requested sysfs '$blockdev' / '$part'"
 		return 1
 	fi
+}
+
+# @description  Helper to keep DRY from check & fetch sysfs
+# @arg $1 (string) Path from sysfs to fetch
+# @arg $2 (string) Device name or path
+function ammStorage::_GetSysBlockGeneric {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	typeset field="$2"
+	[[ -z "$dev" ]] && return 1
+	ammStorage::_GetFromSysBlock "$dev" "$field"
 }
 
 function ammStorage::_GetModuleMajor {
@@ -94,7 +149,7 @@ function ammStorage::_CacheBlkData {
 				line="${line:${#tuple}}"
 			done
 
-		done < <(lsblk --pairs --output-all --bytes)
+		done < <(lsblk --pairs --output $(export IFS=,; echo "${AMMSTORAGE_LSBLKFIELDS[*]}") --bytes)
 
 	else
 
@@ -108,233 +163,113 @@ function ammStorage::_CacheBlkData {
 # Listing devices and discovery
 # -----------------------------------------------------------------------------
 
-function ammStorage::GetRealName {
-	ammLog::Deprecated "ammStorage::GetKernelName"
-}
-
-
-# @description  Returns the kernel (real) name of the device name or path
-# @arg $1  (string) Name or path to the device
-function ammStorage::GetKernelName {
-	typeset name="$1"
-
-	typeset realpath=""
-
-	# Shortname
-	if [[ "${name:0:1}" != "/" ]]; then
-		# Simple case: already real name with dev (maj:min) file
-		if [[ -e "/sys/class/block/$name/dev" ]]; then
-			ammLog::Dbg "Device '$name' exists in /sys/class/block"
-			echo "$name"
-			return 0
-
-		# Not real name, try with usual path
-		else
-			if [[ -e "/dev/$name" ]]; then
-				realpath="$(readlink -f "/dev/$name")"
-				ammLog::Dbg "Device name '$name' (in /dev) maps to '$realpath'"
-			elif [[ -e "/dev/mapper/$name" ]]; then
-				realpath="$(readlink -f "/dev/mapper/$name")"
-				ammLog::Dbg "Device name '$name' (in /dev/mapper) maps to '$realpath'"
-			fi
-		fi
-	# Starts with / treat as absolute path
-	else
-		# Need real block device (dm-X instead of lvm "vgname-lvname" symlink)
-		realpath="$(readlink -f $name)"
-
-		ammLog::Dbg "Device path '$name' maps to '$realpath'"
-
-		if [[ -e "/sys/class/block/${realpath##*/}/dev" ]]; then
-			echo "${realpath##*/}"
-			return 0
-		fi
-	fi
-
-	# Blockdevice exists (but can be an mknod' alias name
-	if [[ -b "$realpath" ]]; then
-
-		# If there is an entry in /sys for this disk/virt/part... got real
-		typeset devname="${realpath##*/}"
-		if [[ -d "/sys/class/block/$devname" ]]; then
-			echo "$devname"
-			return 0
-
-		# Not real name (eg mknod toto). Resolution through MAJ:MIN
-		else
-			typeset maj min btest
-			read maj min < <(ammStorage::GetMajorMinor "$realpath")
-
-			# There should be only 1 *direct* listing with this maj/min
-			for btest in /sys/class/block/*/dev; do
-				if [[ "$(<$btest)" == "$maj:$min" ]]; then
-					btest="${btest%/dev}"
-					echo "${btest##*/}"
-					return 0
-				fi
-			done
-		fi
-	fi
-
-	ammLog::Err "Unable to get real name for device '$name'"
-	return 1
-}
-
-# @description  Returns the "Major Minor" format of the given device
-# @arg $1  (string) Name of path of the block device
-function ammStorage::GetMajorMinor {
+function ammStorage::ListParents {
 	typeset blockdev="$1"
 
-	# Cannot call GetKernelName before, can create infinite loop
-	if ! ammStorage::Exists "$blockdev"; then
-		ammLog::Err "Invalid blockdev '$blockdev'. Cannot get Major/minor"
-		return 1
-	fi
-
 	typeset blockname="$(ammStorage::GetKernelName "$blockdev")"
-
-	typeset majmin=$(</sys/class/block/$blockname/dev)
-	echo "${majmin%%:*} ${majmin##*:}"
-}
-
-
-function ammStorage::GetType {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
-
-# TODO: return a type: "nvme" "hdd" "ssd" "mdraid" "multipath" "luks1" "luks2" ..
-# TODO: plus a subtype: crypt (luks aes-xts-plain64), part (nvme), lvm (meta), lvm (thin)
-	typeset -l typ=""
-	typeset tmp=
-	# partition
-	if ammStorage::IsPartition "$dev"; then
-		typ="part"
-	# DeviceMapper (LVM CRYPT-LUKS2 )
-	elif tmp=$(ammStorage::_GetFromSysfs "$dev" "dm/uuid"); then
-		
-		typ="${tmp%%-*}"
-	# NVMe
-	elif [[ "${dev#nvme}" != "$dev" ]]; then
-		typ="nvme"
-	# Scsi Disk (sd)
-	elif [[ "${dev#sd[a-z]}" != "$dev" ]]; then
-		typ="disk"
-	fi
-
-	if [[ -z "$typ" ]]; then
-		ammLog::Dbg "Unable to get the type of '$dev'"
+	if [[ -z "$blockname" ]]; then
+		ammLog::Wrn "Unable to get kernel name for device '$blockdev'"
 		return 1
 	fi
 
-	echo "$typ"
+	typeset parents=""
+	typeset maj min
+	read maj min < <(ammStorage::GetMajorMinor "$blockdev")
+
+
+	# For partitions, use the special name of the devicea (there is no /slave folder)
+	if ammStorage::IsPartition "$blockname"; then
+		typeset part="$(ammStorage::_GetFromSysBlock "$blockname" "partition")"
+		case $blockname in
+			# SCSI disks: simple number appended
+			sd*)    parents="${blockname%$part}" ;;
+			# NVMe or MMC: remove p* in nvme0n1p3 or mmcblk1p3
+			nvme*|mmc*)  parents="${blockname%p$part}" ;;
+			# Unknown scheme: use plain listing
+			*)
+				ammLog::Dbg "Unhandled partition naming '$blockname'. Doing listing"
+				typeset bpath=""
+				for bpath in /sys/class/block/*/$blockname; do
+					if [[ -d "$bpath" ]]; then
+						parents="${bpath#/sys/class/block/}"
+						parents="${parents%/*}"
+						break
+					fi
+				done
+				;;
+		esac
+
+	# Device Mapper
+	elif [[ "$maj" == "$AMMSTORAGE_MAJOR_DM" ]]; then
+		# Nothing to do, should appear in /sys/class/block/dm-X/slaves
+		:
+
+	# MD-Raid device
+	elif [[ "$maj" == "$AMMSTORAGE_MAJOR_MD" ]]; then
+		:
+
+	elif [[ "$maj" == "$AMMSTORAGE_MAJOR_LOOP" ]]; then
+		:
+
+	elif [[ "$maj" == "$AMMSTORAGE_MAJOR_DRBD" ]]; then
+		:
+
+	# ZFS: TODO: Parse "zpool list -vHPp"
+	elif [[ -d "/sys/module/zfs" ]] && ammExec::Exists zpool && zpool list "$blockdev" >/dev/null 2>&1; then
+
+		typeset dev _junk
+		while read dev _junk; do
+			:
+		done < <(zpool list -vHPp "$blockdev")
+
+	# btrfs: TODO
+	elif [[ -d "/sys/module/btrfs" ]]; then
+		:
+
+	# No special case. Should be a physical device
+	else
+		#ammLog::Err "Unable to manage '$blockname': unknown device type"
+		:
+	fi
+
+
+	# Check for slaves registerd in /sys
+	typeset slave
+	for slave in "/sys/class/block/$blockname/slaves/"*; do
+		[[ -d "$slave" ]] || continue
+		parents+="${slave##*/} "
+	done
+
+	ammLog::Dbg "Parents of '$blockdev' ($blockname / $maj:$min): $parents"
+	echo "$parents"
 }
 
-function ammStorage::GetName {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
+# @description  Try to find the real underlying device of a given blockdev
+function ammStorage::ListUnderlyingDevices {
+	typeset blockdev="$1"
 
-	typeset name="$(ammStorage::_GetFromSysfs "$dev" "dm/name")"
-	[[ -z "$name" ]] && name="$dev"
-
-	echo "$name"
-}
-
-function ammStorage::GetSize {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
-
-	typeset -i nblocks blocksize
-	# each blockdev has a size
-	nblocks="$(ammStorage::_GetFromSysfs "$dev" "size")"
-
-	# But only the parent block has physical size
-	blocksize="$(ammStorage::GetBlockSize "$dev")"
-
-	echo $(($nblocks * $blocksize))
-}
-
-function ammStorage::GetBlockSize {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
-
-	typeset bsize="$(ammStorage::_GetFromSysfs "$dev" "queue/physical_block_size")"
-	if [[ -z "$bsize" ]]; then
-		typeset bsizetmp=
-		typeset parent
-		for parent in $(ammStorage::ListParents "$dev"); do
-			bsizetmp="$($FUNCNAME "$parent")"
-			if [[ -n "$bsizetmp" ]] && [[ -n "$bsize" ]] && [[ "$bsizetmp" != "$bsize" ]]; then
-				ammLog::Wrn "Multiple parent devices reported different block-size"
-				break
-			fi
-
-			bsize="$bsizetmp"
+	# Get its parents recursively
+	typeset parents="$(ammStorage::ListParents "$blockdev")"
+	if [[ -z "$parents" ]]; then
+		ammLog::Dbg "Device '$blockdev' is a media storage"
+		echo "$blockdev"
+	else
+		for parent in $parents; do
+			$FUNCNAME "$parent"
 		done
 	fi
-
-	echo $bsize
 }
 
-function ammStorage::GetModel {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
 
-	typeset model="$(ammStorage::_GetFromSysfs "$dev" "device/model")"
-	# No direct model, fallback depending on type
-	if [[ -z "$model" ]]; then
-		typeset typ="$(ammStorage::GetType "$dev")"
-		case "$typ" in
-			# Crypt: display type and encryption
-			crypt)
-				;;
-			# LVM: display LVM type
-			lvm)
-				;;
-			# partition: get from its parent
-			part)
-				typeset parent="$(ammStorage::ListParents "$dev")"
-				[[ -z "$parent" ]] && return 1
-				model="($(ammStorage::_GetFromSysfs "$parent" "device/model"))"
-				;;
-			*)
-				return 1
-		esac
-	fi
 
-	echo "$model"
+function ammStorage::ListAvail {
+
+	typeset bdpath
+	for bdpath in /sys/class/block/*; do
+		echo "${bdpath##*/}"
+	done
 }
 
-function ammStorage::GetSerial {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
-
-	ammStorage::_GetFromSysfs "$dev" "device/serial"
-}
-
-function ammStorage::GetFirmware {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
-
-	ammStorage::_GetFromSysfs "$dev" "device/firmware_rev"
-}
-
-function ammStorage::GetMountpoint {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
-
-	typeset bdev mntpnt fstyp mntopts _junk
-	while read bdev mntpnt fstyp mntopts _junk; do
-		# Skip non block-backed mounts
-		ammStorage::Exists $bdev || continue
-
-		bdev="$(ammStorage::GetKernelName "$bdev")"
-		if [[ "$bdev" == "$dev" ]]; then
-			echo "$mntpnt"
-			return 0
-		fi
-	done < /proc/mounts
-	return 1
-}
 
 function ammStorage::Exists {
 	typeset blockdev="$1"
@@ -358,99 +293,293 @@ function ammStorage::Exists {
 	return 1
 }
 
-function ammStorage::ListChildren {
-	typeset blockdev="$1"
-
-}
-
-function ammStorage::ListParents {
-	typeset blockdev="$1"
-
-	typeset blockname="$(ammStorage::GetKernelName "$blockdev")"
-	[[ -z "$blockname" ]] && return 1
-
-	typeset parents=""
-	typeset maj min
-	read maj min < <(ammStorage::GetMajMin "$blockdev")
 
 
-	# For partitions, use the special name of the device
-	if ammStorage::IsPartition "$blockname"; then
-		typeset part="$(ammStorage::_GetFromSysfs "$blockname" "partition")"
-		case $blockname in
-			# SCSI disks: simple number appended
-			sd*)    parents="${blockname%[0-9]}" ;;
-			# NVMe or MMC: remove p* in nvme0n1p3 or mmcblk1p3
-			nvme*|mmc*)  parents="${blockname%p$part}" ;;
-			# Unknown scheme: use plain listing
-			*)
-				ammLog::Dbg "Unhandled partition naming '$blockname'. Doing listing"
-				typeset bpath=""
-				for bpath in /sys/class/block/*/$blockname; do
-					if [[ -d "$bpath" ]]; then
-						parents="${bpath#/sys/class/block/}"
-						parents="${parents%/*}"
-					fi
-				done
-				;;
-		esac
+# -----------------------------------------------------------------------------
+# Device identification
+# -----------------------------------------------------------------------------
 
-	# Device Mapper
-	elif [[ "$maj" == "$AMMSTORAGE_MAJOR_DM" ]]; then
-		
-		lsblk --pairs --output-all --bytes
 
-	# MD-Raid device
-	elif [[ "$maj" == "$AMMSTORAGE_MAJOR_MD" ]]; then
-		:
+# @description  Returns the kernel (real) name of the device name or path
+# @arg $1  (string) Name or path to the device
+function ammStorage::GetKernelName {
+	typeset name="$1"
 
-	# ZFS: TODO: Parse "zpool list -vHPp"
-	elif [[ -d "/sys/module/zfs" ]] && ammExec::Exists zpool && zpool list "$blockdev" >/dev/null 2>&1; then
+	typeset realpath=""
 
-		typeset dev _junk
-		while read dev _junk; do
-			:
-		done < <(zpool list -vHPp "$blockdev")
+	# Shortname (not absolute path)
+	if [[ "${name:0:1}" != "/" ]]; then
+		# Simple case: already real name with dev (maj:min) file
+		if [[ -e "/sys/class/block/$name/dev" ]]; then
+			ammLog::Dbg "Device '$name' maps to itself"
+			echo "$name"
+			return 0
 
-	# btrfs: TODO
-	elif [[ -d "/sys/module/btrfs" ]]; then
-		:
+		# Not real name, try with usual path
+		else
+			if [[ -b "/dev/$name" ]]; then
+				realpath="$(readlink -f "/dev/$name")"
+				#ammLog::Dbg "Found '$name' in /dev: '$realpath'"
+			elif [[ -e "/dev/mapper/$name" ]]; then
+				realpath="$(readlink -f "/dev/mapper/$name")"
+				#ammLog::Dbg "Found '$name' in /dev/mapper: '$realpath'"
 
-	# Unknown device type...
+			# TODO: add other paths, like drbd, etc...
+			fi
+		fi
+	# Starts with / treat as absolute path
 	else
-		ammLog::Err "Unable to manage '$blockname': unknown device type"
+		# Need real block device (dm-X instead of lvm "vgname-lvname" symlink)
+		realpath="$(readlink -f $name)"
+
+		ammLog::Dbg "Device path '$name' maps to '$realpath'"
+
+		if [[ -e "/sys/class/block/${realpath##*/}/dev" ]]; then
+			echo "${realpath##*/}"
+			return 0
+		fi
 	fi
 
+	# Blockdevice exists (but can be an mknod' alias name
+	if [[ -b "$realpath" ]]; then
 
-	# Check for slaves registerd in /sys
-	typeset slave
-	for slave in "/sys/class/block/$blockname/slaves/"*; do
-		[[ -d "$slave" ]] || continue
-		echo ${slave##*/}
-	done
+		# If there is an entry in /sys for this disk/virt/part... got real
+		typeset devname="${realpath##*/}"
+		if [[ -d "/sys/class/block/$devname" ]]; then
+			ammLog::Dbg "Device '$name' ($realpath) maps to device '$devname'"
+			echo "$devname"
+			return 0
+
+		# Not real name (eg mknod toto). Resolution through MAJ:MIN
+		else
+			typeset maj min btest
+			read maj min < <(ammStorage::GetMajorMinor "$realpath")
+
+			ammLog::Dbg "Device '$name' ($realpath) maps to unknown block '$devname'"
+
+			# There should be only 1 *direct* listing with this maj/min
+			for btest in /sys/class/block/*/dev; do
+				if [[ "$(<$btest)" == "$maj:$min" ]]; then
+					btest="${btest%/dev}"
+					echo "${btest##*/}"
+					return 0
+				fi
+			done
+		fi
+	fi
+
+	ammLog::Err "Unable to get real name for device '$name'"
+	return 1
+}
+function ammStorage::GetRealName {
+	ammLog::Deprecated "ammStorage::GetKernelName" "$@"
 }
 
-# @description  Try to find the real underlying device of a given blockdev
-function ammStorage::ListUnderlyingDevices {
+# @description  Returns the "Major Minor" format of the given device
+# @arg $1  (string) Name of path of the block device
+function ammStorage::GetMajorMinor {
 	typeset blockdev="$1"
+	typeset separator="${2:- }"
 
-	# Get its parents recursively
-	typeset parent
-	while read parent; do
-# TODO !!
-		:
-	done < <(ammStorage::ListParents "$blockdev")
+	# Cannot call GetKernelName before, can create infinite loop
+	if ! ammStorage::Exists "$blockdev"; then
+		ammLog::Err "Invalid blockdev '$blockdev'. Cannot get Major/minor"
+		return 1
+	fi
+
+	# Get the shortname
+	typeset blockname="$(ammStorage::GetKernelName "$blockdev")"
+
+	typeset majmin=$(</sys/class/block/$blockname/dev)
+	echo "${majmin%%:*}${separator}${majmin##*:}"
+}
+
+# @description  Returns the device name from the major:minor couple
+# @arg $1  (string) Major:Minor like 253:0
+function ammStorage::GetNameFromMajorMinor {
+	typeset majmin="$1"
+
+	if ! [[ -e "/sys/dev/block/$majmin" ]]; then
+		ammLog::Wrn "Device with major:minor '$majmin' does not exist"
+		return 1
+	fi
+
+	typeset name="$(readlink -f "/sys/dev/block/$majmin")"
+	echo "${name##*/}"
+}
+
+function ammStorage::GetType {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+# TODO: return a type: "nvme" "hdd" "ssd" "mdraid" "multipath" "luks1" "luks2" ..
+# TODO: plus a subtype: crypt (luks aes-xts-plain64), part (nvme), lvm (meta), lvm (thin)
+	typeset -l typ=""
+	typeset tmp=
+	# partition
+	if ammStorage::IsPartition "$dev"; then
+		typ="part"
+	# DeviceMapper (LVM CRYPT-LUKS2 )
+	elif tmp=$(ammStorage::_GetFromSysBlock "$dev" "dm/uuid"); then
+		typ="${tmp%%-*}"
+	# NVMe
+	elif [[ "${dev#nvme}" != "$dev" ]]; then
+		typ="nvme"
+	# Scsi Disk (sd)
+	elif [[ "${dev#sd[a-z]}" != "$dev" ]]; then
+		typ="disk"
+	fi
+
+	if [[ -z "$typ" ]]; then
+		ammLog::Dbg "Unable to get the type of '$dev'"
+		return 1
+	fi
+
+	echo "$typ"
+}
+
+function ammStorage::GetName {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	typeset name="$(ammStorage::_GetFromSysBlock "$dev" "dm/name")"
+	[[ -z "$name" ]] && name="$dev"
+
+	echo "$name"
+}
+
+# -----------------------------------------------------------------------------
+# Hardware details
+# -----------------------------------------------------------------------------
+
+function ammStorage::GetModel {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	typeset model="$(ammStorage::_GetFromSysBlock "$dev" "device/model")"
+	# No direct model, fallback depending on type
+	if [[ -z "$model" ]]; then
+		typeset typ="$(ammStorage::GetType "$dev")"
+		case "$typ" in
+			# Crypt: display type and encryption
+			crypt)
+				;;
+			# LVM: display LVM type
+			lvm)
+				;;
+			# partition: get from its parent
+			part)
+				typeset parent="$(ammStorage::ListParents "$dev")"
+				[[ -z "$parent" ]] && return 1
+				model="($(ammStorage::_GetFromSysBlock "$parent" "device/model"))"
+				;;
+			*)
+				return 1
+		esac
+	fi
+
+	echo "$model"
+}
+
+function ammStorage::GetSerial {    ammStorage::_GetSysBlockGeneric "$1" "device/serial"; }
+function ammStorage::GetFirmware {  ammStorage::_GetSysBlockGeneric "$1" "device/firmware_rev"; }
+
+function ammStorage::GetHost {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	typeset host="$(readlink -f "/sys/class/block/$dev")"
+	host="${host#*host}"
+	host="${host%/*}"
+	host="host${host}"
+}
+
+function ammStorage::GetTransport {
+	typeset dev="$1"
+	ammStorage::_GetSysBlockGeneric "device/" "$dev"
+}
+
+#function ammStorage::GetTransportLink
+#function ammStorage::GetTransportLinkSpeed
+#function ammStorage::GetTransport
+
+# Intersting elements
+# - ata_device/devX.Y/{class,trim,*mode}
+# - block/$dev/mq/X/cpuX/
+# - block/$dev/{stat,size,...}
+# - block/$dev/device/{queue*,
+# - block/$dev/device/scsi_disk/*/*
+# - block/$dev/
+# - /sys/devices/pci*/*/label :  "Onboard - SATA"
+
+# -----------------------------------------------------------------------------
+# Filesystem details
+# -----------------------------------------------------------------------------
+
+function ammStorage::GetMountpoint {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	typeset bdev mntpnt fstyp mntopts _junk
+	while read bdev mntpnt fstyp mntopts _junk; do
+		# Skip non block-backed mounts
+		ammStorage::Exists $bdev || continue
+
+		bdev="$(ammStorage::GetKernelName "$bdev")"
+		if [[ "$bdev" == "$dev" ]]; then
+			echo "$mntpnt"
+			return 0
+		fi
+	done < /proc/mounts
+	return 1
 }
 
 
 
-function ammStorage::ListAvail {
+function ammStorage::GetSize {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	typeset -i nblocks blocksize
+	# each blockdev has a size
+	nblocks="$(ammStorage::_GetFromSysBlock "$dev" "size")"
+
+	# But only the parent block has physical size
+	blocksize="$(ammStorage::GetBlockSize "$dev")"
+
+	echo $(($nblocks * $blocksize))
+}
+
+function ammStorage::GetBlockSize {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	typeset bsize="$(ammStorage::_GetFromSysBlock "$dev" "queue/physical_block_size")"
+	if [[ -z "$bsize" ]]; then
+		typeset bsizetmp=
+		typeset parent
+		for parent in $(ammStorage::ListParents "$dev"); do
+			bsizetmp="$($FUNCNAME "$parent")"
+			if [[ -n "$bsizetmp" ]] && [[ -n "$bsize" ]] && [[ "$bsizetmp" != "$bsize" ]]; then
+				ammLog::Wrn "Multiple parent devices reported different block-size"
+				break
+			fi
+
+			bsize="$bsizetmp"
+		done
+	fi
+
+	echo $bsize
+}
+
+
+# -----------------------------------------------------------------------------
+# Queue management
+# -----------------------------------------------------------------------------
+
+function ammStorage::GetScheduler {
 	
-	typeset bdpath
-	for bdpath in /sys/class/block/*; do
-		echo "${bdpath##*/}"
-	done
 }
+
+
 
 # -----------------------------------------------------------------------------
 # Devices state check
@@ -459,7 +588,7 @@ function ammStorage::ListAvail {
 function ammStorage::IsPartition {
 	typeset blockdev="$1"
 
-	ammStorage::_GetFromSysfs "$blockdev" "partition" >/dev/null
+	[[ -n "$(ammStorage::_GetFromSysBlock "$blockdev" "partition")" ]]
 }
 
 function ammStorage::IsHealthy {

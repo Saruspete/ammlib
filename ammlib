@@ -738,6 +738,7 @@ function ammLog::Color {
 	typeset -r esc="\033["
 	typeset -a codes=()
 
+	# TODO: Handle truecolor. See https://gist.github.com/XVilka/8346728
 	while [[ -n "${1-}" ]]; do
 		[[ -n "${__AMMLOG_TERMCODES[$1]-}" ]] && codes[${#codes[@]}+1]="${__AMMLOG_TERMCODES[$1]}"
 		shift

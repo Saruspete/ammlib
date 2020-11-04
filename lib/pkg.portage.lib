@@ -46,7 +46,7 @@ function _ammPkgPortage::Portage {
 		fi
 	done
 
-	ammLog::Dbg "Executing yum with args: $opts $@"
+	ammLog::Dbg "Executing emerge with args: $opts $@"
 
 	typeset out=""
 	typeset -i r=0
@@ -72,6 +72,12 @@ function _ammPkgPortage::Portage {
 	return $r
 }
 
+# @description  Query the portage database
+function _ammPkgPortage::Portageq {
+	:
+}
+
+# @description Wrapper for equery, provided by app-portage/gentoolkit. See portageq
 function _ammPkgPortage::Equery {
 
 	ammExec::Exists "equery" >/dev/null || return 1

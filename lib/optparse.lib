@@ -91,6 +91,9 @@ function _ammOptparse::OptToId {
 # @description Expand short options and var=val to independant elements
 function _ammOptparse::Expand {
 
+	# Early return: empty array to avoid unbound var checks
+	[[ "${#__AMMLIB_CALLOPTS[@]}" == "1" ]] && [[ -z "${__AMMLIB_CALLOPTS[@]}" ]] && return
+
 	typeset optid skipall=false
 	typeset -a options
 	for (( optid=0; optid < ${#__AMMLIB_CALLOPTS[@]}; optid+=1 )); do

@@ -606,7 +606,7 @@ function ammOptparse::Get {
 		# Standard variable
 		else
 			# Special format to refer to another variable
-			while [[ "$val" =~ %\{([a-zA-Z0-9_:\-\.]+)\} ]]; do
+			while [[ "$val" =~ %\{([-a-zA-Z0-9_:\-\.]+)\} ]]; do
 				# Fetch the referenced var
 				typeset subvarname="${BASH_REMATCH[1]}"
 				typeset subvarval="$(ammOptparse::Get "$subvarname")"

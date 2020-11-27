@@ -1,0 +1,60 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammGit::MetaCheck {
+	ammExec::Require git
+}
+
+function ammGit::MetaInit {
+	ammLib::Require string
+}
+
+# -----------------------------------------------------------------------------
+# Git management
+# -----------------------------------------------------------------------------
+
+# @description  Fetches a sub-path in a remote git repository
+function ammGit::RemoteFetchPath {
+	typeset repoUrl="$1"
+	typeset repoBranch="${2:-master}"
+	typeset dst="${3:-$(ammLib::TmpPathGet "remotefetch_$(ammString::HashMD5 "$repoUrl$repoBranch")")}"
+	shift 3
+
+	if ! ammPath::IsEmpty "$dst"; then
+		ammLog::Err "Cannot use '$dst' as destination: destination exists and is not empty"
+		return 1
+	fi
+
+	if ! [[ -d "$dst" ]] && ! mkdir "$dst"; then
+		ammLog::Err "Unable to create destination dir '$dst'"
+		return 1
+	fi
+
+	(
+		cd "$dst"
+		\git init
+		\git remote add origin -f "$repoUrl"
+		\git config core.sparseCheckout true
+
+		typeset p
+		for p in "$@"; do
+			# Must start with root, else will fetch any matching path
+			[[ "${p:0:1}" != "/" ]] && p="/$p"
+			echo "$p" >> .git/info/sparse-checkout
+		done
+		\git pull origin "$repoBranch"
+	)
+
+	echo "$dst"
+}	
+
+
+

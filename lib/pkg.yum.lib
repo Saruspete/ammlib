@@ -142,7 +142,15 @@ function ammPkgYum::InfoWhatProvides {
 
 					# pkg is only empty after a Filename key, or at start
 					else
-						[[ -z "$pkg" ]] && pkg="$key"
+						if [[ -z "$pkg" ]]; then
+							pkg="$key"
+							# Remove prefix like '1:openssl-devel"
+							pkg="${pkg#[0-9]:}"
+							typeset arch="${pkg##*.}"
+							# name-version.dist.arch
+							typeset name="${pkg%-*-*.*.*}"
+							pkg="$arch.$name"
+						fi
 					fi
 
 				done

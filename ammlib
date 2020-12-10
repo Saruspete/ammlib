@@ -1251,6 +1251,26 @@ function ammPath::IsWritable {
 	return 0
 }
 
+# @description  Check if a folder contains something
+# @arg $1  (path) Path to the folder to check
+function ammPath::IsEmpty {
+	typeset path="$1"
+
+	typeset i
+	for i in "$path"/*; do
+		# Skip virtual entries
+		if [[ "$i" == "." ]] || [[ "$i" == ".." ]]; then
+			continue
+		fi
+
+		# If anything else exists, it's not empty
+		[[ -e "$i" ]] && return 1
+	done
+
+	return 0
+}
+
+
 # @description  Copy a selection of files with their relative structure
 # @arg $1  (path) Source path where to find the content
 # @arg $2  (path) Destination path where to copy content

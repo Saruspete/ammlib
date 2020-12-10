@@ -128,15 +128,21 @@ function ammPkgYum::InfoWhatProvides {
 
 			# Else, fallback to yum + parsing
 			else
-				typeset key val pkg=""
-				_ammPkgYum::Yum "provides" "$element" 2>/dev/null | while IFS=: read key val; do
+				typeset key val _junk pkg=""
+				_ammPkgYum::Yum "provides" "$element" 2>/dev/null | while IFS=: read key val _junk; do
 					key="$(ammString::Trim "$key")"
 					val="$(ammString::Trim "$val")"
+
+					# Somep ackages have a slot prefix, like "1:openssl"
+					if [[ -z "${key#[0-9]}" ]]; then
+						key="$val"
+						val="$(ammString::Trim "$_junk")"
+					fi
 
 					# if we are within a finding block, print the package and reset it to avoid double print
 					if [[ "$key" == "Filename" ]]; then
 						if [[ -n "$pkg" ]]; then
-							echo $pkg
+							echo "$pkg"
 							pkg=""
 						fi
 
@@ -144,12 +150,13 @@ function ammPkgYum::InfoWhatProvides {
 					else
 						if [[ -z "$pkg" ]]; then
 							pkg="$key"
-							# Remove prefix like '1:openssl-devel"
-							pkg="${pkg#[0-9]:}"
 							typeset arch="${pkg##*.}"
 							# name-version.dist.arch
 							typeset name="${pkg%-*-*.*.*}"
-							pkg="$arch.$name"
+							if [[ -n "$name" ]]; then
+								ammLog::Dbg "Renamed '$pkg' to '$name.$arch'"
+								pkg="$name.$arch"
+							fi
 						fi
 					fi
 

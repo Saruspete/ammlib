@@ -1164,8 +1164,19 @@ function ammEnv::VarExport {
 	# TODO: Check for usage of "${var@A}" to export as array
 	typeset varname vardef
 	for varname in "$@"; do
+		typeset multiline=false
 		while read vardef; do
-			[[ "$varname" == "${vardef%%=*}" ]] && echo "$vardef"
+			if [[ "$varname" == "${vardef%%=*}" ]] || $multiline; then
+				echo "$vardef"
+
+				# If the def has spaces and does not end with '  it's a multiline
+				typeset firstc="${vardef#$varname=}"
+				firstc="${firstc:0:1}"
+				typeset lastc="${vardef: -1:1}"
+				[[ "$firstc" == "'" ]] && multiline=true
+				[[ "$lastc" == "'" ]] && multiline=false
+			fi
+
 		done < <(set -o posix; set)
 	done
 }

@@ -272,9 +272,7 @@ function ammConfig::VarDeclare {
 	esac
 
 	# define the var now if not already
-	if ! eval "[[ -n \"\${$name:-}\" ]]"; then
-		eval "typeset $vardecl $name="
-	fi
+	eval "[[ -n \"\${$name:-}\" ]] || typeset $vardecl $name="
 
 }
 

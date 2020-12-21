@@ -290,19 +290,3 @@ function ammConfig::VarAllowOverride {
 	fi
 }
 
-function ammConfig::VarSet {
-	typeset name="$1"
-	typeset value="$2"
-
-	
-}
-
-function ammConfig::VarGet {
-	typeset name="$1"
-
-	
-}
-
-function ammConfig::VarImport {
-	:
-}

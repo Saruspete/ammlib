@@ -1,0 +1,359 @@
+# vim: ft=sh ts=4
+
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammChrootCentos::MetaCheck {
+	ammLib::Require "pkg" "pkg.yum" "config"
+}
+
+function ammChrootCentos::MetaInit {
+	ammLib::Load "pkg" "pkg.yum" "config"
+
+	typeset -gA __AMMCHROOTCENTOS_VERSIONS=(
+		[6.7]="1601"
+		[6.8]="1605"
+		[6.9]="1704"
+		[6.10]="1808"
+		[7.0]="1406"
+		[7.1]="1503"
+		[7.2]="1511"
+		[7.3]="1611"
+		[7.4]="1708"
+		[7.5]="1804"
+		[7.6]="1810"
+		[7.7]="1908"
+		[7.8]="2003"
+		[8.0]="8.0.1905"
+		[8.1]="8.1.1911-20200113.3"
+		[8.2]="8.2.2004-20200611.2"
+		[8.3]="8.3.2011-20201204.2"
+	)
+
+	# Default versions for shorts
+	__AMMCHROOTCENTOS_VERSIONS+=(
+		[6]=${__AMMCHROOTCENTOS_VERSIONS[6.10]}
+		[7]=${__AMMCHROOTCENTOS_VERSIONS[7.8]}
+		[8]=${__AMMCHROOTCENTOS_VERSIONS[8.3]}
+	)
+
+	typeset -gA AMMCHROOTCENTOS_VERSIONS=
+	typeset -g  AMMCHROOTCENTOS_URL_CLOUD_MIRROR="https://cloud.centos.org"
+
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_VERSIONS"         "assoc"  "Additional versions available"
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_URL_CLOUD_MIRROR" "string" "Base URL/Mirror for cloud.centos.org"
+	ammConfig::FileLoad "toto"
+}
+
+# -----------------------------------------------------------------------------
+# Some description for your lib
+# -----------------------------------------------------------------------------
+
+function _ammChrootCentos::GetDataFolder {
+	typeset extra="${1:-}"
+
+	typeset f="$__AMMLIB_DATA/chroot.centos/$extra"
+	[[ -d "$f" ]] || mkdir -p "$f"
+	echo "$f"
+}
+
+
+# @description Init a new CentOS chroot, from host yum config or from template
+function ammChrootCentos::Init {
+	typeset chrootdir="$1"
+	typeset version="$2"
+
+	# Dispatch to the 
+
+}
+
+function ammChrootCentos::InitFromTemplate {
+	typeset chrootdir="$1"
+	typeset version="$2"
+
+	ammLib::Require "http"
+
+	typeset -i r=0
+
+
+	# Generate the URL or use the ones set in configuration
+	typeset -a urls
+	case $version in
+		8|8.*)
+			typeset release=""
+
+			# Lookup the target version (no symlink avail at the moment)
+			if (set +u; [[ -n "${__AMMCHROOTCENTOS_VERSIONS[$version]}" ]] ); then
+				release="${__AMMCHROOTCENTOS_VERSIONS[$version]}"
+			fi
+
+			# Check for custom version passed
+			if [[ -z "$release" ]] && ! [[ "$version" != "$maj" ]]; then
+				# Use can chose a specific release date, no just a maj.min release
+				if [[ "$version" =~ $maj\..+ ]]; then
+					release="${version#$maj.}"
+					ammLog::Err "Unmanaged release version: '$version'"
+					return 1
+				fi
+			fi
+
+			url="$AMMCHROOTCENTOS_URL_CLOUD_MIRROR/centos/8/x86_64/images/CentOS-8-Container"
+			[[ -n "$release" ]] && url+="-$release"
+
+			urls+=("${url}.x86_64.tar.xz" "${url}-layer.x86_64.tar.gz")
+			;;
+
+		6|7|7.*|6.*)
+			typeset release="" url=""
+			typeset maj="${version:0:1}"
+
+			# Map the release short name to full release number
+			if (set +u; [[ -n "${__AMMCHROOTCENTOS_VERSIONS[$version]}" ]] ); then
+				release="${__AMMCHROOTCENTOS_VERSIONS[$version]}"
+			fi
+
+			# Check mapping
+			if [[ -z "$release" ]] && ! [[ "$version" != "$maj" ]]; then
+				# Use can chose a specific release date, no just a maj.min release
+				if [[ "$version" =~ $maj\..+ ]]; then
+					release="${version#$maj.}"
+				else
+					ammLog::Err "Unmanaged release version: '$version'"
+					return 1
+				fi
+			fi
+
+			url="$AMMCHROOTCENTOS_URL_CLOUD_MIRROR/centos/$maj/images/CentOS-${maj}-x86_64-GenericCloud"
+			[[ -n "$release" ]] && url+="-$release"
+			url+=".raw.tar.gz"
+
+			urls+=("$url")
+			;;
+
+		*)
+			if (set +u; [[ -n "${AMMCHROOTCENTOS_VERSIONS[$version]}" ]] ); then
+				# not putting double quotes here, as spaces in URL are %20, which leaves spaces as separator
+				urls+=( ${AMMCHROOTCENTOS_VERSIONS[$version]} )
+			else
+				ammLog::Error "Unable to find a target url for template version '$version'"
+				return 1
+			fi
+	esac
+
+	# Check if we have something to fetch
+	if [[ -z "$url" ]]; then
+		ammLog::Err "Unable to get the URL for image version '$version'"
+		return 1
+	fi
+
+	# Try to fetch the image (else, check on vault.centos.org)
+	typeset url=""
+	for url in "${urls[@]}"; do
+
+		# Try to get the source from local storage
+		typeset srcname="${url##*/}";
+		typeset srcfilepath="$(ammLib::DataPathGet "images")/$srcname"
+
+		# TODO: All of this should be handled by ammArchive::Unpack
+
+		# try to get the rawfile extraction method from name (if needed)
+		typeset rawfilepath="$srcfilepath"
+		case "$srcname" in
+			*.raw.tar.gz|*.raw.tar.xz|*.raw.tar.bz2) rawfilepath="${srcfilepath%.tar.*}" ;;
+			# Skip tar archives
+			*.tar.gz|*.tar.xz|*.tar.bz2) ;;
+			*.xz)       rawfilepath="${srcfilepath%.*}"
+		esac
+
+		# TODO: place a lock here
+
+		# If the archive does not already exists, generate it
+		if ! [[ -s "$rawfilepath" ]]; then
+
+			# If the archive is different (compressed) we'll need to uncompress it
+			if [[ "$rawfilepath" != "$srcfilepath" ]]; then
+				typeset tmpfilepath="$(ammLib::TmpPathGet "image.$version")/${url##*/}"
+
+				# Check if archive is already downloaded
+				if ! [[ -s "$tmpfilepath" ]]; then
+
+					# Download the image
+					ammLog::Inf "Downloading compressed image '$url' as '$tmpfilepath'"
+					typeset dlfilepath="$(ammHttp::FetchSmart "$url" "$tmpfilepath")"
+					if [[ -z "$dlfilepath" ]]; then
+						ammLog::Err "Unable to download image from '$url'"
+						r+=1
+					fi
+				else
+					ammLog::Inf "Using already present compressed image '$tmpfilepath'"
+				fi
+
+				# Extract the compressed image
+				ammLog::Inf "Extracting tmp image to raw '$rawfilepath'"
+				case "$tmpfilepath" in
+					*.raw.tar.*)
+						if ! tar -xp -C "${rawfilepath%/*}" -f "$tmpfilepath"; then
+							ammLog::Err "Unable to extract data '$tmpfilepath'"
+							return 1
+						fi
+
+						;;
+					*.xz)
+						if ! xz -d "$tmpfilepath"; then
+							ammLog::Err "Unable to extract xz '$tmpfilepath'"
+							return 1
+						fi
+						# Move archive to destination
+						if ! mv "${tmpfilepath%.xz}" "$rawfilepath"; then
+							ammLog::Err "Unable to move '${tmpfilepath%.xz}' to '$rawfilepath'"
+							return 1
+						fi
+						;;
+					*)
+						ammLog::Err "Unable to pre-process '$tmpfilepath'. This is a bug, please report it"
+						;;
+				esac
+			fi
+
+			if ! [[ -s "$rawfilepath" ]]; then
+				ammLog::Err "Archive didn't contain raw file '$rawfilepath'"
+				return 1
+			fi
+		fi
+
+		# Extract uncompressed archive depending on type
+		case "$rawfilepath" in
+			*.tar.*)
+				# tar in tar archive
+				if [[ -n "$(tar -tf "$rawfilepath"|grep ^repositories)"  ]]; then
+					tar -x -O -f "$rawfilepath" '*/layer.tar' | tar -x -C "$chrootdir"
+
+				# Simple archive
+				else
+					tar -xpf "$rawfilepath" -C "$chrootdir"
+				fi
+				;;
+			*.raw)
+				# Mount temp filepath
+				typeset lodev="$(ammExec::AsUser "root" losetup --find "$rawfilepath" --show --partscan --read-only)"
+
+				if [[ -z "$lodev" ]]; then
+					ammLog::Err "Unable to mount raw file '$rawfilepath' using losetup"
+					return 1
+				fi
+
+				# Mount image
+				typeset mntdev="${lodev}p1"
+				typeset mntpnt="$(ammLib::TmpPathGet "")/mnt.root"
+				[[ -d "$mntpnt" ]] || mkdir -p "$mntpnt"
+				if ! ammExec::AsUser "root" mount "$mntdev" "$mntpnt"; then
+					ammLog::Err "Unable to mount image '$mntdev' to '$mntpnt'"
+					return 1
+				fi
+
+				# Copy archive to chroot
+				ammLog::Inf "Copying data from '$mntpnt' to '$chrootdir'"
+				\cp -a "$mntpnt/." "$chrootdir"
+
+				if ! ammExec::AsUser "root" umount "$mntpnt"; then
+					ammLog::Err "Unable to umount dir '$mntpnt'. Cleanup manually"
+				fi
+
+				;;
+			*.qcow2)
+				# Check for nbd module
+				#qemu-nbd --connect=/dev/nbd0 "$rawfilepath"
+				#mount /dev/nbd0p1 
+
+				# Of if available: virt-tar-out
+				# virt-tar-out -a  <image_name>.qcow2  /etc/ - | gzip --best > etc.tar
+
+				# Or convert it
+				# qemu-img convert -p -O raw oldfile.qcow2 newfile.raw
+
+				ammLog::Err "qcow2 images are not yet supported"
+				;;
+			*)
+				ammLog::Err "Unsupported archive format of '$rawfilepath'"
+				return 1
+		esac
+
+	done
+
+	return $r
+}
+
+function ammChrootCentos::InitFromHost {
+	typeset chrootdir="$1"
+	typeset version="$2"
+
+	# Create db from the host rpm version
+	ammPkgRpm::DbInit "$chrootdir"
+
+	typeset pkgpath="$__AMMLIB_DATA/chroot.centos.$version.basepkgs"
+	ammPkgYum::Download "$pkgpath" "centos-release"
+
+	ammpkgRpm::Install "$chrootdir" "$pkgpath/"*
+
+	# Import keys from host (or elsewhere)
+	typeset key
+	for key in "$chrootdir/etc/pki/rpm-gpg/RPM-GPG-KEY-"*; do
+		ammPkgRpm::DbKeyImport "$chrootdir" "$key"
+	done
+
+	# Install yum from the host configuration
+	ammPkgYum::Install --installroot="$chrootdir" \
+	    --setopt=cachedir="$chrootdir/var/cache/yum" \
+	    --setopt=tsflags='nodocs' \
+	    --setopt=override_install_langs=en_US.utf8 \
+	    --nogpgcheck -y \
+	    rpm yum
+
+	# Avoid installation of docs and other langs
+	sed -i "/distroverpkg=centos-release/a override_install_langs=en_US.utf8\ntsflags=nodocs" "$chrootdir/etc/yum.conf"
+
+}
+
+
+function ammChrootCentos::Populate {
+	typeset chrootdir="$1"
+	typeset version="$2"
+
+
+	# Base system
+	typeset pkgs="basesystem bash busybox coreutils filesystem redhat-release-server"
+	pkgs+="rpm yum rpm-build ca-certificates"
+
+	case $version in
+		6.*|7.*)
+			# Services
+			pkgs+="initscripts"
+			;;
+	esac
+
+	# Core
+	pkgs+="chkconfig procps-ng iputils mingetty"
+	# Utils and tools
+	pkgs+="bzip2 date gawk grep gzip info less"
+	pkgs+="ncurses perl pcre sed tar tee which"
+	# Build
+	pkgs+="elfutils findutils gcc make strace"
+
+	ammChroot::Exec "$chrootdir" "yum -y install $pkgs"
+
+}
+
+# @description: remove all non-necessary files
+function ammChrootCentos::Clean {
+	typeset chrootdir="$1"
+
+	ammChroot::Exec "$chrootdir" "yum clean all"
+}
+

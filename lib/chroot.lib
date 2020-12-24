@@ -1,0 +1,274 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammChroot::MetaCheck {
+	ammExec::Require awk
+	ammLib::Require  fs string config
+}
+
+function ammChroot::MetaInit {
+	_ammChroot::OSInit
+	ammLib::Load  fs string
+}
+# -----------------------------------------------------------------------------
+# Sub-libraries management
+# -----------------------------------------------------------------------------
+
+# Scan and populate the OS List
+function _ammChroot::OSInit {
+	(set +u; [[ -n "${__AMMCHROOT_OS:-}" ]] ) && return 0
+
+	for sublib in $(ammLib::LocatePattern "chroot.*"); do
+		ammLog::Inf "Trying to load sublib $sublib"
+
+		if ammLib::Loadable "$sublib"; then
+			ammLib::Load "$sublib"
+		else
+			ammLog::Wrn "Unable to load '$sublib'"
+		fi
+	done
+
+	if ( set +u; [[ -n "${__AMMCHROOT_OS[@]:-}" ]] ); then
+		ammLog::Wrn "No chroot sublib was loaded. Chroot unavailable"
+		return 1
+	fi
+}
+
+function _ammChroot::OSCall {
+	typeset osname="$1"
+	typeset func="$(ammString::ToCapital "$2")"
+	shift 2
+
+	typeset fname="ammChroot${osname}::${func}"
+	if ammIs::Func "$fname"; then
+		$fname "$@"
+	else
+		ammLog::Wrn "Requested function '$func' is not available for OS '$osname'"
+		return 1
+	fi
+}
+
+
+
+# -----------------------------------------------------------------------------
+# Local repositories and versions
+# -----------------------------------------------------------------------------
+
+
+# CentOS: http://mirror.centos.org/centos/$release/os/x86_64
+
+function ammChroot::OSNameValidate {
+	typeset name="$1"
+
+	_ammChroot::OSInit
+	ammString::ContainsWord "$name" "$__AMMCHROOT_OS"
+}
+
+function ammChroot::OSNameList {
+	_ammChroot::OSInit
+	echo $__AMMCHROOT_OS
+}
+
+
+# -----------------------------------------------------------------------------
+# Chroot runtime helpers
+# -----------------------------------------------------------------------------
+
+function ammChroot::Mounted {
+	typeset mntpnt="$1"
+	typeset mntopts="${2:-}"
+
+	typeset mnt="$(awk '$2 == "'$mntpnt'"{ print $4}' /proc/self/mounts)"
+
+	# We got a mountpoint
+	if [[ -n "$mnt" ]]; then
+		# If we seek a specific mountopts
+		if [[ -n "$mntopts" ]]; then
+			for mntneed in ${mntopts//,/ }; do
+				for mntgot in ${mnt//,/ }; do
+					[[ "${mntneed,,}" == "${mntgot,,}" ]] && continue
+				done
+
+				# We are still here, we didn't find our option
+				ammLog::Wrn "Didn't find requested opt: $lntneed in $mnt"
+				return 1
+			done
+		fi
+
+		return 0
+	fi
+
+	# Still here, not mounted
+	return 1
+}
+
+
+function ammChroot::Mount {
+	typeset chrootdir="$1"
+	typeset mntsrc="$2"
+	typeset mntdst="${3:-}"
+	typeset mntopts="${4:-}"
+
+	typeset mnttype=""
+
+	case "$mntsrc" in
+		proc)   mntsrc="proc"     ; mnttype="proc"    ; : ${mntdst:=$chrootdir/proc} ;;
+		dev)    mntsrc="devtmpfs" ; mnttype="devtmpfs"; : ${mntdst:=$chrootdir/dev}  ;;
+		devpts) mntsrc="devpts"   ; mnttype="devpts"  ; : ${mntdst:=$chrootdir/dev/pts} ;;
+		sys)    mntsrc="sys"      ; mnttype="sysfs"   ; : ${mntdst:=$chrootdir/sys}  ;;
+		tmpfs)  mntsrc="tmpfs"    ; mnttype="tmpfs"   ; : ${mntdst:=$chrootdir/run}  ;;
+		debugfs)mntsrc="debugfs"  ; mnttype="debugfs" ; : ${mntdst:=$chrootdir/sys/kernel/debug} ;;
+		*)
+			# If source is a folder, use bindmount
+			[[ -d "$mntsrc" ]] && mntopts+="${mntopts:+,}bind"
+			;;
+	esac
+
+	# If we didn't specify dst, assume it in chroot
+	[[ -z "$mntdst" ]] && mntdst="$chrootdir/$mntsrc"
+
+	# Mount the target
+	if ! [[ -d "$mntdst" ]]; then
+		ammLog::Inf "Target mount '$mntdst' does not exists. Creating"
+		mkdir -p "$mntdst"
+	fi
+
+	if ammChroot::Mounted "$mntdst"; then
+		ammLog::Inf "Mountpoint '$mntdst' already mounted"
+		return 0
+	fi
+
+	# Do the mount
+	mount $mnttype $mntopts "$mntsrc" "$mntdst"
+}
+
+function ammChroot::MountList {
+	typeset basedir="$1"
+	basedir="${basedir%/}"
+
+	typeset mounts="$(awk '$2 ~ /^'$basedir'/{ print $2}')"
+
+	echo "$mounts"
+	[[ -n "$mounts" ]]
+}
+
+function ammChroot::Umount {
+	typeset chrootdir="$1"
+	typeset mnt="$2"
+
+	typeset dev mntpnt fstyp opts _junk
+	while read dev mntpnt fstyp opts _junk; do
+		ammLog::Inf "Umount '$mnt' (dev:$dev fstyp:$fstyp opts:$opts)"
+		umount "$mntpnt" 2>/dev/null
+	done < <(awk '$2=="'$mnt'" {print $2}' /proc/self/mounts|sort -r)
+}
+
+# -----------------------------------------------------------------------------
+# Chroot creation / destruction
+# -----------------------------------------------------------------------------
+
+function ammChroot::Create {
+	typeset chrootdir="$(readlink -f $1)"
+	typeset osname="$2"
+	typeset osvers="${3:-}"
+
+	[[ -d "$chrootdir" ]] || {
+		mkdir -p "$chrootdir"
+	}
+
+	# Prepare base files
+#	echo "#!/bin/bash" > "$chrootdir/$_CHROOT_FILECMD"
+#	chmod +x "$dest/$_CHROOT_FILECMD"
+#	mkdir "$dest/$_CHROOT_PATHPKG"
+
+	ammLog::StepBegin "Creating new chroot in '$chrootdir'"
+
+	# Bind mount
+	ammLog::Inf "Mounting system mounts"
+	typeset dir
+	for dir in proc sys dev devpts tmpfs; do
+		ammChroot::Mount "$chrootdir" "$dir"
+	done
+
+	ammLog::Inf "Initializing OS"
+	_ammChroot::OSCall "$osname" "Init" "$chrootdir" "$osvers"
+
+
+	# Touch some files, cause dumb stuff happens...
+	mkdir -p "$chrootdir/etc"
+	touch "$chrootdir/etc/fstab"
+
+	# Copy resolv.conf
+	cp -f /etc/resolv.conf $dest/etc/resolv.conf
+
+	# Create the base system
+	ammLog::Inf "Populating the chroot with OS manager"
+	_ammChroot::OSCall "$osname" "Populate" "$chrootdir" || {
+		ammLog::Err "Error during populating chroot '$chrootdir'"
+		return 1
+	}
+
+	ammLog::StepEnd
+}
+
+function ammChroot::Destroy {
+	typeset chrootdir="$(readlink -f $1)"
+
+	chroot_isvalid "$chrootdir" || return 1
+
+
+	ammLog::StepBegin "Destroying chroot $chrootdir"
+
+	# 0: kill all process using the fs
+	ammLog::Inf "Killing all processes using the chroot"
+	# TODO
+
+	# 1: umount all fs under the chroot (normal, then force, then lazy)
+	mount | awk '{print $3}' | fgrep "$chrootdir" | sort -r | xargs -n1 umount 2>/dev/null
+	mount | awk '{print $3}' | fgrep "$chrootdir" | sort -r | xargs -n1 umount -f 2>/dev/null
+	mount | awk '{print $3}' | fgrep "$chrootdir" | sort -r | xargs -n1 umount -l 2>/dev/null
+	
+	# 2: Remove all data
+	rm -fr --one-file-system "$chrootdir"
+	
+	# Return if the root-folder was successfuly removed
+	[[ -e "$chrootdir" ]]
+}
+
+function ammChroot::SetKernel {
+	typeset chrootdir="$1"
+	typeset kvers="$2"
+	typeset installdevpkgs=true
+
+	# TODO: Install kernel + devel packages
+
+	# Create a uname wrapper for these dumb creators using "uname -r"
+	[[ ! -e "$chrootdir/bin/uname.bin" ]] && mv "$chrootdir/bin/uname" "$chrootdir/bin/uname.bin"
+
+	echo "$kver" > "$chrootdir/bin/uname.kver"
+	cat >"$chrootdir/bin/uname" <<-EOT
+	#!/bin/bash
+
+	typeset    UNAME_BIN="/bin/uname.bin"
+	typeset    REAL_KVER="\$(\$UNAME_BIN -r)"
+	typeset    FAKE_KVER="\$(cat \$0.kver)"
+
+	# Get the real output
+	OUTPUT="\$(\$UNAME_BIN \$@)"
+
+	# And replace the version by our fake
+	echo "\${OUTPUT/\$REAL_KVER/\$FAKE_KVER}"
+	EOT
+
+	chmod +x "$chrootdir/bin/uname"
+}
+
+

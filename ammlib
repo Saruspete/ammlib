@@ -861,6 +861,11 @@ function ammLog::Inf {
 	_ammLog::Log "INF" "bold green" "$@"
 }
 
+# @description  Log an information, about simple steps, not needed to be shown if no error
+function ammLog::Trace {
+	_ammLog::Log "TRC" "bold blue" "$@"
+}
+
 function ammLog::_DbgIsEnabled {
 	# Early tests
 	[[ $__AMMLOG_VERBOSITY -ge 2 ]] && return 0
@@ -891,7 +896,7 @@ function ammLog::Dbg {
 		# Get the caller
 		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}::${BASH_LINENO[0]}"
 
-		_ammLog::Log "DBG" "bold blue" "[$callerdbg] $@"
+		_ammLog::Log "DBG" "bold blue reverse" "[$callerdbg] $@"
 
 	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
 	else

@@ -77,7 +77,11 @@ function ammChroot::OSNameList {
 	echo $__AMMCHROOT_OS
 }
 
+function ammChroot::DirValidate {
+	typeset chrootdir="$1"
 
+	[[ -d "$chrootdir" ]] && [[ "$(readlink -f "$chrootdir")" != "/" ]]
+}
 # -----------------------------------------------------------------------------
 # Chroot runtime helpers
 # -----------------------------------------------------------------------------
@@ -147,7 +151,7 @@ function ammChroot::Mount {
 	fi
 
 	# Do the mount
-	mount $mnttype $mntopts "$mntsrc" "$mntdst"
+	ammExec::AsUser "root" "mount" ${mnttype:+-t $mnttype} ${mntopts:+-o $mntopts} "$mntsrc" "$mntdst"
 }
 
 function ammChroot::MountList {
@@ -171,6 +175,64 @@ function ammChroot::Umount {
 	done < <(awk '$2=="'$mnt'" {print $2}' /proc/self/mounts|sort -r)
 }
 
+
+function ammChroot::Start {
+	typeset chrootdir="$1"
+
+	if ! ammChroot::DirValidate "$chrootdir"; then
+		ammLog::Err "Invald chroot to start '$chrootdir'"
+		return 1
+	fi
+
+	# Mount minimum chroot
+	typeset mnt
+	for mnt in proc dev devpts sys tmpfs; do
+		if ! ammChroot::Mounted "$chrootdir/$mnt"; then
+			ammChroot::Mount "$chrootdir" "$mnt"
+		fi
+	done
+}
+
+function ammChroot::Stop {
+	typeset chrootdir="$1"
+
+	if ! ammChroot::DirValidate "$chrootdir"; then
+		ammLog::Err "Invald chroot to exec inside '$chrootdir'"
+		return 1
+	fi
+
+	# 0: kill all process using the fs
+	ammLog::Inf "Killing all processes using the chroot (TODO)"
+	# TODO
+
+	# 1: umount all fs under the chroot (normal, then force, then lazy)
+	ammLog::Inf "Umounting folders under '$chrootdir'"
+	typeset mnt
+	for mnt in $(awk '$2~/'${chrootdir////\\/}'/ {print $2}' /proc/mounts | sort -r); do
+		if ! ammExec::AsUser "root" umount "$mnt"; then
+			ammLog::Wrn "Unable to umount path '$mnt'"
+		fi
+	done
+
+	return 0
+}
+
+# @description  Execute a command inside a cheroot (ensure mounts are ok)
+function ammChroot::Exec {
+	typeset chrootdir="$1"
+	shift
+
+	if ! ammChroot::DirValidate "$chrootdir"; then
+		ammLog::Err "Invald chroot to exec inside '$chrootdir'"
+		return 1
+	fi
+
+	# Call start
+	ammChroot::Start "$chrootdir"
+
+	# And exec
+	ammExec::AsUser "root" "chroot" "$chrootdir" "$@"
+}
 # -----------------------------------------------------------------------------
 # Chroot creation / destruction
 # -----------------------------------------------------------------------------
@@ -222,25 +284,31 @@ function ammChroot::Create {
 function ammChroot::Destroy {
 	typeset chrootdir="$(readlink -f $1)"
 
-	chroot_isvalid "$chrootdir" || return 1
+	if ! ammChroot::DirValidate "$chrootdir"; then
+		ammLog::Err "Invalid chroot: '$chrootdir'"
+		return 1
+	fi
 
 
-	ammLog::StepBegin "Destroying chroot $chrootdir"
-
-	# 0: kill all process using the fs
-	ammLog::Inf "Killing all processes using the chroot"
-	# TODO
-
-	# 1: umount all fs under the chroot (normal, then force, then lazy)
-	mount | awk '{print $3}' | fgrep "$chrootdir" | sort -r | xargs -n1 umount 2>/dev/null
-	mount | awk '{print $3}' | fgrep "$chrootdir" | sort -r | xargs -n1 umount -f 2>/dev/null
-	mount | awk '{print $3}' | fgrep "$chrootdir" | sort -r | xargs -n1 umount -l 2>/dev/null
+	ammLog::StepBegin "Destroying chroot '$chrootdir'"
 	
+	if ! ammChroot::Stop "$chrootdir"; then
+		ammLog::Err "Cannot stop chroot '$chrootdir'"
+		ammLog::StepEnd 1
+		return 1
+	fi
+
 	# 2: Remove all data
-	rm -fr --one-file-system "$chrootdir"
+	rm -rf --one-file-system "$chrootdir"
 	
 	# Return if the root-folder was successfuly removed
-	[[ -e "$chrootdir" ]]
+	if [[ -e "$chrootdir" ]]; then
+		ammLog::StepEnd 1 "Folder '$chrootdir' still exists"
+		return 1
+	else
+		ammLog::StepEnd 0 "Folder '$chrootdir' successfully destroyed"
+		return 0
+	fi
 }
 
 function ammChroot::SetKernel {
@@ -270,5 +338,4 @@ function ammChroot::SetKernel {
 
 	chmod +x "$chrootdir/bin/uname"
 }
-
 

@@ -17,39 +17,58 @@ function ammChrootCentos::MetaCheck {
 function ammChrootCentos::MetaInit {
 	ammLib::Load "pkg" "pkg.yum" "config"
 
-	typeset -gA __AMMCHROOTCENTOS_VERSIONS=(
-		[6.7]="1601"
-		[6.8]="1605"
-		[6.9]="1704"
-		[6.10]="1808"
-		[7.0]="1406"
-		[7.1]="1503"
-		[7.2]="1511"
-		[7.3]="1611"
-		[7.4]="1708"
-		[7.5]="1804"
-		[7.6]="1810"
-		[7.7]="1908"
-		[7.8]="2003"
-		[8.0]="8.0.1905"
-		[8.1]="8.1.1911-20200113.3"
-		[8.2]="8.2.2004-20200611.2"
-		[8.3]="8.3.2011-20201204.2"
-	)
-
-	# Default versions for shorts
-	__AMMCHROOTCENTOS_VERSIONS+=(
-		[6]=${__AMMCHROOTCENTOS_VERSIONS[6.10]}
-		[7]=${__AMMCHROOTCENTOS_VERSIONS[7.8]}
-		[8]=${__AMMCHROOTCENTOS_VERSIONS[8.3]}
-	)
+	typeset -g  AMMCHROOTCENTOS_URL_CLOUD="https://cloud.centos.org"
+	typeset -g  AMMCHROOTCENTOS_URL_VAULT="https://vault.centos.org"
+	typeset -g  AMMCHROOTCENTOS_URL_MIRROR="https://mirror.centos.org"
+	typeset -g  AMMCHROOTCENTOS_URL_DEBUG="http://debuginfo.centos.org"
+	typeset -g  AMMCHROOTCENTOS_PATH_CACHE="$(ammLib::DataPathGet "cache")"
 
 	typeset -gA AMMCHROOTCENTOS_VERSIONS=
-	typeset -g  AMMCHROOTCENTOS_URL_CLOUD_MIRROR="https://cloud.centos.org"
+	typeset -gA __AMMCHROOTCENTOS_VERSIONS=(
+		[6.7]="1601" [6.8]="1605" [6.9]="1704" [6.10]="1808"
+		[7.0]="1406" [7.1]="1503" [7.2]="1511" [7.3]="1611" [7.4]="1708" [7.5]="1804" [7.6]="1810" [7.7]="1908" [7.8]="2003" [7.9]="2009"
+		[8.0]="8.0.1905" [8.1]="8.1.1911-20200113.3" [8.2]="8.2.2004-20200611.2" [8.3]="8.3.2011-20201204.2"
+	)
+	__AMMCHROOTCENTOS_VERSIONS+=(
+		[6]=${__AMMCHROOTCENTOS_VERSIONS[6.10]}
+		[7]=${__AMMCHROOTCENTOS_VERSIONS[7.9]}
+		[8]=${__AMMCHROOTCENTOS_VERSIONS[8.3]}
+	)
+	typeset -gA AMMCHROOTCENTOS_REPO_URLS=
+	typeset -gA AMMCHROOTCENTOS_REPO_LIST=
+	typeset -gA AMMCHROOTCENTOS_REPO_GPG=
 
-	ammConfig::VarDeclare "AMMCHROOTCENTOS_VERSIONS"         "assoc"  "Additional versions available"
-	ammConfig::VarDeclare "AMMCHROOTCENTOS_URL_CLOUD_MIRROR" "string" "Base URL/Mirror for cloud.centos.org"
-	ammConfig::FileLoad "toto"
+	# Mirrorlist is only for latest version, else it's in the vault
+	typeset repo vers
+	for repo in os updates extras centosplus fasttrack BaseOS AppStream; do
+		AMMCHROOTCENTOS_REPO_URLS[$repo]=$AMMCHROOTCENTOS_URL_VAULT'/$releasever/'$repo'/$basearch'
+	done
+	AMMCHROOTCENTOS_REPO_URLS[debuginfo]=$AMMCHROOTCENTOS_URL_DEBUG'/$releasever/$basearch/'
+
+	# The latest ones have faster mirrorlist
+	for v in 7 8; do
+		#AMMCHROOTCENTOS_REPO_URLS[$repo]='mirrorlist:http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo='$repo'&infra=$infra'
+		:
+	done
+
+	typeset v;
+	for v in ${!__AMMCHROOTCENTOS_VERSIONS[@]}; do
+		case "$v" in
+			6*|7*)  AMMCHROOTCENTOS_REPO_LIST[$v]="os updates extras centosplus" ;;
+			8*)     AMMCHROOTCENTOS_REPO_LIST[$v]="BaseOS AppStream" ;;
+		esac
+	done
+
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_VERSIONS"   "assoc"  "Additional versions available"
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_REPO_URLS"  "assoc"  "Repositories available: [id]=url"
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_REPO_LIST"  "assoc"  "Repositories selected from available: [CentOSversion]='id1 id2 id3...'"
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_URL_CLOUD"  "string" "Base URL for cloud.centos.org"
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_URL_VAULT"  "string" "Base URL for vault.centos.org"
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_URL_DEBUG"  "string" "Base URL for debuginfo.centos.org"
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_URL_MIRROR" "string" "Base URL for mirror.centos.org"
+	ammConfig::VarDeclare "AMMCHROOTCENTOS_PATH_CACHE" "string" "Path to package cache"
+	ammConfig::FileLoad "defaults.conf"
+
 }
 
 # -----------------------------------------------------------------------------
@@ -104,7 +123,7 @@ function ammChrootCentos::InitFromTemplate {
 				fi
 			fi
 
-			url="$AMMCHROOTCENTOS_URL_CLOUD_MIRROR/centos/8/x86_64/images/CentOS-8-Container"
+			url="$AMMCHROOTCENTOS_URL_CLOUD/centos/8/x86_64/images/CentOS-8-Container"
 			[[ -n "$release" ]] && url+="-$release"
 
 			urls+=("${url}.x86_64.tar.xz" "${url}-layer.x86_64.tar.gz")
@@ -130,7 +149,7 @@ function ammChrootCentos::InitFromTemplate {
 				fi
 			fi
 
-			url="$AMMCHROOTCENTOS_URL_CLOUD_MIRROR/centos/$maj/images/CentOS-${maj}-x86_64-GenericCloud"
+			url="$AMMCHROOTCENTOS_URL_CLOUD/centos/$maj/images/CentOS-${maj}-x86_64-GenericCloud"
 			[[ -n "$release" ]] && url+="-$release"
 			url+=".raw.tar.gz"
 
@@ -240,7 +259,7 @@ function ammChrootCentos::InitFromTemplate {
 					tar -xpf "$rawfilepath" -C "$chrootdir"
 				fi
 				;;
-			*.raw)
+			*.raw) 
 				# Mount temp filepath
 				typeset lodev="$(ammExec::AsUser "root" losetup --find "$rawfilepath" --show --partscan --read-only)"
 
@@ -290,23 +309,57 @@ function ammChrootCentos::InitFromTemplate {
 	return $r
 }
 
-function ammChrootCentos::InitFromHost {
+# @description  Create a new chroot 
+# @arg $1  (path) Location of the chroot to be created
+# @arg $2  (string) Version of the CentOS release to be created
+# @arg $@  (string) (optional) Tuples "name=url" of repositories to be set, instead of defaults
+function ammChrootCentos::InitFromPkg {
 	typeset chrootdir="$1"
 	typeset version="$2"
+	shift 2
+
+	typeset versionRelease="$version.${__AMMCHROOTCENTOS_VERSIONS[$version]}"
 
 	# Create db from the host rpm version
 	ammPkgRpm::DbInit "$chrootdir"
 
-	typeset pkgpath="$__AMMLIB_DATA/chroot.centos.$version.basepkgs"
-	ammPkgYum::Download "$pkgpath" "centos-release"
+	#
+	# Configure Yum 
+	#
 
-	ammpkgRpm::Install "$chrootdir" "$pkgpath/"*
+	ammPkgYum::ReleaseSet "$chrootdir" "$versionRelease"
 
-	# Import keys from host (or elsewhere)
-	typeset key
-	for key in "$chrootdir/etc/pki/rpm-gpg/RPM-GPG-KEY-"*; do
-		ammPkgRpm::DbKeyImport "$chrootdir" "$key"
-	done
+	# Set provided repos
+	if [[ $# -gt 0 ]]; then
+		typeset repo
+		for repo in "$@"; do
+			typeset name="${repo%%=*}" url="${repo#*=}"
+			ammPkgYum::RepoConfigure "$chrootdir/etc/yum.repos.d/default.repo" "" "$name" "$url"
+		done
+	# Or use default ones
+	else
+		typeset repoid repourl
+		for repoid in ${AMMCHROOTCENTOS_REPO_LIST[$version]}; do
+			for repourl in ${AMMCHROOTCENTOS_REPO_URLS[$repoid]}; do
+				ammPkgYum::RepoConfigure "$chrootdir/etc/yum.repos.d/default.repo" "$repoid" "" "$repourl"
+			done
+		done
+	fi
+
+	# Download the release files from our host yum version
+	typeset pkgpath="$AMMCHROOTCENTOS_PATH_CACHE/pkgs.$version"
+	ammPkgYum::Download "$chrootdir" "$pkgpath" "centos-release"
+
+	# Install minimum in chroot
+	ammPkgRpm::Install "$chrootdir" "$pkgpath/centos-release"*
+
+	# Remove automatically added repos
+	typeset repoOld="$chrootdir/etc/yum.repos.d/disabled"
+	mkdir --parents "$repoOld"
+	mv "$chrootdir/etc/yum.repos.d/CentOS-"*  "$repoOld"
+
+	# Import keys from chroot (or elsewhere)
+	ammPkgRpm::GpgKeyImport "$chrootdir" "$chrootdir/etc/pki/rpm-gpg/RPM-GPG-KEY-"*
 
 	# Install yum from the host configuration
 	ammPkgYum::Install --installroot="$chrootdir" \
@@ -316,8 +369,22 @@ function ammChrootCentos::InitFromHost {
 	    --nogpgcheck -y \
 	    rpm yum
 
+	# Note: for DNF, already looks in --installroot
+	#    --setopt=reposdir="$chrootdir/etc/yum.repos.d" \
+	#    --setopt=logfile="$chrootdir/var/log/yum.log" \
+	#    --setopt=config_file_path="$chrootdir/etc/yum/yum.conf" \
+
 	# Avoid installation of docs and other langs
-	sed -i "/distroverpkg=centos-release/a override_install_langs=en_US.utf8\ntsflags=nodocs" "$chrootdir/etc/yum.conf"
+	ammExec::AsUser "root" sed -i  "$chrootdir/etc/yum.conf" -e "/distroverpkg=centos-release/a override_install_langs=en_US.utf8\ntsflags=nodocs"
+
+	# Remove non-native RPMdb (from host)
+	ammExec::AsUser "root" mv "$chrootdir/var/lib/rpm" "$chrootdir/var/lib/rpm.host"
+	ammChroot::Exec "$chrootdir" rpm --initdb
+	typeset key
+	for key in "$chrootdir/etc/pki/rpm-gpg/RPM-GPG-KEY-"*; do
+		ammChroot::Exec "$chrootdir" rpm --import "${key#$chrootdir}"
+	done
+	ammChroot::Exec "$chrootdir" yum install -y yum rpm
 
 }
 
@@ -328,25 +395,25 @@ function ammChrootCentos::Populate {
 
 
 	# Base system
-	typeset pkgs="basesystem bash busybox coreutils filesystem redhat-release-server"
-	pkgs+="rpm yum rpm-build ca-certificates"
+	typeset pkgs="basesystem bash busybox coreutils filesystem"
+	pkgs+=" rpm yum rpm-build ca-certificates"
 
 	case $version in
 		6.*|7.*)
 			# Services
-			pkgs+="initscripts"
+			pkgs+=" initscripts"
 			;;
 	esac
 
 	# Core
-	pkgs+="chkconfig procps-ng iputils mingetty"
+	pkgs+=" chkconfig procps-ng iputils mingetty"
 	# Utils and tools
-	pkgs+="bzip2 date gawk grep gzip info less"
-	pkgs+="ncurses perl pcre sed tar tee which"
+	pkgs+=" bzip2 date gawk grep gzip info less"
+	#pkgs+="ncurses perl pcre sed tar tee which"
 	# Build
-	pkgs+="elfutils findutils gcc make strace"
+	#pkgs+="elfutils findutils gcc make strace"
 
-	ammChroot::Exec "$chrootdir" "yum -y install $pkgs"
+	ammChroot::Exec "$chrootdir" yum -y install $pkgs
 
 }
 

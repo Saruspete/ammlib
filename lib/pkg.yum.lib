@@ -19,6 +19,14 @@ function ammPkgYum::MetaCheck {
 }
 function ammPkgYum::MetaInit {
 	ammLib::Require pkg.rpm string
+
+
+	typeset -gA AMMPKGYUM_REPO_DEFAULTS=(
+		[enabled]="1"
+		[metadata_expire]="1d"
+		[type]="rpm"
+		[skip_if_unavailable]="True"
+	)
 }
 
 function ammPkgYum::IsAvailable {
@@ -242,7 +250,9 @@ function ammPkgYum::DownloadRecursive {
 #
 # @stdout  (path[]) List of archives downloaded
 function ammPkgYum::Download {
-	typeset outdir="$1"; shift
+	typeset root="${1:-/}"
+	typeset outdir="$2"
+	shift 2
 
 	[[ -d "$outdir" ]] || mkdir -p "$outdir"
 
@@ -253,18 +263,18 @@ function ammPkgYum::Download {
 	typeset -a dlcmd=""
 
 	# Select the best available command
-	if ammExec::Exists yumdownloader >/dev/null; then
-		ammLog::Dbg "Using yumdownloader to download '$@'"
-		dlcmd=(yumdownloader --destdir "$outdir" "$@")
+	if ammExec::Exists yumdownloader; then
+		dlcmd=(yumdownloader --installroot "$root" --destdir "$outdir" "$@")
+		ammLog::Dbg "Using yumdownloader as '${dlcmd[@]}'"
 
 	# Need to do some checks due to yum being lazy
 	else
-		ammLog::Dbg "Failback to yum to download '$@'"
-		typeset cmdbase="_ammPkgYum::Yum --downloadonly --downloaddir=\"$outdir\""
+		typeset cmdbase="_ammPkgYum::Yum --installroot=\"$root\" --downloadonly --downloaddir=\"$outdir\""
 		dlcmd=(eval "(" $cmdbase install "$@" ";" $cmdbase reinstall "$@" ")")
+		ammLog::Dbg "Failback to yum with '${dlcmd[@]}'"
 	fi
 
-	${dlcmd[@]} 2>/dev/null | while read f1 f2 f3 f4 _junk; do
+	${dlcmd[@]} | while read f1 f2 f3 f4 _junk; do
 		# YUM: ---> Package htop.x86_64 0:2.2.0-3.el7 will be installed
 		if [[ "$f1" == "--->" ]]; then
 			# The downloaded version is the new or update
@@ -323,6 +333,110 @@ function ammPkgYum::Extract {
 
 }
 
+
+# -----------------------------------------------------------------------------
+# Repository configuration
+# -----------------------------------------------------------------------------
+
+function ammPkgYum::RepoConfigure {
+	typeset file="$1"
+	typeset id="${2:-}"
+	typeset name="${3:-}"
+	typeset url="$4"
+	shift 4
+
+	# Check for filename
+	[[ "${file#*.repo}" == "$file" ]] && ammLog::Wrn "The file '$file' does not end with '.repo', this likely won't work"
+
+	# Some defaults if needed
+	[[ -z "$id" ]] && id="${file##*/}" && id="${id%.repo}" && id="${id// /-}"
+	[[ -z "$name" ]] && name="$id"
+
+	typeset urltype="baseurl"
+	case "$url" in
+		metalink:*|mirrorlist:*)
+			urltype="${url%%:*}"
+			url="${url#*:}"
+			;;
+	esac
+
+
+	# Set the basic vars
+	if ! [[ -d "${file%/*}" ]]; then
+		if ! mkdir --parents "${file%/*}"; then
+			ammLog::Err "Unable to create parent dir for '$file'"
+			return 1
+		fi
+	fi
+	cat >> "$file" <<-EOT
+		[$id]
+		name=$name
+		$urltype=$url
+		EOT
+
+	typeset extra
+	typeset -A extras=$(ammEnv::VarReturnArray AMMPKGYUM_REPO_DEFAULTS)
+	for extra in "$@"; do
+		if [[ "${extra//=/}" == "$extra" ]]; then
+			ammLog::Wrn "Malformated extra config: $extra (wanted format variable=value)"
+			continue
+		fi
+
+		# add or change defaults with provided extra
+		extras[${extra%%=*}]="${extra#*=}"
+	done
+
+	# Export default values to config file
+	for extra in "${!extras[@]}"; do
+		echo >> "$file" "$extra=${extras[$extra]}"
+	done
+	echo >> "$file"
+}
+
+function ammPkgYum::_RepoSet {
+	typeset file="$1"
+	typeset name="$2"
+	typeset var="$3"
+	typeset val="$4"
+}
+
+# @description  Override a release version var
+function ammPkgYum::ReleaseSet {
+	typeset root="${1:-/}"
+	typeset releasever="$2"
+
+	# Override with /etc/yum/vars
+	typeset dst="$root/etc/yum/vars/releasever"
+	if ! [[ -d "${dst%/*}" ]]; then
+		if ! mkdir --parents "${dst%/*}"; then
+			ammLog::Err "Unable to create parent dir for '$file'"
+			return 1
+		fi
+	fi
+
+	echo "$releasever" >| "$dst"
+}
+
+function ammPkgYum::ConfigSet {
+	typeset file="$1"
+	typeset var="$2"
+	typeset val="$3"
+
+	if ! [[ -s "$file" ]]; then
+		if ! [[ -d "${file%/*}" ]]; then
+			if ! mkdir --parents "${file%/*}"; then
+				ammLog::Err "Unable to create parent dir for '$file'"
+				return 1
+			fi
+		fi
+
+		echo "[main]" >| "$file"
+	fi
+
+	# TODO: smarter ini parser
+	echo "$var=$val" >> "$file"
+
+}
 
 # -----------------------------------------------------------------------------
 # Yum emulation

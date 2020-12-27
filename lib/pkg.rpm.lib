@@ -51,7 +51,7 @@ function _ammPkgRpm::Rpm {
 
 			# If the arg is a folder, and it has a valid rpmlib db, use it
 			if [[ -d "$1" ]] && [[ -s "$1/var/lib/rpm/Packages" ]]; then
-				opts+=" --root='$1'"
+				opts+=" --root=$1"
 				shift
 			else
 				break
@@ -94,7 +94,7 @@ function ammPkgRpm::Install {
 		fi
 	done
 
-	_ammPkgRPm::Rpm "${installopts[@]} --upgrade --oldpackage" "$@"
+	_ammPkgRpm::Rpm "${installopts[@]}" --upgrade --oldpackage "$@"
 }
 
 
@@ -192,29 +192,33 @@ function ammPkgRpm::InfoRequiresToPkg {
 function ammPkgRpm::DbInit {
 	typeset prefix="${1:-}"
 
+	# I must add the root exlicitely, as the files checked by _rpm doen't exists yet
 	typeset rpmopts=""
 	if [[ -n "$prefix" ]]; then
 		[[ -d "$prefix" ]] || mkdir -p "$prefix"
 		rpmopts+="--root=$prefix"
 	fi
-	rpm $rpmopts --initdb
+	_ammPkgRpm::Rpm $rpmopts --initdb
 }
 
-function ammPkgRpm::DbKeyImport {
-	typeset prefix="${1:-}";
+function ammPkgRpm::GpgKeyImport {
+	_ammPkgRpm::Rpm --import "$@"
+}
 
-	# If the first element is a folder, consider it a prefix
-	if [[ -d "$prefix" ]]; then
-		shift
-	else
-		prefix=""
-	fi
+function ammPkgRpm::GpgKeyExport {
+	_ammPkgRpm::Rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
+}
 
-	typeset rpmopts=""
+function ammPkgRpm::GpgKeyRemove {
+	typeset prefix="${1:-}"
+	
+	typeset key
+	typeset -a keys
 	for key in "$@"; do
-		[[ -n "$prefix" ]] && rpmopts+=" --root=$prefix"
-		rpm $rpmopts "$key"
+		[[ "${key#gpg-pubkey}" == "$key" ]] && key="gpg-pubkey-$key"
+		keys+=("$key")
 	done
+	_ammPkgRpm::Rpm -e "${keys[@]}"
 }
 
 function ammPkgRpm::DbExport {

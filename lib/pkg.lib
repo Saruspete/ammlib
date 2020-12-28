@@ -9,13 +9,14 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+typeset -gA __AMMPKG_PATHTOTYPE
+
 function ammPkg::MetaCheck {
 	ammLib::Require string
 	ammExec::Require ldd
 }
 
 function ammPkg::MetaInit {
-	typeset -gA __AMMPKG_PATHTOTYPE
 
 	# Try to load the local package manager to avoid redundancy
 	typeset localpkgmgr="$(ammPkg::ManagerDetect)"

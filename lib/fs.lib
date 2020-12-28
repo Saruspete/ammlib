@@ -9,15 +9,22 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+typeset -gA __AMMFS_MOUNT2STORE_CACHE
+typeset -gA __AMMFS_MOUNT2OPTS_CACHE
+typeset -gA __AMMFS_MOUNT2TYPE_CACHE
+typeset -gA __AMMFS_STORE2MOUNT_CACHE
+typeset -gA __AMMFS_ABS2STORE_CACHE
+typeset -g  __AMMFS_CACHED
+
 function ammFs::MetaInit {
 #	ammExec::Require awk
 
-	typeset -gA __AMMFS_MOUNT2STORE_CACHE
-	typeset -gA __AMMFS_MOUNT2OPTS_CACHE
-	typeset -gA __AMMFS_MOUNT2TYPE_CACHE
-	typeset -gA __AMMFS_STORE2MOUNT_CACHE
-	typeset -gA __AMMFS_ABS2STORE_CACHE
-	typeset -g  __AMMFS_CACHED=false
+	__AMMFS_MOUNT2STORE_CACHE=
+	__AMMFS_MOUNT2OPTS_CACHE=
+	__AMMFS_MOUNT2TYPE_CACHE=
+	__AMMFS_STORE2MOUNT_CACHE=
+	__AMMFS_ABS2STORE_CACHE=
+	__AMMFS_CACHED=false
 
 }
 

@@ -9,6 +9,35 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+	# Prefix to look for
+	typeset -g  __AMMINPUT_PREFIX
+
+	# Canary for populating before get
+	typeset -g  __AMMINPUT_POPULATED
+
+	# List of registered questions from InputRegister
+	typeset -ga __AMMINPUT_ORDER)
+	typeset -gA __AMMINPUT_IDS
+	typeset -gA __AMMINPUT_DEFAULTS
+	typeset -gA __AMMINPUT_VALIDATIONCB
+	typeset -gA __AMMINPUT_HELP
+
+	# State for blueprint
+	typeset -gA __AMMINPUT_REPLIES
+	typeset -gA __AMMINPUT_REPLIES_FROMENV
+	typeset -gA __AMMINPUT_REPLIES_FROMCMD
+
+	typeset -gA __AMMINPUT_REPLIES_USED
+	typeset -gA __AMMINPUT_REPLIES_UNKNOWNID
+
+	# Behaviour management
+	typeset -g __AMMINPUT_BATCH_AUTOTRY
+	typeset -g __AMMINPUT_BATCH_DIE_ON_ERR
+	typeset -g __AMMINPUT_BATCH_SILENTOK
+
+
+
+
 function ammInput::MetaCheck {
 	ammLib::Require string
 }
@@ -16,30 +45,30 @@ function ammInput::MetaInit {
 	ammLib::Require string
 
 	# Prefix to look for
-	typeset -g  __AMMINPUT_PREFIX="input-"
+	__AMMINPUT_PREFIX="input-"
 
 	# Canary for populating before get
-	typeset -g  __AMMINPUT_POPULATED=false
+	__AMMINPUT_POPULATED=false
 
 	# List of registered questions from InputRegister
-	typeset -ga __AMMINPUT_ORDER=()
-	typeset -gA __AMMINPUT_IDS=()
-	typeset -gA __AMMINPUT_DEFAULTS=()
-	typeset -gA __AMMINPUT_VALIDATIONCB=()
-	typeset -gA __AMMINPUT_HELP=()
+	__AMMINPUT_ORDER=()
+	__AMMINPUT_IDS=()
+	__AMMINPUT_DEFAULTS=()
+	__AMMINPUT_VALIDATIONCB=()
+	__AMMINPUT_HELP=()
 
 	# State for blueprint
-	typeset -gA __AMMINPUT_REPLIES=()
-	typeset -gA __AMMINPUT_REPLIES_FROMENV=()
-	typeset -gA __AMMINPUT_REPLIES_FROMCMD=()
+	__AMMINPUT_REPLIES=()
+	__AMMINPUT_REPLIES_FROMENV=()
+	__AMMINPUT_REPLIES_FROMCMD=()
 
-	typeset -gA __AMMINPUT_REPLIES_USED=()
-	typeset -gA __AMMINPUT_REPLIES_UNKNOWNID=()
+	__AMMINPUT_REPLIES_USED=()
+	__AMMINPUT_REPLIES_UNKNOWNID=()
 
 	# Behaviour management
-	typeset -g __AMMINPUT_BATCH_AUTOTRY=false
-	typeset -g __AMMINPUT_BATCH_DIE_ON_ERR=false
-	typeset -g __AMMINPUT_BATCH_SILENTOK=false
+	__AMMINPUT_BATCH_AUTOTRY=false
+	__AMMINPUT_BATCH_DIE_ON_ERR=false
+	__AMMINPUT_BATCH_SILENTOK=false
 
 	# If we can't have user interaction, dont mind to ask for it
 	if ! $__AMMLIB_INTERACTIVE; then

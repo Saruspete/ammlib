@@ -10,6 +10,15 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+typeset -g  AMMCHROOTUBUNTU_URL_RELEASES
+typeset -g  AMMCHROOTUBUNTU_URL_CLOUDIMG
+typeset -g  AMMCHROOTUBUNTU_PATH_CACHE
+typeset -gA AMMCHROOTUBUNTU_VERSIONS
+typeset -gA __AMMCHROOTUBUNTU_VERSIONS
+typeset -gA __AMMCHROOTUBUNTU_ARCHS
+typeset -gA __AMMCHROOTUBUNTU_ARCHS_MAP
+
+
 function ammChrootUbuntu::MetaCheck {
 	ammLib::Loadable "pkg" "config"
 }
@@ -20,12 +29,12 @@ function ammChrootUbuntu::MetaInit {
 		ammLog::UnavaiableFunc "ammChrootUbuntu::InitFromPackage" "pkg.apt module cannot be loaded. Is apt binary available?"
 	fi
 
-	typeset -g  AMMCHROOTUBUNTU_URL_RELEASES="http://releases.ubuntu.com"
-	typeset -g  AMMCHROOTUBUNTU_URL_CLOUDIMG="http://cloud-images.ubuntu.com"
-	typeset -g  AMMCHROOTUBUNTU_PATH_CACHE="$(ammLib::DataPathGet "cache")"
+	AMMCHROOTUBUNTU_URL_RELEASES="http://releases.ubuntu.com"
+	AMMCHROOTUBUNTU_URL_CLOUDIMG="http://cloud-images.ubuntu.com"
+	AMMCHROOTUBUNTU_PATH_CACHE="$(ammLib::DataPathGet "cache")"
 
-	typeset -gA AMMCHROOTUBUNTU_VERSIONS=
-	typeset -gA __AMMCHROOTUBUNTU_VERSIONS=(
+	AMMCHROOTUBUNTU_VERSIONS=
+	__AMMCHROOTUBUNTU_VERSIONS=(
 		[trusty]=14.04   [trustytahr]=14.04
 		[xenial]=16.04   [xenialxerus]=16.04
 		[yakkety]=16.10  [yakketyyak]=16.10
@@ -39,12 +48,12 @@ function ammChrootUbuntu::MetaInit {
 		[groovy]=20.10   [groovygorilla]=20.10
 		[hirsute]=21.04  [hirsutehippo]=21.04
 	)
-	typeset -gA __AMMCHROOTUBUNTU_ARCHS=(
+	__AMMCHROOTUBUNTU_ARCHS=(
 		[i386]="x86 32bits"   [amd64]="x86 64bits"
 		[amrel]="ARM 32bits"  [armhf]="ARM 32bits + FPU"  [arm64]="ARM 64bits"
 		[power]="PowerPC"     [ppc64el]="PowerPC 64Bits"
 	)
-	typeset -gA __AMMCHROOTUBUNTU_ARCHS_MAP=(
+	__AMMCHROOTUBUNTU_ARCHS_MAP=(
 		[x86]=i386      [x86_64]=amd64
 		[arm6]=armel    [arm7]=armhf    [arm8]=arm64
 		[power]=powerpc [power64]=ppc64el

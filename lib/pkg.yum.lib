@@ -10,6 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 #typeset -g AMMPKGYUM_AVAIL_
+typeset -gA AMMPKGYUM_REPO_DEFAULTS
 
 # Some tools are required for this module to work
 function ammPkgYum::MetaCheck {
@@ -21,7 +22,7 @@ function ammPkgYum::MetaInit {
 	ammLib::Require pkg.rpm string
 
 
-	typeset -gA AMMPKGYUM_REPO_DEFAULTS=(
+	AMMPKGYUM_REPO_DEFAULTS=(
 		[enabled]="1"
 		[metadata_expire]="1d"
 		[type]="rpm"
@@ -409,13 +410,34 @@ function ammPkgYum::ReleaseSet {
 	typeset dst="$root/etc/yum/vars/releasever"
 	if ! [[ -d "${dst%/*}" ]]; then
 		if ! mkdir --parents "${dst%/*}"; then
-			ammLog::Err "Unable to create parent dir for '$file'"
-			return 1
+		ammLog::Err "Unable to create parent dir for '$file'"
+		return 1
 		fi
 	fi
 
 	echo "$releasever" >| "$dst"
+
+	# Override in yum.conf
+	ammPkgYum::ConfigSet "$root/etc/yum.conf" "releasever" "$releasever"
+	ammPkgYum::ConfigSet "$root/etc/yum.conf" "distroverpkg" "$releasever"
 }
+
+function ammPkgYum::ReleaseGet {
+	typeset root="${1:-/}"
+
+	if [[ "$root" != "/" ]]; then
+		ammLog::Err "Different root from / is not yet supported"
+		return 1
+	fi
+
+	if ammPkgYum::IsDnf; then
+		python -c 'import dnf; db = dnf.dnf.Base(); print(db.conf.substitutions["releasever"])'
+	else
+		# Remove potential message "Loaded plugin"
+		python -c 'import yum; yb = yum.YumBase(); print yb.conf.yumvar["releasever"]' | tail -n 1
+	fi
+}
+
 
 function ammPkgYum::ConfigSet {
 	typeset file="$1"

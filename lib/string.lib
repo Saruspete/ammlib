@@ -10,12 +10,15 @@ function ammString::MetaCheck {
 	ammExec::Require seq tr
 }
 
+typeset -g __AMMSTRING_UUID_MACADDR
+typeset -g __AMMSTRING_UUID_TS1582
+
 function ammString::MetaInit {
-	typeset -g __AMMSTRING_UUID_MACADDR=""
+	__AMMSTRING_UUID_MACADDR=""
 
 	# Days diff in Julian Calendar between 15 oct 1582 (uuid) and 1jan 1970 (epoch)
 	#typeset -g __AMMSTRING_UUID_CALJUL2UNX=$(( (2440587 - 2299160) ))
-	typeset -g __AMMSTRING_UUID_TS1582=$(( (2440587 - 2299160) * 86400 ))
+	__AMMSTRING_UUID_TS1582=$(( (2440587 - 2299160) * 86400 ))
 
 }
 

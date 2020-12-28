@@ -9,6 +9,15 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+typeset -gi AMMSTORAGE_MAJOR_DM
+typeset -gi AMMSTORAGE_MAJOR_MD
+typeset -gi AMMSTORAGE_MAJOR_LOOP
+typeset -gi AMMSTORAGE_MAJOR_DRBD
+typeset -g  AMMSTORAGE_UDEV_DATAPATH
+typeset -gA AMMSTORAGE_UDEV_CACHE AMMSTORAGE_UDEV_PARSED
+typeset -ga AMMSTORAGE_LSBLKFIELDS
+
+
 function ammStorage::MetaCheck {
 	# Should be in util-linux
 	#ammExec::RequireOne lsblk blkid
@@ -17,15 +26,15 @@ function ammStorage::MetaCheck {
 function ammStorage::MetaInit {
 
 	# Some values are fixed in include/uapi/linux/major.h, some are dynamics
-	typeset -gi AMMSTORAGE_MAJOR_DM="$(ammStorage::_GetModuleMajor "device-mapper")"
-	typeset -gi AMMSTORAGE_MAJOR_MD=9
-	typeset -gi AMMSTORAGE_MAJOR_LOOP=7
-	typeset -gi AMMSTORAGE_MAJOR_DRBD=147
+	AMMSTORAGE_MAJOR_DM="$(ammStorage::_GetModuleMajor "device-mapper")"
+	AMMSTORAGE_MAJOR_MD=9
+	AMMSTORAGE_MAJOR_LOOP=7
+	AMMSTORAGE_MAJOR_DRBD=147
 
-	typeset -g  AMMSTORAGE_UDEV_DATAPATH="/run/udev/data"
-	typeset -gA AMMSTORAGE_UDEV_CACHE=  AMMSTORAGE_UDEV_PARSED=
+	AMMSTORAGE_UDEV_DATAPATH="/run/udev/data"
+	AMMSTORAGE_UDEV_CACHE=  AMMSTORAGE_UDEV_PARSED=
 
-	typeset -ga AMMSTORAGE_LSBLKFIELDS=(
+	AMMSTORAGE_LSBLKFIELDS=(
 		# Identifiers & HW Spec
 		"NAME" "KNAME" "PATH" "MAJ:MIN" "UUID" "VENDOR" "MODEL" "SERIAL" "SIZE"
 		# Partition

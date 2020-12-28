@@ -10,6 +10,18 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+typeset -g  AMMCHROOTCENTOS_URL_CLOUD
+typeset -g  AMMCHROOTCENTOS_URL_VAULT
+typeset -g  AMMCHROOTCENTOS_URL_MIRROR
+typeset -g  AMMCHROOTCENTOS_URL_DEBUG
+typeset -g  AMMCHROOTCENTOS_PATH_CACHE
+
+typeset -gA AMMCHROOTCENTOS_VERSIONS
+typeset -gA __AMMCHROOTCENTOS_VERSIONS
+typeset -gA AMMCHROOTCENTOS_REPO_URLS
+typeset -gA AMMCHROOTCENTOS_REPO_LIST
+typeset -gA AMMCHROOTCENTOS_REPO_GPG
+
 function ammChrootCentos::MetaCheck {
 	ammLib::Loadable "pkg" "config"
 }
@@ -23,14 +35,13 @@ function ammChrootCentos::MetaInit {
 		ammLog::UnavailableFunc "ammChrootCentos::InitFromTemplate" "http module cannot be loaded"
 	fi
 
-	typeset -g  AMMCHROOTCENTOS_URL_CLOUD="https://cloud.centos.org"
-	typeset -g  AMMCHROOTCENTOS_URL_VAULT="https://vault.centos.org"
-	typeset -g  AMMCHROOTCENTOS_URL_MIRROR="https://mirror.centos.org"
-	typeset -g  AMMCHROOTCENTOS_URL_DEBUG="http://debuginfo.centos.org"
-	typeset -g  AMMCHROOTCENTOS_PATH_CACHE="$(ammLib::DataPathGet "cache")"
+	AMMCHROOTCENTOS_URL_CLOUD="https://cloud.centos.org"
+	AMMCHROOTCENTOS_URL_VAULT="https://vault.centos.org"
+	AMMCHROOTCENTOS_URL_MIRROR="https://mirror.centos.org"
+	AMMCHROOTCENTOS_URL_DEBUG="http://debuginfo.centos.org"
+	AMMCHROOTCENTOS_PATH_CACHE="$(ammLib::DataPathGet "cache")"
 
-	typeset -gA AMMCHROOTCENTOS_VERSIONS=
-	typeset -gA __AMMCHROOTCENTOS_VERSIONS=(
+	__AMMCHROOTCENTOS_VERSIONS=(
 		[6.7]="1601" [6.8]="1605" [6.9]="1704" [6.10]="1808"
 		[7.0]="1406" [7.1]="1503" [7.2]="1511" [7.3]="1611" [7.4]="1708" [7.5]="1804" [7.6]="1810" [7.7]="1908" [7.8]="2003" [7.9]="2009"
 		[8.0]="8.0.1905" [8.1]="8.1.1911-20200113.3" [8.2]="8.2.2004-20200611.2" [8.3]="8.3.2011-20201204.2"
@@ -40,9 +51,6 @@ function ammChrootCentos::MetaInit {
 		[7]=${__AMMCHROOTCENTOS_VERSIONS[7.8]}
 		[8]=${__AMMCHROOTCENTOS_VERSIONS[8.3]}
 	)
-	typeset -gA AMMCHROOTCENTOS_REPO_URLS=
-	typeset -gA AMMCHROOTCENTOS_REPO_LIST=
-	typeset -gA AMMCHROOTCENTOS_REPO_GPG=
 
 	# Mirrorlist is only for latest version, else it's in the vault
 	typeset repo vers
@@ -143,6 +151,7 @@ function ammChrootCentos::InitFromTemplate {
 			# Map the release short name to full release number
 			if (set +u; [[ -n "${__AMMCHROOTCENTOS_VERSIONS[$version]}" ]] ); then
 				release="${__AMMCHROOTCENTOS_VERSIONS[$version]}"
+				ammLog::Dbg "Mapping version '$version' to relase '$release'"
 			fi
 
 			# Check mapping

@@ -9,6 +9,12 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+# Var definition
+typeset -ga AMMCONFIG_SEARCHDIR
+typeset -gA __AMMCONFIG_VARS_DECL __AMMCONFIG_VARS_DESC
+typeset -gA __AMMCONFIG_VARS_TYPE __AMMCONFIG_VARS_LIST
+typeset -ga __AMMCONFIG_FILTER_NAME __AMMCONFIG_FILTER_FILE
+
 #function ammConfig::MetaCheck {
 #	ammExec::Require awk
 #}
@@ -16,16 +22,13 @@ function ammConfig::MetaInit {
 
 	ammLib::Require "string"
 
-	typeset -ga AMMCONFIG_SEARCHDIR=(
+	#typeset -ga AMMCONFIG_SEARCHDIR=(
+	AMMCONFIG_SEARCHDIR=(
 		"/etc/ammlib/conf"
 		"$__AMMLIB_REALPATH/conf/"
 		"$HOME/.ammlib/conf"
 	)
 
-	typeset -gA __AMMCONFIG_VARS_DECL __AMMCONFIG_VARS_DESC
-	typeset -gA __AMMCONFIG_VARS_TYPE __AMMCONFIG_VARS_LIST
-
-	typeset -ga __AMMCONFIG_FILTER_NAME __AMMCONFIG_FILTER_FILE
 
 	ammLib::HookRegister "before:optparse:parse" "_ammConfig::HookOptparseAddOpt"
 	ammLib::HookRegister "after:optparse:parse" "_ammConfig::HookOptparse"

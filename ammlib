@@ -496,8 +496,7 @@ function ammLib::MetaGetPrefix {
 	echo "amm${funcpref}::Meta"
 }
 
-
-# @description  Test if a library is loadable (it's requirements are met)
+# @description  Test if a library is loadable (MetaCheck) and display its path
 # @arg $@  (string[]) Name of the library
 # @exitcode 0  If all modules are loadable
 # @exitcode 1+ if one or more module cannot be loaded
@@ -505,16 +504,20 @@ function ammLib::Loadable {
 
 	typeset -i r=0
 
-	for libname in "$@"; do
-		typeset libfile="$libname.lib"
+	ammLog::Dbg "Checking if libs are loadable: $@"
 
-		# If the given path was a file, find its libname from path
-		if [[ -f "$libfile" ]]; then
+	typeset arg=""
+	for arg in "$@"; do
+		typeset libfile="" libname=""
+
+		# If the provide arg is an absolute path to a file
+		if [[ "${arg:0:1}" == "/" ]] && [[ -s "$arg" ]]; then
+			libfile="$arg"
 			libname="$(ammLib::NameFromPath $libfile)"
-			#libname="${libfile##*/}"
-			#libname="${libname%.lib}"
+
 		# Else, find our file
 		else
+			libname="$arg"
 			libfile="$(ammLib::Locate "$libname")"
 		fi
 
@@ -526,7 +529,7 @@ function ammLib::Loadable {
 			typeset metapref="$(ammLib::MetaGetPrefix "$libname")"
 			typeset metatext=""
 
-			# Display the lib file
+			# Display the lib file before the test to have its path in error messages
 			echo "$libfile"
 
 			# check for features starting from bash 4.2 (typeset -g)
@@ -539,7 +542,7 @@ function ammLib::Loadable {
 			fi
 
 			# Code 98 = fail during the load (parsing error ?)
-			metatext="$(ammLog::Silence onlyerr; . $libfile || exit 98; if \type ${metapref}Check >/dev/null 2>&1; then ${metapref}Check; exit $?; else exit 0; fi;)"
+			metatext="$(ammLog::Silence onlyerr; . $libfile || exit 98; if \type ${metapref}Check >/dev/null 2>&1; then ${metapref}Check >/dev/null; exit $?; else exit 0; fi;)"
 
 			# Dont stop loading, just log error and increase return
 			if [[ $? -ne 0 ]]; then
@@ -557,6 +560,7 @@ function ammLib::Loadable {
 
 	return $r
 }
+
 
 # @description  Load a library
 # @arg $@  (string[]) Library name to be loaded
@@ -610,7 +614,7 @@ function ammLib::Load {
 
 			# Call init
 			typeset metapref="$(ammLib::MetaGetPrefix "$libname")"
-			ammEnv::IsFunc ${metapref}Init && ${metapref}Init
+			ammEnv::IsFunc ${metapref}Init && ${metapref}Init >/dev/null
 
 			ammLib::HookTrigger "after:libload:$libname"
 

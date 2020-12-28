@@ -925,6 +925,29 @@ function ammLog::Deprecated {
 	$replacement "$@"
 }
 
+# @description  Set a function as unavailable
+# @arg $1  function
+# @arg $2  reason
+function ammLog::UnavailableFunc {
+	typeset func="$1"
+	typeset reason="${2:-unspecified reason}"
+
+	typeset origin="$(ammLog::Stackdump 2 1)"
+
+	# Some security
+	typeset lib="${func%%::*}"
+	case $lib in
+		ammLib|ammLog|ammEnv)
+			ammLog::Err "It's unlikely you want to set core function unavailable... (from $origin)"
+			return 1
+			;;
+	esac
+
+	# Override the function with a message
+	ammLog::Trace "Disabling function '$func' from '$origin': $reason"
+	eval "function $func { ammLog::Err 'Cannot call $func: function is disabled because $reason ($origin)'; }"
+}
+
 
 function _ammLog::StepPad {
 	typeset step="${1:-$__AMMLOG_STEPDEPTH}"

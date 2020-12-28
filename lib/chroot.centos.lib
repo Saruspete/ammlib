@@ -19,6 +19,9 @@ function ammChrootCentos::MetaInit {
 	if ! ammLib::Load "pkg.yum"; then
 		ammLog::UnavailableFunc "ammChrootCentos::InitFromPackage" "pkg.yum module cannot be loaded. Is yum binary available?"
 	fi
+	if ! ammLib::Load "http"; then
+		ammLog::UnavailableFunc "ammChrootCentos::InitFromTemplate" "http module cannot be loaded"
+	fi
 
 	typeset -g  AMMCHROOTCENTOS_URL_CLOUD="https://cloud.centos.org"
 	typeset -g  AMMCHROOTCENTOS_URL_VAULT="https://vault.centos.org"
@@ -99,8 +102,6 @@ function ammChrootCentos::Init {
 function ammChrootCentos::InitFromTemplate {
 	typeset chrootdir="$1"
 	typeset version="$2"
-
-	ammLib::Require "http"
 
 	typeset -i r=0
 

@@ -15,7 +15,10 @@ function ammChrootUbuntu::MetaCheck {
 }
 
 function ammChrootUbuntu::MetaInit {
-	ammLib::Load "pkg" "pkg.apt" "config"
+	ammLib::Require "pkg" "pkg.apt" "config"
+	if ! ammLib::Load "pkg.apt"; then
+		ammLog::UnavaiableFunc "ammChrootUbuntu::InitFromPackage" "pkg.apt module cannot be loaded. Is apt binary available?"
+	fi
 
 	typeset -g  AMMCHROOTUBUNTU_URL_RELEASES="http://releases.ubuntu.com"
 	typeset -g  AMMCHROOTUBUNTU_URL_CLOUDIMG="http://cloud-images.ubuntu.com"

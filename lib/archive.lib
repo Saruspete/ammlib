@@ -9,9 +9,18 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
+typeset -gA __AMMARCHIVE_PASSWORDS
+
+
+function ammArchive::MetaCheck {
+	ammExec::Require "file"
+	ammLib::Loadable "string"
+}
+
 function ammArchive::MetaInit {
-	ammExec::Require file
 	ammLib::Require string
+
+	__AMMARCHIVE_PASSWORDS=()
 }
 
 function ammArchive::LibLoad {
@@ -47,7 +56,7 @@ function ammArchive::LibList {
 # @arg $2  (path)   file o
 # @arg $3  (string) Format for the archive if not guessable from file
 # @arg $@  (string[])  Options to pass to the called function
-function _ammArchive::Proxy {
+function ammArchive::_Proxy {
 	typeset op="$1"
 	typeset file="$2"
 	typeset fmt="${3:-}"
@@ -120,38 +129,48 @@ function ammArchive::FormatFromFile {
 # Basic operations: create / unpack
 # -----------------------------------------------------------------------------
 
-# @description  Unpack an archive
-function ammArchive::Extract {
-	typeset arch="$1"
+# @description  Extract an archive
+# @arg $1  (path) File to unpack
+# @arg $2  (path) Folder to extract files to
+# @arg $@  (path) Content to extract from the archive
+function ammArchive::Unpack {
+	typeset file="$1"
 	typeset dest="$2"
-	typeset fmt="${3:-}"
-	typeset opts="${4:-}"
+	shift 2
 
 	# Call the real function
-	_ammArchive::Proxy "Extract" "$arch" "$fmt" "$dest" "$opts"
+	ammArchive::_Proxy "Unpack" "$file" "" "$dest" "$@"
 }
 
+# @description  Create an archive
+# @arg $1  (path) File to create
+# @arg $2  (path) Root folder to add in archive
+# @arg $@  (path) optional: select files relative to root folder to add
+function ammArchive::Pack {
+	typeset file="$1"
+	typeset src="$2"
+	shift 2
+
+	# Call the real function
+	ammArchive::_Proxy "Pack" "$file" "" "$src" "$@"
+}
 
 # @description  Add a file or folder to an archive
 # @arg $1  (file) Archive on which to add the file
 # @arg $2  (path) optionnal prefix for the content to be added
 # @arg $@  (path[]) Files or folders to be added to the archive
 function ammArchive::Add {
-	typeset arch="$1"; shift
+	typeset file="$1"; shift
 
 	typeset prefix=""
 
+	ammArchive::_Proxy "Pack" "$file" "" "$dest"
 
-}
-
-function ammArchive::Finalize {
-	:
 }
 
 # -----------------------------------------------------------------------------
 # Specfic operations
 # -----------------------------------------------------------------------------
-typeset -gA __AMMARCHIVE_PASSWORDS=()
 function ammArchive::SetPassword {
 	typeset file="$1"
 	typeset pass="$2"
@@ -170,5 +189,11 @@ function ammArchive::SetEncryption {
 }
 
 
+function ammArchive::SetCompressionLevel {
+	typeset file="$1"
+	typeset level="$2"
+
+	__AMMARCHIVE_COMPLEVEL[$file]="$level"
+}
 
 

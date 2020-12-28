@@ -17,7 +17,8 @@ function ammArchiveTar::MetaCheck {
 # Some description for your lib
 # -----------------------------------------------------------------------------
 
-# @description 
+# @description  Extract an archive file
+# @arg $1  
 function ammArchiveTar::Unpack {
 	typeset vers="$1"
 	typeset src="$2"
@@ -88,3 +89,7 @@ function ammArchiveTar::Unpack {
 
 }
 
+
+function ammArchiveTar::Pack {
+	:
+}

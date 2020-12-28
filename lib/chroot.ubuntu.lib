@@ -1,0 +1,159 @@
+# vim: ft=sh ts=4
+
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammChrootUbuntu::MetaCheck {
+	ammLib::Loadable "pkg" "config"
+}
+
+function ammChrootUbuntu::MetaInit {
+	ammLib::Load "pkg" "pkg.apt" "config"
+
+	typeset -g  AMMCHROOTUBUNTU_URL_RELEASES="http://releases.ubuntu.com"
+	typeset -g  AMMCHROOTUBUNTU_URL_CLOUDIMG="http://cloud-images.ubuntu.com"
+	typeset -g  AMMCHROOTUBUNTU_PATH_CACHE="$(ammLib::DataPathGet "cache")"
+
+	typeset -gA AMMCHROOTUBUNTU_VERSIONS=
+	typeset -gA __AMMCHROOTUBUNTU_VERSIONS=(
+		[trusty]=14.04   [trustytahr]=14.04
+		[xenial]=16.04   [xenialxerus]=16.04
+		[yakkety]=16.10  [yakketyyak]=16.10
+		[zesty]=17.04    [zestyzapus]=17.04
+		[artful]=17.10   [artfulaadvark]=17.10
+		[bionic]=18.04   [bionicbeaver]=18.04
+		[cosmic]=18.10   [cosmiccuttlefish]=18.10
+		[disco]=19.04    [discodingo]=19.04
+		[eoan]=19.10     [eoanermine]=19.10
+		[focal]=20.04    [focalfossa]=20.04
+		[groovy]=20.10   [groovygorilla]=20.10
+		[hirsute]=21.04  [hirsutehippo]=21.04
+	)
+	typeset -gA __AMMCHROOTUBUNTU_ARCHS=(
+		[i386]="x86 32bits"   [amd64]="x86 64bits"
+		[amrel]="ARM 32bits"  [armhf]="ARM 32bits + FPU"  [arm64]="ARM 64bits"
+		[power]="PowerPC"     [ppc64el]="PowerPC 64Bits"
+	)
+	typeset -gA __AMMCHROOTUBUNTU_ARCHS_MAP=(
+		[x86]=i386      [x86_64]=amd64
+		[arm6]=armel    [arm7]=armhf    [arm8]=arm64
+		[power]=powerpc [power64]=ppc64el
+	)
+
+	ammConfig::VarDeclare "AMMCHROOTUBUNTU_VERSIONS"     "assoc"  "Additional versions available"
+	ammConfig::VarDeclare "AMMCHROOTUBUNTU_URL_CLOUDIMG" "string" "Base URL for cloud-images.ubuntu.com"
+	ammConfig::VarDeclare "AMMCHROOTUBUNTU_URL_RELEASES" "string" "Base URL for releases.ubuntu.org"
+	ammConfig::VarDeclare "AMMCHROOTUBUNTU_PATH_CACHE"   "string" "Path to package cache"
+	ammConfig::FileLoad "defaults.conf"
+
+}
+
+# -----------------------------------------------------------------------------
+# Some description for your lib
+# -----------------------------------------------------------------------------
+
+function _ammChrootUbuntu::GetDataFolder {
+	typeset extra="${1:-}"
+
+	typeset f="$__AMMLIB_DATA/chroot.ubuntu/$extra"
+	[[ -d "$f" ]] || mkdir -p "$f"
+	echo "$f"
+}
+
+
+# @description Init a new ubuntu chroot, from host yum config or from template
+function ammChrootUbuntu::Init {
+	typeset chrootdir="$1"
+	typeset version="$2"
+
+	# Dispatch to the 
+
+}
+
+function ammChrootUbuntu::InitFromTemplate {
+	typeset chrootdir="$1"
+	typeset version="$2"
+	typeset arch="${3:-amd64}"
+
+	ammLib::Require "http"
+	ammExec::Require "tar"
+
+	typeset -i r=0
+
+	typeset relnum="$version"
+	if ! [[ "$relnum" =~ ^[12][0-9]\.(04|10) ]]; then
+		if ! ( set +u; [[ -n "${__AMMCHROOTUBUNTU_VERSIONS[$version]}" ]] ); then
+			ammLog::Err "Invalid version '$version'"
+			return 1
+		fi
+
+		relnum="${__AMMCHROOTUBUNTU_VERSIONS[$version]}"
+		ammLog::Dbg "Translated '$version' to release '$relnum'"
+	fi
+
+	if ! ( set +u; [[ -n "${__AMMCHROOTUBUNTU_ARCHS[$arch]}" ]] ); then
+		ammLog::Err "Invalid arch '$arch'. Need one of ${!__AMMCHROOTUBUNTU_ARCHS[@]}"
+		return 1
+	fi
+
+	typeset url="$AMMCHROOTUBUNTU_URL_CLOUDIMG/releases/$version/release/ubuntu-${relnum}-server-cloudimg-${arch}-root.tar.gz"
+	typeset archive="${url##*/}"
+	typeset dest="$AMMCHROOTUBUNTU_PATH_CACHE/$archive"
+
+	# Download the archive if not already present
+	if ! [[ -s "$dest" ]]; then
+
+		if ! ammHttp::Fetch "$url" "$dest"; then
+			ammLog::Err "Unable to download '$url'"
+			return 1
+		fi
+	fi
+
+	# Create target chroot
+	if ! [[ -d "$chrootdir" ]]; then
+		if ! mkdir --parents "$chrootdir"; then
+			ammLog::Err "Cannot create chrootdir '$chrootdir'"
+			return 1
+		fi
+	fi
+
+	# Unpack file using archive
+	if ! ammExec::AsUser "root" tar -pxf "$dest" -C "$chrootdir"; then
+		ammLog::Err "Error during archive extraction '$dest' into '$chrootdir'"
+		return 1
+	fi
+
+	return 0
+}
+
+# @description  Create a new chroot 
+# @arg $1  (path) Location of the chroot to be created
+# @arg $2  (string) Version of the ubuntu release to be created
+# @arg $@  (string) (optional) Tuples "name=url" of repositories to be set, instead of defaults
+function ammChrootUbuntu::InitFromPkg {
+	typeset chrootdir="$1"
+	typeset version="$2"
+	shift 2
+
+	ammLib::Require "pkg.apt"
+
+	# TODO
+	return 99
+}
+
+
+
+# @description: remove all non-necessary files
+function ammChrootUbuntu::Clean {
+	typeset chrootdir="$1"
+
+	ammChroot::Exec "$chrootdir" "apt clean"
+}
+

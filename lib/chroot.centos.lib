@@ -37,7 +37,7 @@ function ammChrootCentos::MetaInit {
 	)
 	__AMMCHROOTCENTOS_VERSIONS+=(
 		[6]=${__AMMCHROOTCENTOS_VERSIONS[6.10]}
-		[7]=${__AMMCHROOTCENTOS_VERSIONS[7.9]}
+		[7]=${__AMMCHROOTCENTOS_VERSIONS[7.8]}
 		[8]=${__AMMCHROOTCENTOS_VERSIONS[8.3]}
 	)
 	typeset -gA AMMCHROOTCENTOS_REPO_URLS=
@@ -102,6 +102,7 @@ function ammChrootCentos::Init {
 function ammChrootCentos::InitFromTemplate {
 	typeset chrootdir="$1"
 	typeset version="$2"
+	typeset arch="${3:-x86_64}"
 
 	typeset -i r=0
 
@@ -111,6 +112,7 @@ function ammChrootCentos::InitFromTemplate {
 	case $version in
 		8|8.*)
 			typeset release=""
+			typeset maj="${version:0:1}"
 
 			# Lookup the target version (no symlink avail at the moment)
 			if (set +u; [[ -n "${__AMMCHROOTCENTOS_VERSIONS[$version]}" ]] ); then
@@ -118,16 +120,17 @@ function ammChrootCentos::InitFromTemplate {
 			fi
 
 			# Check for custom version passed
-			if [[ -z "$release" ]] && ! [[ "$version" != "$maj" ]]; then
+			if [[ -z "$release" ]] && [[ "$version" != "$maj" ]]; then
 				# Use can chose a specific release date, no just a maj.min release
 				if [[ "$version" =~ $maj\..+ ]]; then
 					release="${version#$maj.}"
+				else
 					ammLog::Err "Unmanaged release version: '$version'"
 					return 1
 				fi
 			fi
 
-			url="$AMMCHROOTCENTOS_URL_CLOUD/centos/8/x86_64/images/CentOS-8-Container"
+			url="$AMMCHROOTCENTOS_URL_CLOUD/centos/8/${arch}/images/CentOS-8-Container"
 			[[ -n "$release" ]] && url+="-$release"
 
 			urls+=("${url}.x86_64.tar.xz" "${url}-layer.x86_64.tar.gz")
@@ -143,7 +146,7 @@ function ammChrootCentos::InitFromTemplate {
 			fi
 
 			# Check mapping
-			if [[ -z "$release" ]] && ! [[ "$version" != "$maj" ]]; then
+			if [[ -z "$release" ]] && [[ "$version" != "$maj" ]]; then
 				# Use can chose a specific release date, no just a maj.min release
 				if [[ "$version" =~ $maj\..+ ]]; then
 					release="${version#$maj.}"
@@ -153,7 +156,7 @@ function ammChrootCentos::InitFromTemplate {
 				fi
 			fi
 
-			url="$AMMCHROOTCENTOS_URL_CLOUD/centos/$maj/images/CentOS-${maj}-x86_64-GenericCloud"
+			url="$AMMCHROOTCENTOS_URL_CLOUD/centos/$maj/images/CentOS-${maj}-${arch}-GenericCloud"
 			[[ -n "$release" ]] && url+="-$release"
 			url+=".raw.tar.gz"
 
@@ -283,7 +286,7 @@ function ammChrootCentos::InitFromTemplate {
 
 				# Copy archive to chroot
 				ammLog::Inf "Copying data from '$mntpnt' to '$chrootdir'"
-				\cp -a "$mntpnt/." "$chrootdir"
+				ammExec::AsUser "root" cp -a "$mntpnt/." "$chrootdir"
 
 				if ! ammExec::AsUser "root" umount "$mntpnt"; then
 					ammLog::Err "Unable to umount dir '$mntpnt'. Cleanup manually"

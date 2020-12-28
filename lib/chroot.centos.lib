@@ -11,11 +11,14 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammChrootCentos::MetaCheck {
-	ammLib::Require "pkg" "pkg.yum" "config"
+	ammLib::Loadable "pkg" "config"
 }
 
 function ammChrootCentos::MetaInit {
-	ammLib::Load "pkg" "pkg.yum" "config"
+	ammLib::Load "pkg" "config"
+	if ! ammLib::Load "pkg.yum"; then
+		ammLog::UnavailableFunc "ammChrootCentos::InitFromPackage" "pkg.yum module cannot be loaded. Is yum binary available?"
+	fi
 
 	typeset -g  AMMCHROOTCENTOS_URL_CLOUD="https://cloud.centos.org"
 	typeset -g  AMMCHROOTCENTOS_URL_VAULT="https://vault.centos.org"

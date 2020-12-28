@@ -898,7 +898,7 @@ function ammLog::Dbg {
 	#if [[ -n "${AMMLIB_DEBUG:-}" ]] || [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
 	if ammLog::_DbgIsEnabled "${FUNCNAME[1]}"; then
 		# Get the caller
-		typeset callerdbg="${BASH_SOURCE[1]##*/}::${FUNCNAME[1]}::${BASH_LINENO[0]}"
+		typeset callerdbg="${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]} ${FUNCNAME[1]}"
 
 		_ammLog::Log "DBG" "bold blue reverse" "[$callerdbg] $@"
 

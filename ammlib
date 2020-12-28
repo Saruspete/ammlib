@@ -596,7 +596,7 @@ function ammLib::Load {
 		fi
 
 		# Skip already loaded libraries
-		ammLib::IsLoaded "$libname" && continue 2
+		ammLib::IsLoaded "$libname" && continue
 
 		# Check if we can load requested lib
 		libfile="$(ammLib::Loadable "$libname")"

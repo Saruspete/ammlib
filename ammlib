@@ -130,7 +130,7 @@ function _ammLib::PathGetForCaller {
 	typeset dir="$prefix/$callingfile/$suffix"
 	! [[ -d "$dir" ]] && mkdir -p "$dir"
 	if ! [[ -d "$dir" ]]; then
-		ammLog::Err "Error during creation of path '$dir'. Please check"
+		ammLog::Error "Error during creation of path '$dir'. Please check"
 		return 1
 	fi
 
@@ -180,11 +180,11 @@ function ammLib::HookRegister {
 	typeset varname="$(ammLib::HookNameToVarname "$name")"
 	# Create the hook first if not existing
 	if ! ammLib::HookExists $name; then
-		ammLog::Dbg "Registering cb '$@' to new hook '$name'"
+		ammLog::Debug "Registering cb '$@' to new hook '$name'"
 		eval "$varname=('$@')"
 		__AMMLIB_HOOKLIST["$varname"]="$name"
 	else
-		ammLog::Dbg "Registering cb '$@' to existing hook '$name'"
+		ammLog::Debug "Registering cb '$@' to existing hook '$name'"
 		eval "$varname+=('$@')"
 		__AMMLIB_HOOKLIST["$varname"]+=" $name"
 	fi
@@ -212,15 +212,15 @@ function ammLib::HookListCallbacks {
 function ammLib::HookTrigger {
 	typeset name="$1"; shift
 
-	ammLog::Dbg "Triggering callbacks for '$name'"
+	ammLog::Debug "Triggering callbacks for '$name'"
 
 	typeset callback args
 	while read callback args; do
 		if ! ammEnv::IsFunc "$callback"; then
-			ammLog::Wrn "Callback '$callback' is not a function. Skipping it"
+			ammLog::Warning "Callback '$callback' is not a function. Skipping it"
 			continue
 		fi
-		ammLog::Dbg "Calling callback '$callback $args' with '$@'"
+		ammLog::Debug "Calling callback '$callback $args' with '$@'"
 		$callback $args "$@"
 	done < <(ammLib::HookListCallbacks "$name")
 }
@@ -275,11 +275,11 @@ function ammLib::TrapRegister {
 				if (set -u; [[ -n "${__AMMLIB_SIGNALS[$signame]}" ]] ); then
 					__AMMLIB_TRAP_CALLBACKS[$signame]+="$callback "
 					if ! ( set +u; [[ -n "${__AMMLIB_TRAP_REGISTERED[$signame]}" ]] ); then
-						ammLog::Dbg "Registered callback with uninit signal. Registering signal:$signame for callback:$callback"
+						ammLog::Debug "Registered callback with uninit signal. Registering signal:$signame for callback:$callback"
 						_ammLib::TrapInit "$signame"
 					fi
 				else
-					ammLog::Wrn "Invalid signal to register callback: signal:$signame callback:$callback"
+					ammLog::Warning "Invalid signal to register callback: signal:$signame callback:$callback"
 				fi
 				;;
 		esac
@@ -294,9 +294,9 @@ function ammLib::TrapClean {
 	# clean global temp vars
 	if [[ -n ${AMMLIB_DEBUG:-} ]]; then
 		if ( shopt -s nullglob dotglob; f=($__AMMLIB_DATATMP/*); [[ ${#f[@]} -gt 0 ]] ); then
-			ammLog::Inf "Debug enabled: Keeping non-empty temporary path '$__AMMLIB_DATATMP'"
+			ammLog::Info "Debug enabled: Keeping non-empty temporary path '$__AMMLIB_DATATMP'"
 		else
-			ammLog::Inf "Removing empty temporary path '$__AMMLIB_DATATMP'"
+			ammLog::Info "Removing empty temporary path '$__AMMLIB_DATATMP'"
 			[[ -d "$__AMMLIB_DATATMP" ]] && rmdir "$__AMMLIB_DATATMP"
 		fi
 	else
@@ -323,7 +323,7 @@ function _ammLib::TrapHandler {
 	typeset sigtype=""
 	typeset retaction="return"
 
-	ammLog::Dbg "Caught signal '$signame' with retcode $retcode"
+	ammLog::Debug "Caught signal '$signame' with retcode $retcode"
 	case $signame in
 		# Standard shutdown
 		EXIT)
@@ -331,15 +331,15 @@ function _ammLib::TrapHandler {
 
 			# Wait for unfinished jobs
 			if [[ -n "$(jobs)" ]] && [[ $__AMMLIB_TRAP_WAITMAX -gt 0 ]]; then
-				ammLog::Inf "Waiting unfinished jobs in background for $__AMMLIB_TRAP_WAITMAX checks every $__AMMLIB_TRAP_WAITSTEP sec"
+				ammLog::Info "Waiting unfinished jobs in background for $__AMMLIB_TRAP_WAITMAX checks every $__AMMLIB_TRAP_WAITSTEP sec"
 				typeset num pid state cmd
 				typeset -i waitjob=0
 				while [[ $waitjob -lt $__AMMLIB_TRAP_WAITMAX ]]; do
 					typeset -i jobcnt=0
-					ammLog::Inf "== Check $waitjob $(ammLog::Time)"
+					ammLog::Info "== Check $waitjob $(ammLog::Time)"
 					while read num pid state cmd; do
 						[[ "$pid" == "$$" ]] && continue
-						ammLog::Inf "PID:$pid State:$state Command:$cmd"
+						ammLog::Info "PID:$pid State:$state Command:$cmd"
 						jobcnt+=1
 					done < <(jobs -lr)
 					[[ $jobcnt -eq 0 ]] && break
@@ -348,8 +348,8 @@ function _ammLib::TrapHandler {
 				done
 
 				if [[ $waitjob -eq $__AMMLIB_TRAP_WAITMAX ]]; then
-					ammLog::Wrn "Hit timeout before all background jobs finished. Remains:"
-					jobs -l | ammLog::Wrn -
+					ammLog::Warning "Hit timeout before all background jobs finished. Remains:"
+					jobs -l | ammLog::Warning -
 				fi
 			fi
 			;;
@@ -357,17 +357,17 @@ function _ammLib::TrapHandler {
 		# Manual stop
 		INT|HUP|TERM|QUIT)
 			sigtype="EXITERR"
-			ammLog::Wrn "Caught graceful interruption $signame. Cleaning"
+			ammLog::Warning "Caught graceful interruption $signame. Cleaning"
 			retaction="exit"
 			;;
 
 		# Unamanged return code
 		'')
-			ammLog::Wrn "Called with empty signal name..."
+			ammLog::Warning "Called with empty signal name..."
 			;;
 
 		*)
-			ammLog::Wrn "Unhandled signal name '$signame'"
+			ammLog::Warning "Unhandled signal name '$signame'"
 			;;
 	esac
 
@@ -375,9 +375,9 @@ function _ammLib::TrapHandler {
 	if ( set +u; [[ -n "${__AMMLIB_TRAP_CALLBACKS[$signame]}" ]] ); then
 		typeset callback
 		for callback in ${__AMMLIB_TRAP_CALLBACKS[$signame]}; do
-			ammLog::Dbg "Calling callback $callback"
+			ammLog::Debug "Calling callback $callback"
 			$callback "$signame"
-			ammLog::Dbg "Callback done. Retcode: $?"
+			ammLog::Debug "Callback done. Retcode: $?"
 		done
 	fi
 
@@ -522,7 +522,7 @@ function ammLib::Loadable {
 		fi
 
 		# If the lib exists, load it
-		ammLog::Dbg "Checking if '$libfile' is a valid library"
+		ammLog::Debug "Checking if '$libfile' is a valid library"
 		if [[ -n "$libfile" ]] && [[ -f "$libfile" ]] && [[ -s "$libfile" ]]; then
 
 			# try to load it in a subshell to check init
@@ -535,7 +535,7 @@ function ammLib::Loadable {
 			# check for features starting from bash 4.2 (typeset -g)
 			if [[ "${BASH_VERSINFO[0]:-0}" -eq "4" ]] && [[ "${BASH_VERSINFO[1]:-0}" -lt 2 ]]; then
 				if grep -P '(typeset|declare) -[a-zA-Z]*g[a-zA-Z]* ' $libfile >/dev/null 2>&1; then
-					ammLog::Dbg "Library '$libfile' needs bash >= 4.2"
+					ammLog::Debug "Library '$libfile' needs bash >= 4.2"
 					r+=1
 					continue
 				fi
@@ -546,14 +546,14 @@ function ammLib::Loadable {
 
 			# Dont stop loading, just log error and increase return
 			if [[ $? -ne 0 ]]; then
-				ammLog::Dbg "Unable to load lib '$libname' (file '$libfile'). Init check failed: '$metatext'"
+				ammLog::Debug "Unable to load lib '$libname' (file '$libfile'). Init check failed: '$metatext'"
 				r=r+1
 				continue
 			fi
 
 		# Unable to load the lib
 		else
-			ammLog::Dbg "Unable to locate library '$libname'"
+			ammLog::Debug "Unable to locate library '$libname'"
 			r+=1
 		fi
 	done
@@ -588,7 +588,7 @@ function ammLib::Load {
 				ammLib::IsLoaded "$parentlib" && parentloaded="$parentlib"
 
 				if [[ -z "$parentloaded" ]]; then
-					ammLog::Err "Cannot load '$libname' with ammLib::Load: look like a sub-lib of '$parentlib' and its parent '$parentlib' is not loaded"
+					ammLog::Error "Cannot load '$libname' with ammLib::Load: look like a sub-lib of '$parentlib' and its parent '$parentlib' is not loaded"
 					r=r+1
 					continue
 				fi
@@ -622,9 +622,9 @@ function ammLib::Load {
 
 		else
 			if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
-				ammLog::Err "Unable to load lib '$libname' due to failed init (enable debug with AMMLIB_DEBUG=Lib for full detail)"
+				ammLog::Error "Unable to load lib '$libname' due to failed init (enable debug with AMMLIB_DEBUG=Lib for full detail)"
 			else
-				ammLog::Err "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
+				ammLog::Error "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
 			fi
 
 			r=r+1
@@ -670,9 +670,9 @@ function ammLib::Require {
 	for libname in "$@"; do
 
 		# Spawn it in a subshell to accomodate all potential exec / checks
-		ammLog::Dbg "Trying to load required lib '$libname'"
+		ammLog::Debug "Trying to load required lib '$libname'"
 		if ! ammLib::Load "$libname"; then
-			ammLog::Err "Unable to load required library '$libname'. Exiting"
+			ammLog::Error "Unable to load required library '$libname'. Exiting"
 			exit 1
 		fi
 	done
@@ -848,20 +848,20 @@ function ammLog::Die {
 
 # @description  Log an error
 # @arg $@  Error text to log. If "-", text is read from stdin
-function ammLog::Err {
+function ammLog::Error {
 	# TODO: add calling path
 	_ammLog::Log "ERR" "bold red" "$@"
 }
 
 # @description  Log a warning
 # @arg $@  warning text to log. If "-", text is read from stdin
-function ammLog::Wrn {
+function ammLog::Warning {
 	_ammLog::Log "WRN" "bold yellow" "$@"
 }
 
 # @description  Log an information
 # @arg $@  Info text to log. If "-", text is read from stdin
-function ammLog::Inf {
+function ammLog::Info {
 	_ammLog::Log "INF" "bold green" "$@"
 }
 
@@ -869,6 +869,19 @@ function ammLog::Inf {
 function ammLog::Trace {
 	_ammLog::Log "TRC" "bold blue" "$@"
 }
+
+# Legacy
+function ammLog::Err { ammLog::Error "$@"; }
+function ammLog::Inf { ammLog::Info "$@"; }
+function ammLog::Wrn { ammLog::Warning "$@"; }
+function ammLog::Dbg { ammLog::Debug "$@"; }
+
+alias ammLog::Err=ammLog::Error
+alias ammLog::Inf=ammLog::Info
+alias ammLog::Wrn=ammLog::Warning
+alias ammLog::Dbg=ammLog::Debug
+
+
 
 function ammLog::_DbgIsEnabled {
 	# Early tests
@@ -888,7 +901,7 @@ function ammLog::_DbgIsEnabled {
 
 # @description  Log a debug info
 # @arg $@  Debug text to log. If "-", text is read from stdin
-function ammLog::Dbg {
+function ammLog::Debug {
 
 	# Remove tracing if enabled to limit spam
 	typeset redbg=""
@@ -924,7 +937,7 @@ function ammLog::Deprecated {
 	typeset callee="$(ammLog::Stackdump 2 1)"
 	typeset callstack="$(ammLog::Stackdump 3 1)"
 
-	ammLog::Wrn "Function '$callee' (called from $callstack) is deprectated. Update your code to use '$replacement' instead"
+	ammLog::Warning "Function '$callee' (called from $callstack) is deprectated. Update your code to use '$replacement' instead"
 
 	$replacement "$@"
 }
@@ -993,7 +1006,7 @@ function ammLog::StepBegin {
 	__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]="$name"
 	__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]="$(date +%s)"
 
-	ammLog::Inf "$txt"
+	ammLog::Info "$txt"
 
 	__AMMLOG_STEPDEPTH+=1
 }
@@ -1006,8 +1019,8 @@ function ammLog::StepEnd {
 	typeset    msg="${2:-}"
 
 	if [[ $__AMMLOG_STEPDEPTH -le 0 ]]; then
-		ammLog::Err "Cannot call ammLog::StepEnd while no step in progress. Callstack:"
-		ammLog::Stackdump | ammLog::Err "-"
+		ammLog::Error "Cannot call ammLog::StepEnd while no step in progress. Callstack:"
+		ammLog::Stackdump | ammLog::Error "-"
 		return 1
 	fi
 
@@ -1020,11 +1033,11 @@ function ammLog::StepEnd {
 	[[ -n "$msg" ]] && txt+=" Msg:'$msg'"
 
 	if [[ -z "$ret" ]]; then
-		ammLog::Inf "$txt"
+		ammLog::Info "$txt"
 	elif [[ $ret -eq 0 ]]; then
-		ammLog::Inf "$txt"
+		ammLog::Info "$txt"
 	else
-		ammLog::Wrn "$txt"
+		ammLog::Warning "$txt"
 	fi
 
 	__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]=""
@@ -1070,7 +1083,7 @@ function ammLog::MissingBin {
 
 	# Load the package modules
 	if ! ammLib::Loadable pkg; then
-		ammLog::Err "Cannot load pkg library. Cannot find required packages"
+		ammLog::Error "Cannot load pkg library. Cannot find required packages"
 		return 1
 	fi
 	ammLib::Load pkg
@@ -1103,7 +1116,7 @@ function ammLog::DebugStore {
 	typeset undbg=""
 	[[ "${-//x/}" == "$-" ]] && { undbg="set +x"; }
 	set -x
-	ammLog::Dbg -
+	ammLog::Debug -
 	$undbg
 }
 
@@ -1343,10 +1356,10 @@ function _ammPath::RecurseFolders {
 
 			# If the callback returned false (operation failed) maybe log something
 			if [[ $rl -ne 0 ]]; then
-				ammLog::Wrn "callback '$callback' failed to process '$srcdentry'"
+				ammLog::Warning "callback '$callback' failed to process '$srcdentry'"
 				# If current pattern is a folder, recurse ourself into it
 				if [[ -d "$srcdentry" ]]; then
-				ammLog::Wrn "Recursing into folder '$srcdentry' to process its elements"
+				ammLog::Warning "Recursing into folder '$srcdentry' to process its elements"
 				$FUNCNAME "$srcdentry" "$dstdentry" "$callback" "$force" "*" ".*"
 					rl+=$?
 				fi
@@ -1475,7 +1488,7 @@ function ammExec::SudoIsAble {
 	typeset runuserdata="$(getent passwd "$runuser")"
 
 	if [[ -z "$runuserdata" ]]; then
-		ammLog::Err "Target user '$runuser' does not exists"
+		ammLog::Error "Target user '$runuser' does not exists"
 		return 1
 	fi
 
@@ -1492,12 +1505,12 @@ function ammExec::SudoIsAble {
 		# Pop in a subshell. Don't care about variable locality.
 		echo "$stmp" | while read line; do
 
-			#ammLog::Dbg "== sudo line: '$line'"
+			#ammLog::Debug "== sudo line: '$line'"
 
 			case "$line" in
 				# Reset vars
 				Sudoers\ entry:|LDAP\ Role:*)
-					ammLog::Dbg "New grant '$line'"
+					ammLog::Debug "New grant '$line'"
 					grantstarted=true
 					grantuseful=false
 					;;
@@ -1508,7 +1521,7 @@ function ammExec::SudoIsAble {
 					for user in $users; do
 						user="${user%,}"
 						if [[ "$user" == "ALL" ]] || [[ "$user" == "$runuser" ]]; then
-							ammLog::Dbg " Grant '$line' useful for target user '$runuser' (direct access)"
+							ammLog::Debug " Grant '$line' useful for target user '$runuser' (direct access)"
 							grantuseful=true
 						fi
 
@@ -1517,7 +1530,7 @@ function ammExec::SudoIsAble {
 							\#[0-9]*)
 								typeset userdata="$(getent passwd ${user#\#})"
 								if [[ "${userdata%%:*}" == "$runuser" ]]; then
-									ammLog::Dbg " Grant '$line' match UID of user '$runuser'"
+									ammLog::Debug " Grant '$line' match UID of user '$runuser'"
 									grantuseful=true
 								fi
 								;;
@@ -1527,7 +1540,7 @@ function ammExec::SudoIsAble {
 								user="${user#%}"
 								user="${user#\#}"
 								if [[ "$user" == "$runusergid" ]] || [[ "$user" == "$runusergrp" ]]; then
-									ammLog::Dbg " Grant '$user' in '$line' match primary group of user '$runuser'"
+									ammLog::Debug " Grant '$user' in '$line' match primary group of user '$runuser'"
 									grantuseful=true
 									break
 								fi
@@ -1535,7 +1548,7 @@ function ammExec::SudoIsAble {
 								members="${members##*:}"
 								for member in ${members//, /}; do
 									if [[ "$member" == "$runuser" ]]; then
-										ammLog::Dbg " Grant '$user' in '$line' match membership of user '$runuser'"
+										ammLog::Debug " Grant '$user' in '$line' match membership of user '$runuser'"
 										grantuseful=true
 										break
 									fi
@@ -1552,7 +1565,7 @@ function ammExec::SudoIsAble {
 									i="${i%,*}"
 									if [[ "$i" == "$runuser" ]]; then
 										IFS="$OIFS"
-										ammLog::Dbg " Grant in '$line' match netgroup membership of user '$runuser'"
+										ammLog::Debug " Grant in '$line' match netgroup membership of user '$runuser'"
 										grantuseful=true
 										break
 									fi
@@ -1580,14 +1593,14 @@ function ammExec::SudoIsAble {
 						if [[ "$cmd" == "ALL" ]] ||
 						   [[ "$cmd" == "${runcmd%% *}" ]] ||
 						   [[ "$cmd" == "$runcmd" ]]; then
-							ammLog::Dbg " Matching '$cmd' for '$runcmd'"
+							ammLog::Debug " Matching '$cmd' for '$runcmd'"
 							return 99
 						fi
 
 						# Glob matching (sudo is not regex)
 						case "$runcmd" in
 							$cmd)
-								ammLog::Dbg " Matching glob '$cmd' for '$runcmd'"
+								ammLog::Debug " Matching glob '$cmd' for '$runcmd'"
 								return 99
 								;;
 						esac
@@ -1599,7 +1612,7 @@ function ammExec::SudoIsAble {
 					# Skip error if we have not yet encountered a grant
 					$grantstarted || continue
 
-					ammLog::Wrn "Unmanaged sudo grant line '$line'"
+					ammLog::Warning "Unmanaged sudo grant line '$line'"
 					;;
 			esac
 		done
@@ -1641,7 +1654,7 @@ function ammExec::AsUser {
 			sudo -u "$userrunas" -i
 			ret=$?
 		else
-			ammLog::Err "Cannot change from user $usercurrent to user $userrunas"
+			ammLog::Error "Cannot change from user $usercurrent to user $userrunas"
 			ret=4
 		fi
 
@@ -1649,13 +1662,13 @@ function ammExec::AsUser {
 	else
 		# No user specified, or already correct user
 		if [[ -z "$userrunas" ]] || [[ "$userrunas" == "$usercurrent" ]]; then
-			ammLog::Dbg "Using eval to run as '$userrunas' cmd: '$@'"
+			ammLog::Debug "Using eval to run as '$userrunas' cmd: '$@'"
 			eval "$@" 98>&- 99>&-
 			ret=$?
 
 		# root... yay !
 		elif [[ "$usercurrent" == "root" ]]; then
-			ammLog::Dbg "Using runuser to run as '$userrunas' cmd: '$*'"
+			ammLog::Debug "Using runuser to run as '$userrunas' cmd: '$*'"
 			# I need to flatten
 			# runuser is like su, but without PAM. Preferred when exec from root
 			runuser -c "$*" "$userrunas" 98>&- 99>&-
@@ -1664,14 +1677,14 @@ function ammExec::AsUser {
 		# Maybe handle sudo ?
 		#elif stmp="$(sudo -nll 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$stmp" ]]; then
 		elif ammExec::Exists "sudo" && ammExec::SudoIsAble "$*" "$userrunas"; then
-			ammLog::Dbg "Using sudo to run as '$userrunas' cmd: '$@'"
+			ammLog::Debug "Using sudo to run as '$userrunas' cmd: '$@'"
 			# TODO: parse $stmp output more...
 			sudo -n -u "$userrunas" "$@" 98>&- 99>&-
 			ret=$?
 
 			# Fails...
 		else
-			ammLog::Err "Cannot exec '$@' as user $userrunas from user $usercurrent"
+			ammLog::Error "Cannot exec '$@' as user $userrunas from user $usercurrent"
 			ret=4
 		fi
 
@@ -1719,11 +1732,11 @@ function ammExec::RequestOne {
 	typeset r=1
 	typeset bin
 	for bin in "$@"; do
-		ammLog::Dbg "Trying to find requested bin '$bin'"
+		ammLog::Debug "Trying to find requested bin '$bin'"
 		ammExec::Exists "$bin" && return 0
 	done
 
-	ammLog::Dbg "Unable to find any of requested binaries '$@' in $PATH"
+	ammLog::Debug "Unable to find any of requested binaries '$@' in $PATH"
 	return 1
 }
 
@@ -1733,7 +1746,7 @@ function ammExec::RequestOne {
 function ammExec::Require {
 	typeset bin
 	for bin in "$@"; do
-		ammLog::Dbg "Trying to find required bin '$bin'"
+		ammLog::Debug "Trying to find required bin '$bin'"
 		if ! ammExec::Exists "$bin"; then
 			ammLog::MissingBin "$bin"
 			ammLog::Die "Unable to find required binary $bin in $PATH"

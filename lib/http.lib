@@ -141,6 +141,33 @@ function ammHttp::FetchSmart {
 }
 
 
+function ammHttp::Push {
+	typeset url="$1"
+	typeset file="$2"
+	typeset opts="${3:-}"
+
+	# Allowed options
+
+
+	if ammExec::Exists "curl"; then
+		typeset opt val curlopts=
+		for opt in ${opts:-}; do
+			val="${opt#*=}"
+			case "$opt" in
+				certcafile=*)  curlopts+=" --cacert $val" ;;
+				certcadir=*)   curlopts+=" --capath $val" ;;
+				certclient=*)  curlopts+=" --cert   $val" ;;
+				certcrl=*)     curlopts+=" --crlfile $val" ;;
+			esac
+		done
+
+		curl $curlopts --data-binary "@$file"  "$url"
+
+	elif ammExec::Exists "wget"; then
+		:
+	fi
+}
+
 
 # -----------------------------------------------------------------------------
 # Special sites (to be split into submodule ?

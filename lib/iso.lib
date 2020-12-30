@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammIso::MetaCheck {
-	ammLib::Require string
+	ammLib::Loadable string
 }
 function ammIso::MetaInit {
 	ammLib::Require string

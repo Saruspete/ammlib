@@ -161,7 +161,8 @@ function ammHttp::Push {
 			esac
 		done
 
-		curl $curlopts --data-binary "@$file"  "$url"
+		\curl $curlopts --data-binary "@$file"  "$url" 2>/dev/null
+		return $?
 
 	elif ammExec::Exists "wget"; then
 		:

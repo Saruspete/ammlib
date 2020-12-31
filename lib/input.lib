@@ -16,7 +16,7 @@ fi
 	typeset -g  __AMMINPUT_POPULATED
 
 	# List of registered questions from InputRegister
-	typeset -ga __AMMINPUT_ORDER)
+	typeset -ga __AMMINPUT_ORDER
 	typeset -gA __AMMINPUT_IDS
 	typeset -gA __AMMINPUT_DEFAULTS
 	typeset -gA __AMMINPUT_VALIDATIONCB

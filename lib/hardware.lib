@@ -229,7 +229,7 @@ function ammHardware::CpuFrequencyGetAvailable {
 	elif [[ "$typ" == "soft" ]]; then
 		filepfx="scaling"
 	else
-		ammLog::Err "Unknown type of frequency: $typ. Must be 'hard' or 'soft'"
+		ammLog::Error "Unknown type of frequency: $typ. Must be 'hard' or 'soft'"
 		return 1
 	fi
 
@@ -287,7 +287,7 @@ function ammHardware::CpuFrequencyGetBasefreq {
 		# Remove the . to have freq in KHz, used by cpufreq
 		f=${f//./}
 		if [[ -n "$fprev" ]] && [[ "$fprev" != "$f" ]]; then
-			ammLog::Wrn "Different frequencies found in cpuinfo: '$f' != '$fprev'"
+			ammLog::Warning "Different frequencies found in cpuinfo: '$f' != '$fprev'"
 		fi
 		fprev=$f
 	done
@@ -308,7 +308,7 @@ function ammHardware::CpuFrequencySet {
 	typeset fmax="${2:-$fmin}"
 
 	if ! ammExec::AsUser "root" "cpupower frequency-set --min $fmin --max $fmax"; then
-		ammLog::Err "Unable to set frequency to min/max: $fmin/$fmax"
+		ammLog::Error "Unable to set frequency to min/max: $fmin/$fmax"
 		return 1
 	fi
 	return 0

@@ -19,7 +19,7 @@ fi
 
 function ammTest::Group {
 	typeset group="$1"
-	ammLog::Inf "===== Testing $group"
+	ammLog::Info "===== Testing $group"
 }
 
 function ammTest::Function {

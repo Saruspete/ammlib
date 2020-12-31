@@ -67,22 +67,22 @@ function ammFs::Mounted {
 	typeset src mnt typ opts i1 i2 _junk
 	while read src mnt typ opts i1 i2 _junk; do
 		if [[ -n "$_junk" ]]; then
-			ammLog::Wrn "Found junk value while reading /proc/mounts: '$_junk'"
+			ammLog::Warning "Found junk value while reading /proc/mounts: '$_junk'"
 		fi
 
 		# Check if destination path is mounted
 		if [[ "$mnt" == "$mntdstabs" ]]; then
 			typeset r=0
 			if [[ -n "$mntsrc" ]] && [[ "$src" != "$mntsrc" ]]; then
-				ammLog::Wrn "Mnt '$mntdst' mounted with src '$src' instead of '$mntsrc'"
+				ammLog::Warning "Mnt '$mntdst' mounted with src '$src' instead of '$mntsrc'"
 				r+=1
 			fi
 			if [[ -n "$mnttype" ]] && [[ "$typ" != "$mnttype" ]]; then
-				ammLog::Wrn "Mnt '$mntdst' mounted with type '$typ' instead of '$mnttype'"
+				ammLog::Warning "Mnt '$mntdst' mounted with type '$typ' instead of '$mnttype'"
 				r+=1
 			fi
 			if [[ -n "$mntopts" ]] && [[ "$opts" != "$mntopts" ]]; then
-				ammLog::Wrn "Mnt '$mntdst' mounted with opts '$opts' instead of '$mntopts'"
+				ammLog::Warning "Mnt '$mntdst' mounted with opts '$opts' instead of '$mntopts'"
 				r+=1
 			fi
 
@@ -108,12 +108,12 @@ function ammFs::Mount {
 
 	# Mount the target
 	if ! [[ -d "$mntdst" ]]; then
-		ammLog::Inf "Target mount '$mntdst' does not exists. Creating"
+		ammLog::Info "Target mount '$mntdst' does not exists. Creating"
 		mkdir -p "$mntdst"
 	fi
 
 	if ammFs::Mounted "$mntdst"; then
-		ammLog::Inf "Mountpoint '$mntdst' already mounted"
+		ammLog::Info "Mountpoint '$mntdst' already mounted"
 		return 0
 	fi
 
@@ -146,7 +146,7 @@ function ammFs::TypeFromMountpoint {
 		return 0
 	fi
 
-	ammLog::Wrn "Requested type of non-existing mountpoint: '$mnt'"
+	ammLog::Warning "Requested type of non-existing mountpoint: '$mnt'"
 	return 1
 }
 
@@ -156,7 +156,7 @@ function ammFs::TypeFromBlockdev {
 	typeset blockdev="$1"
 
 	if ! [[ -b "$blockdev" ]]; then
-		ammLog::Err "Path '$blockdev' is not a blockdevice"
+		ammLog::Error "Path '$blockdev' is not a blockdevice"
 		return  1
 	fi
 
@@ -166,7 +166,7 @@ function ammFs::TypeFromBlockdev {
 
 	# Check for store-name from absolute path (aliases, /dev/mapper/vg-lv or /dev/vg/lv, /dev/mdxx)
 	if (set +u; [[ -n "${__AMMFS_ABS2STORE_CACHE[$abs]}" ]] ); then
-		ammLog::Dbg ""
+		ammLog::Debug ""
 		dev="${__AMMFS_ABS2STORE_CACHE[$abs]}"
 	fi
 
@@ -233,7 +233,7 @@ function ammFs::MountpointFromFile {
 	mnt="${mnt##*% }"
 
 	if (set +u; [[ -z "${__AMMFS_MOUNT2TYPE_CACHE[$mnt]}" ]] ); then
-		ammLog::Wrn "Stall cache (Missing entry '$mnt')"
+		ammLog::Warning "Stall cache (Missing entry '$mnt')"
 		ammFs::_ParseMounts
 	fi
 

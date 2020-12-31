@@ -71,7 +71,7 @@ function ammBootloaderIsolinux::Init {
 	for file in $files; do
 		typeset fpath="$(ammBootloaderIsolinux::Find "$file")"
 		if ! [[ -s "$fpath" ]]; then
-			ammLog::Err "Unable to find required '$file'"
+			ammLog::Error "Unable to find required '$file'"
 			return 1
 		fi
 
@@ -118,7 +118,7 @@ function ammBootloaderIsolinux::Config {
 
 	if ! ammString::ContainsWord "$var" "${!__ammBootloaderIsolinux::ConfigAvail[@]}"; then
 		echo "${!__ammBootloaderIsolinux::ConfigAvail[@]}"
-		ammLog::Wrn "Unavailable configuration '$var'"
+		ammLog::Warning "Unavailable configuration '$var'"
 		return 1
 	fi
 

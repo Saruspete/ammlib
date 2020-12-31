@@ -35,7 +35,7 @@ function ammHttp::Fetch {
 	#
 	if ammExec::Exists "curl"; then
 		# TODO: Manage the proxy creds
-		ammLog::Inf "Fetching '$src' with curl"
+		ammLog::Info "Fetching '$src' with curl"
 
 		# Process special parameters
 		typeset curlopts=""
@@ -44,7 +44,7 @@ function ammHttp::Fetch {
 				follow) curlopts+=" -L" ;;
 				nofollow) curlopts="${curlopts// -L/ /}" ;;
 				silent) curlopts+=" " ;;
-				*) ammLog::Err "Unknown option: $o" ;;
+				*) ammLog::Error "Unknown option: $o" ;;
 			esac
 			shift
 		done
@@ -58,7 +58,7 @@ function ammHttp::Fetch {
 	# wget
 	#
 	elif ammExec::Exists "wget"; then
-		ammLog::Inf "Fetching '$src' with wget"
+		ammLog::Info "Fetching '$src' with wget"
 
 		# Process special parameters
 		typeset wgetopts=""
@@ -79,7 +79,7 @@ function ammHttp::Fetch {
 		return $ret
 
 	else
-		ammLog::Err "Unable to find curl not wget for fetch_http"
+		ammLog::Error "Unable to find curl not wget for fetch_http"
 		return 99
 	fi
 }
@@ -107,7 +107,7 @@ function ammHttp::FetchSmart {
 
 	# scp: host:path
 	elif [[ $src =~ ^[a-zA-Z0-9_\-\.]+:.+$ ]]; then
-		ammLog::Wrn "scp not yet implemented"
+		ammLog::Warning "scp not yet implemented"
 		ret=99
 
 	# RSYNC
@@ -116,7 +116,7 @@ function ammHttp::FetchSmart {
 			rsync -a "$src" "$dst"
 			ret=$?
 		else
-			ammLog::Err "Cannot find rsync"
+			ammLog::Error "Cannot find rsync"
 			ret=99
 		fi
 
@@ -128,11 +128,11 @@ function ammHttp::FetchSmart {
 
 	# Local file: "./"
 	elif [[ -e "$(readlink -f $src)" ]]; then
-		ammLog::Inf "Fetching '$src' with cp"
+		ammLog::Info "Fetching '$src' with cp"
 		cp -r "$src" "$dst"
 		ret=$?
 	else
-		ammLog::Err "Unable to process url '$src'"
+		ammLog::Error "Unable to process url '$src'"
 		ret=99
 	fi
 

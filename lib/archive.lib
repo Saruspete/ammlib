@@ -27,7 +27,7 @@ function ammArchive::LibLoad {
 	typeset atype="$1"
 
 	if ! ammLib::Load "archive.$atype"; then
-			ammLog::Err "Cannot load required archive library '$atype'"
+			ammLog::Error "Cannot load required archive library '$atype'"
 			return 1
 	fi
 }
@@ -38,10 +38,10 @@ function ammArchive::LibList {
 
 	typeset sublib
 	for sublib in $(ammLib::LocatePattern "archive.*"); do
-		ammLog::Dbg "Found sublib '$sublib'"
+		ammLog::Debug "Found sublib '$sublib'"
 
 		if ammString::IsTrue "$onlyusable" && ! ammLib::Loadable $sublib >/dev/null; then
-			ammLog::Dbg "Unable to load $sublib"
+			ammLog::Debug "Unable to load $sublib"
 			continue
 		fi
 
@@ -67,18 +67,18 @@ function ammArchive::_Proxy {
 		if [[ -s "$file" ]]; then
 			fmt="$(ammArchive::FormatFromFile "$file")"
 			if [[ -z "$fmt" ]]; then
-				ammLog::Err "Unable to guess format of '$file' from current system available modules"
+				ammLog::Error "Unable to guess format of '$file' from current system available modules"
 				return 1
 			fi
 		else
-			ammLog::Err "Unable to guess format from empty file '$file'"
+			ammLog::Error "Unable to guess format from empty file '$file'"
 			return 1
 		fi
 	fi
 
 	typeset func="ammArchive$fmt::$op"
 	if ! ammEnv::IsFunc "$func"; then
-		ammLog::Err "Function '$op' is not implemented with lib '$fmt'"
+		ammLog::Error "Function '$op' is not implemented with lib '$fmt'"
 		return 1
 	fi
 

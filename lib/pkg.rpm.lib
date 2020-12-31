@@ -23,7 +23,7 @@ function ammPkgRpm::Extract {
 	typeset -i ret=0
 
 	for file in "$@"; do
-		ammLog::Dbg "Extracting package '$file' into '$dst'"
+		ammLog::Debug "Extracting package '$file' into '$dst'"
 		# Exec in subshell to avoid changing script cwd
 		(
 			cd "$dst"
@@ -60,7 +60,7 @@ function _ammPkgRpm::Rpm {
 	done
 
 	# Exec the query + opts
-	ammLog::Dbg "Executing rpm with args: $opts $@"
+	ammLog::Debug "Executing rpm with args: $opts $@"
 	rpm $opts "$@"
 }
 
@@ -72,7 +72,7 @@ function ammPkgRpm::Install {
 			installopts+=("$1")
 			shift
 		elif [[ -d "$1" ]]; then
-			ammLog::Dbg "Working in prefix '$1'. Adding '--noscripts'"
+			ammLog::Debug "Working in prefix '$1'. Adding '--noscripts'"
 			installopts+=("$1" "--noscripts")
 			shift
 		else
@@ -90,7 +90,7 @@ function ammPkgRpm::Install {
 
 		# If we have a package version mismatch...
 		if [[ -n "$curvers" ]] && [[ "$curvers" != "$pkgvers" ]]; then
-			ammLog::Inf "Changing version of package '$pkgname' from '$curvers' to '$pkgvers'"
+			ammLog::Info "Changing version of package '$pkgname' from '$curvers' to '$pkgvers'"
 		fi
 	done
 
@@ -230,7 +230,7 @@ function ammPkgRpm::DbExport {
 		[[ "$(file "$dbfile"|awk '{print $2,$3}')" == "BerkeleyDB" ]] || continue
 
 		# Dump the file to target
-		ammLog::Inf "Dumping '$dbfile' to '$exportdir'"
+		ammLog::Info "Dumping '$dbfile' to '$exportdir'"
 		/usr/lib/rpm/rpmdb_dump "$dbfile" > "$exportdir/${dbfile##*/}.dmp"
 	done
 }

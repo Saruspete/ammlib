@@ -57,7 +57,7 @@ function ammNetwork::Calc {
 			done
 		done
 	else
-		ammLog::Err "Cannot extract cird or netmask from input '$net'"
+		ammLog::Error "Cannot extract cird or netmask from input '$net'"
 		return 1
 	fi
 
@@ -262,7 +262,7 @@ function ammNetwork::TracerouteParse {
 				fi
 
 			else
-				ammLog::Wrn "Unhandled output: '$1'"
+				ammLog::Warning "Unhandled output: '$1'"
 				shift
 			fi
 
@@ -399,7 +399,7 @@ function ammNetwork::Cdp {
 		echo "$out"
 		return 0
 	else
-		ammLog::Err "No collector available or collection failed"
+		ammLog::Error "No collector available or collection failed"
 		return 1
 	fi
 }

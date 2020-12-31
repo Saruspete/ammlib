@@ -133,7 +133,7 @@ function ammChrootCentos::InitFromTemplate {
 				if [[ "$version" =~ $maj\..+ ]]; then
 					release="${version#$maj.}"
 				else
-					ammLog::Err "Unmanaged release version: '$version'"
+					ammLog::Error "Unmanaged release version: '$version'"
 					return 1
 				fi
 			fi
@@ -151,7 +151,7 @@ function ammChrootCentos::InitFromTemplate {
 			# Map the release short name to full release number
 			if (set +u; [[ -n "${__AMMCHROOTCENTOS_VERSIONS[$version]}" ]] ); then
 				release="${__AMMCHROOTCENTOS_VERSIONS[$version]}"
-				ammLog::Dbg "Mapping version '$version' to relase '$release'"
+				ammLog::Debug "Mapping version '$version' to relase '$release'"
 			fi
 
 			# Check mapping
@@ -160,7 +160,7 @@ function ammChrootCentos::InitFromTemplate {
 				if [[ "$version" =~ $maj\..+ ]]; then
 					release="${version#$maj.}"
 				else
-					ammLog::Err "Unmanaged release version: '$version'"
+					ammLog::Error "Unmanaged release version: '$version'"
 					return 1
 				fi
 			fi
@@ -184,7 +184,7 @@ function ammChrootCentos::InitFromTemplate {
 
 	# Check if we have something to fetch
 	if [[ -z "$url" ]]; then
-		ammLog::Err "Unable to get the URL for image version '$version'"
+		ammLog::Error "Unable to get the URL for image version '$version'"
 		return 1
 	fi
 
@@ -220,45 +220,45 @@ function ammChrootCentos::InitFromTemplate {
 				if ! [[ -s "$tmpfilepath" ]]; then
 
 					# Download the image
-					ammLog::Inf "Downloading compressed image '$url' as '$tmpfilepath'"
+					ammLog::Info "Downloading compressed image '$url' as '$tmpfilepath'"
 					typeset dlfilepath="$(ammHttp::FetchSmart "$url" "$tmpfilepath")"
 					if [[ -z "$dlfilepath" ]]; then
-						ammLog::Err "Unable to download image from '$url'"
+						ammLog::Error "Unable to download image from '$url'"
 						r+=1
 					fi
 				else
-					ammLog::Inf "Using already present compressed image '$tmpfilepath'"
+					ammLog::Info "Using already present compressed image '$tmpfilepath'"
 				fi
 
 				# Extract the compressed image
-				ammLog::Inf "Extracting tmp image to raw '$rawfilepath'"
+				ammLog::Info "Extracting tmp image to raw '$rawfilepath'"
 				case "$tmpfilepath" in
 					*.raw.tar.*)
 						if ! tar -xp -C "${rawfilepath%/*}" -f "$tmpfilepath"; then
-							ammLog::Err "Unable to extract data '$tmpfilepath'"
+							ammLog::Error "Unable to extract data '$tmpfilepath'"
 							return 1
 						fi
 
 						;;
 					*.xz)
 						if ! xz -d "$tmpfilepath"; then
-							ammLog::Err "Unable to extract xz '$tmpfilepath'"
+							ammLog::Error "Unable to extract xz '$tmpfilepath'"
 							return 1
 						fi
 						# Move archive to destination
 						if ! mv "${tmpfilepath%.xz}" "$rawfilepath"; then
-							ammLog::Err "Unable to move '${tmpfilepath%.xz}' to '$rawfilepath'"
+							ammLog::Error "Unable to move '${tmpfilepath%.xz}' to '$rawfilepath'"
 							return 1
 						fi
 						;;
 					*)
-						ammLog::Err "Unable to pre-process '$tmpfilepath'. This is a bug, please report it"
+						ammLog::Error "Unable to pre-process '$tmpfilepath'. This is a bug, please report it"
 						;;
 				esac
 			fi
 
 			if ! [[ -s "$rawfilepath" ]]; then
-				ammLog::Err "Archive didn't contain raw file '$rawfilepath'"
+				ammLog::Error "Archive didn't contain raw file '$rawfilepath'"
 				return 1
 			fi
 		fi
@@ -280,7 +280,7 @@ function ammChrootCentos::InitFromTemplate {
 				typeset lodev="$(ammExec::AsUser "root" losetup --find "$rawfilepath" --show --partscan --read-only)"
 
 				if [[ -z "$lodev" ]]; then
-					ammLog::Err "Unable to mount raw file '$rawfilepath' using losetup"
+					ammLog::Error "Unable to mount raw file '$rawfilepath' using losetup"
 					return 1
 				fi
 
@@ -289,16 +289,16 @@ function ammChrootCentos::InitFromTemplate {
 				typeset mntpnt="$(ammLib::TmpPathGet "")/mnt.root"
 				[[ -d "$mntpnt" ]] || mkdir -p "$mntpnt"
 				if ! ammExec::AsUser "root" mount "$mntdev" "$mntpnt"; then
-					ammLog::Err "Unable to mount image '$mntdev' to '$mntpnt'"
+					ammLog::Error "Unable to mount image '$mntdev' to '$mntpnt'"
 					return 1
 				fi
 
 				# Copy archive to chroot
-				ammLog::Inf "Copying data from '$mntpnt' to '$chrootdir'"
+				ammLog::Info "Copying data from '$mntpnt' to '$chrootdir'"
 				ammExec::AsUser "root" cp -a "$mntpnt/." "$chrootdir"
 
 				if ! ammExec::AsUser "root" umount "$mntpnt"; then
-					ammLog::Err "Unable to umount dir '$mntpnt'. Cleanup manually"
+					ammLog::Error "Unable to umount dir '$mntpnt'. Cleanup manually"
 				fi
 
 				;;
@@ -313,10 +313,10 @@ function ammChrootCentos::InitFromTemplate {
 				# Or convert it
 				# qemu-img convert -p -O raw oldfile.qcow2 newfile.raw
 
-				ammLog::Err "qcow2 images are not yet supported"
+				ammLog::Error "qcow2 images are not yet supported"
 				;;
 			*)
-				ammLog::Err "Unsupported archive format of '$rawfilepath'"
+				ammLog::Error "Unsupported archive format of '$rawfilepath'"
 				return 1
 		esac
 

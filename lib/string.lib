@@ -365,7 +365,7 @@ function ammString::UnitToPow {
 	typeset unitdst="${2:-}"
 
 	if [[ "${#unitsrc}" != "1" ]]; then
-		ammLog::Err "$FUNCNAME units are single char from SI unit"
+		ammLog::Error "$FUNCNAME units are single char from SI unit"
 	fi
 
 	# For Exa, Zetta, Yotta, don't care about Zepto/Yocto. However, I hope you'll use bc instead of pure bash
@@ -424,7 +424,7 @@ function ammString::UnitConvert {
 	# For very high values, bash will overflow
 	if [[ $pow -gt 6 ]]; then
 		useBc=true
-		ammLog::Dbg "Exponant '$pow' is > 6, using bc for calculation"
+		ammLog::Debug "Exponant '$pow' is > 6, using bc for calculation"
 	fi
 
 	# Negative power, division
@@ -433,7 +433,7 @@ function ammString::UnitConvert {
 		pow="$(( $pow * -1 ))"
 	fi
 
-	ammLog::Dbg "Converting $unitsrc to $unitdst: $base**$pow * $mult / $div"
+	ammLog::Debug "Converting $unitsrc to $unitdst: $base**$pow * $mult / $div"
 
 	# Using bc for high values
 	if $useBc; then
@@ -469,7 +469,7 @@ function ammString::BaseConvert {
 		echo "obase=$basedst; ibase=$basesrc; $number" | bc
 		return $?
 	else
-		ammLog::Err "Cannot convert from $basesrc to $basedst"
+		ammLog::Error "Cannot convert from $basesrc to $basedst"
 		return 1
 	fi
 }
@@ -496,7 +496,7 @@ function ammString::IPv4ToHex {
 function ammString::HexToIPv4 {
 	typeset strhex="$1"
 	if [[ "${#strhex}" != 8 ]]; then
-		ammLog::Wrn "Calling $FUNCNAME with arg length != 8"
+		ammLog::Warning "Calling $FUNCNAME with arg length != 8"
 		return 1
 	fi
 
@@ -572,7 +572,7 @@ function ammString::Filter {
 	typeset filtercolumn="${3:-}"
 	typeset displaycolumn="${4:-0}"
 
-	ammLog::Dbg "fl=$filterline fc=$filtercolumn dc=$displaycolumn file=$file"
+	ammLog::Debug "fl=$filterline fc=$filtercolumn dc=$displaycolumn file=$file"
 	awk -v fl="$filterline" -v fc="$filtercolumn" -v dc="$displaycolumn" '
 		# Line matching
 		match($0, fl) {
@@ -680,7 +680,7 @@ function ammString::ExpandStringBash {
 				if [[ "${seq//,/}" != "$seq" ]] || [[ "${seq//../}" != "${seq}" ]]; then
 					$FUNCNAME "$pfx{$seq}$sfx"
 				else
-					ammLog::Dbg "Adding '${pfx}${seq}${sfx}'"
+					ammLog::Debug "Adding '${pfx}${seq}${sfx}'"
 					values+=("${pfx}${seq}${sfx}")
 				fi
 
@@ -688,7 +688,7 @@ function ammString::ExpandStringBash {
 				if [[ "${seq2//,/}" != "$seq2" ]] || [[ "${seq2//../}" != "${seq2}" ]]; then
 					$FUNCNAME "$pfx{$seq2}$sfx"
 				else
-					ammLog::Dbg "Adding '${pfx}${seq2}${sfx}'"
+					ammLog::Debug "Adding '${pfx}${seq2}${sfx}'"
 					values+=("${pfx}${seq2}${sfx}")
 				fi
 			# No seq2, only seq try to expand it maybe
@@ -696,14 +696,14 @@ function ammString::ExpandStringBash {
 				# WARNING / TODO: This may be nasty here... Securization needed
 				typeset i=""
 				for i in $(eval echo $pfx{$seq}$sfx); do
-					ammLog::Dbg "Adding '$i' from '$seq'"
+					ammLog::Debug "Adding '$i' from '$seq'"
 					values+=("$i")
 				done
 			fi
 		# Not a bash composite group, just use it raw
 		else
 			if [[ -n "$group" ]]; then
-					ammLog::Dbg "Adding '$seq'"
+					ammLog::Debug "Adding '$seq'"
 				values+=($group)
 			fi
 		fi
@@ -734,20 +734,20 @@ function ammString::ExpandIntegerList {
 
 			# Some checks
 			if [[ -z "$bgn" ]]; then
-				ammLog::Wrn "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
+				ammLog::Warning "List begin element '$bgn' (in group '$group') cannot be empty. Skipping"
 				continue
 			fi
 			if [[ -z "$end" ]]; then
-				ammLog::Wrn "List end element '$end' (in group '$group') cannot be empty. Skipping"
+				ammLog::Warning "List end element '$end' (in group '$group') cannot be empty. Skipping"
 				continue
 			fi
 
 			if ! ammString::IsInteger "$bgn"; then
-				ammLog::Wrn "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
+				ammLog::Warning "List element '$bgn' (in group '$group' in element '$elem') is not an integer. Skipping"
 				continue
 			fi
 			if ! ammString::IsInteger "$end"; then
-				ammLog::Wrn "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
+				ammLog::Warning "List element '$end' (in group '$group' in element '$elem') is not an integer. Skipping"
 				continue
 			fi
 
@@ -806,7 +806,7 @@ function ammString::UUIDGenerate {
 		typeset macaddr="$(cat /sys/class/net/$iface/address 2>/dev/null)"
 		if [[ -z "$macaddr" ]]; then
 			macaddr="00:11:22:33:44:55"
-			ammLog::Wrn "Unable to get real MAC Interface. Using dummy $macaddr"
+			ammLog::Warning "Unable to get real MAC Interface. Using dummy $macaddr"
 		fi
 		__AMMSTRING_UUID_MACADDR="${macaddr//:/}"
 	fi
@@ -868,7 +868,7 @@ function ammString::UUIDGenerate {
 			fi
 			;;
 		*)
-			ammLog::Wrn "Unmanaged UUID Version '$version'"
+			ammLog::Warning "Unmanaged UUID Version '$version'"
 			;;
 	esac
 }
@@ -883,7 +883,7 @@ function ammString::HashMD5 {
 	typeset salt="${2:-}"
 
 	if [[ "$str" == "-" ]] && [[ -n "$salt" ]]; then
-		ammLog::Wrn "$FUNCNAME: Cannot set a salt when reading from stdin"
+		ammLog::Warning "$FUNCNAME: Cannot set a salt when reading from stdin"
 	fi
 
 	if ammExec::Exists "md5sum"; then
@@ -901,7 +901,7 @@ function ammString::HashMD5 {
 			echo -n "${salt}${str}" | openssl md5 | cut -f 2 -d " "
 		fi
 	else
-		ammLog::Err "No MD5 generator available (openssl or md5sum)"
+		ammLog::Error "No MD5 generator available (openssl or md5sum)"
 		return 1
 	fi
 
@@ -913,7 +913,7 @@ function ammString::HashSHA1 {
 	typeset salt="${2:-}"
 
 	if [[ "$str" == "-" ]] && [[ -n "$salt" ]]; then
-		ammLog::Wrn "$FUNCNAME: Cannot set a salt when reading from stdin"
+		ammLog::Warning "$FUNCNAME: Cannot set a salt when reading from stdin"
 	fi
 
 	if ammExec::Exists "sha1sum"; then
@@ -931,7 +931,7 @@ function ammString::HashSHA1 {
 			echo -n "${salt}${str}" | openssl sha1 | cut -f 2 -d " "
 		fi
 	else
-		ammLog::Err "No SHA1 generator available (openssl or sha1sum)"
+		ammLog::Error "No SHA1 generator available (openssl or sha1sum)"
 		return 1
 	fi
 

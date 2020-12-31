@@ -197,22 +197,22 @@ function ammInput::Get {
 				# Set the reply and consume it
 				default="${__AMMINPUT_REPLIES[$id]}"
 				unset __AMMINPUT_REPLIES[$id]
-				ammLog::Dbg "Getting reply from filled list __AMMINPUT_REPLIES[$id] => '$default'"
+				ammLog::Debug "Getting reply from filled list __AMMINPUT_REPLIES[$id] => '$default'"
 
 			# Get from cmdline
 			elif (set +u; [[ -n "${__AMMINPUT_REPLIES_FROMCMD[$id]}" ]]); then
 				default="${__AMMINPUT_REPLIES_FROMCMD[$id]}"
-				ammLog::Dbg "Getting reply from cmdline __AMMINPUT_REPLIES_FROMCMD[$id] => '$default'"
+				ammLog::Debug "Getting reply from cmdline __AMMINPUT_REPLIES_FROMCMD[$id] => '$default'"
 			elif (set +u; [[ -n "${__AMMINPUT_REPLIES_FROMENV[${id^^}]}" ]]); then
 				default="${__AMMINPUT_REPLIES_FROMENV[${id^^}]}"
-				ammLog::Dbg "Getting reply from env __AMMINPUT_REPLIES_FROMENV[${id^^}] => '$default'"
+				ammLog::Debug "Getting reply from env __AMMINPUT_REPLIES_FROMENV[${id^^}] => '$default'"
 			fi
 			
 #typeset envname="${id^^}"
 #				typeset envval="$(eval echo "\${$envname}")"
 #				if [[ -n "$envval" ]]; then
 #					default="$envval"
-#					ammLog::Dbg "Getting reply from env '$envname' => '$default'"
+#					ammLog::Debug "Getting reply from env '$envname' => '$default'"
 #				fi
 #			fi
 		fi
@@ -233,7 +233,7 @@ function ammInput::Get {
 		# Read from user input
 		else
 			read -e $readopts -p "$prompt" ${default:+-i "$default"} reply
-			ammLog::Dbg "Got input from user question. Id:$id Caller:$caller"
+			ammLog::Debug "Got input from user question. Id:$id Caller:$caller"
 		fi
 
 		#
@@ -245,7 +245,7 @@ function ammInput::Get {
 			# I expect it to be a simple function, not a binary
 			if ammEnv::IsFunc "$validcb"; then
 				if ! $validcb "$reply"; then
-					ammLog::Wrn "Reply '$reply' is invalid (callback '$validcb')"
+					ammLog::Warning "Reply '$reply' is invalid (callback '$validcb')"
 
 					# If we are in silent ok, and had error, display it now
 					$__AMMINPUT_BATCH_SILENTOK && ammLog::WriteTerm "${prompt}${reply}"
@@ -254,11 +254,11 @@ function ammInput::Get {
 						ammLog::Die "Dying due to DieOnErr requested"
 					fi
 				else
-					ammLog::Dbg "Input validated by arg provided callback '$validcb'"
+					ammLog::Debug "Input validated by arg provided callback '$validcb'"
 					break
 				fi
 			else
-				ammLog::Err "Validation callback '$validcb' is not a function. Please retry"
+				ammLog::Error "Validation callback '$validcb' is not a function. Please retry"
 				unset validcb
 			fi
 
@@ -271,19 +271,19 @@ function ammInput::Get {
 					# If we are in silent ok, and had error, display it now
 					$__AMMINPUT_BATCH_SILENTOK && ammLog::WriteTerm "${prompt}${reply}"
 
-					ammLog::Wrn "Reply '$reply' is invalid (callback '$func')"
+					ammLog::Warning "Reply '$reply' is invalid (callback '$func')"
 				else
-					ammLog::Dbg "Input validated by registered '$validcb'"
+					ammLog::Debug "Input validated by registered '$validcb'"
 					break
 				fi
 			else
-				ammLog::Err "Validation callback '$func' is not a function. Please retry"
+				ammLog::Error "Validation callback '$func' is not a function. Please retry"
 				unset __AMMINPUT_VALIDATIONCB[$id]
 			fi
 
 		# No validation requested
 		else
-			ammLog::Dbg "No validation requested."
+			ammLog::Debug "No validation requested."
 			break
 		fi
 
@@ -335,7 +335,7 @@ function ammInput::Populate {
 						id="${id%%=*}"
 
 						# Save parsed var
-						ammLog::Dbg "Saving envvar '$id' to '$val'"
+						ammLog::Debug "Saving envvar '$id' to '$val'"
 						__AMMINPUT_REPLIES_FROMENV[$id]="$val"
 						# Map input with ID for replay, option style
 						#__AMMINPUT_IDS[$id]="--$var"
@@ -365,7 +365,7 @@ function ammInput::Populate {
 					# if our option parsing can be done
 					if [[ "$var" = $pfx* ]]; then
 
-						ammLog::Dbg "Processing input related var '$var' having prefix '$pfx'"
+						ammLog::Debug "Processing input related var '$var' having prefix '$pfx'"
 						# remove prefix and add reply
 						typeset id="${var#$pfx}"
 						id="${id%%=*}"
@@ -374,10 +374,10 @@ function ammInput::Populate {
 						# If we didn't have a '=', consume next option
 						if [[ "$var" == "$val" ]]; then
 							val="${__AMMLIB_CALLOPTS[$(( optid + 1))]}"
-							ammLog::Dbg "Consumed next value '$val'"
+							ammLog::Debug "Consumed next value '$val'"
 							optconsumed=true
 						else
-							ammLog::Dbg "Extracted value '$val'"
+							ammLog::Debug "Extracted value '$val'"
 						fi
 
 						# Save reply without prefix
@@ -394,7 +394,7 @@ function ammInput::Populate {
 				# Recreate the arguments, without our options
 				#set - "${args[@]}"
 				__AMMLIB_CALLOPTS=("${args[@]}")
-				ammLog::Dbg "Set __AMMLIB_CALLOPTS to ${__AMMLIB_CALLOPTS[@]}"
+				ammLog::Debug "Set __AMMLIB_CALLOPTS to ${__AMMLIB_CALLOPTS[@]}"
 				;;
 
 			# From /proc/cmdline
@@ -420,7 +420,7 @@ function ammInput::Populate {
 				;;
 
 			*)
-				ammLog::Err "Unknown source type: '$src'"
+				ammLog::Error "Unknown source type: '$src'"
 				;;
 		esac
 	done
@@ -487,9 +487,9 @@ function ammInput::GetYN {
 	# If a default value has been proposed, check it
 	if [[ -n "$default" ]]; then
 		if ammInput::ValidateYN "$default"; then
-			ammLog::Dbg "Default input '$default' validated"
+			ammLog::Debug "Default input '$default' validated"
 		else
-			ammLog::Wrn "Invalid yes/no default input: '$default'"
+			ammLog::Warning "Invalid yes/no default input: '$default'"
 			default=""
 		fi
 	fi
@@ -530,13 +530,13 @@ function ammInput::GetPassword {
 		case $chkkey in
 			minsize)
 				[[ ${#password} -ge $chkval ]] || {
-					ammLog::Err "Password validation: Must be at least $chkval chars long (got ${#password})"
+					ammLog::Error "Password validation: Must be at least $chkval chars long (got ${#password})"
 					ret+=1
 				}
 				;;
 			maxsize)
 				[[ ${#password} -le $chkval ]] || {
-					ammLog::Err "Password validation: Must be at most $chkval chars long (got ${#password})"
+					ammLog::Error "Password validation: Must be at most $chkval chars long (got ${#password})"
 					ret+=1
 				}
 				;;
@@ -545,11 +545,11 @@ function ammInput::GetPassword {
 					echo "$password" | cracklib-check >/dev/null
 					ret+=$?
 				else
-					ammLog::Wrn "Cracklib check required, but no cracklib-check exec available. Skipping"
+					ammLog::Warning "Cracklib check required, but no cracklib-check exec available. Skipping"
 				fi
 				;;
 			*)
-				ammLog::Wrn "Unknown check: $chkkey ($chkval)"
+				ammLog::Warning "Unknown check: $chkkey ($chkval)"
 				;;
 		esac
 	done

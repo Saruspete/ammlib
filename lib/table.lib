@@ -73,7 +73,7 @@ function _ammTable::ColGetSize {
 	typeset colid="$1"
 
 	typeset termsize="$(_ammTable::TermCols)"
-	ammLog::Dbg "Getting colsize for column id '$colid' (term=$termsize)"
+	ammLog::Debug "Getting colsize for column id '$colid' (term=$termsize)"
 
 	# try cache
 	if (set +u; [[ -n "${__AMMTABLE_CACHE_COLSIZE[$colid]}" ]] && [[ $__AMMTABLE_CACHE_TERMSIZE == "$termsize" ]] ); then
@@ -98,7 +98,7 @@ function _ammTable::ColGetSize {
 		esac
 	done
 
-	ammLog::Dbg "We got: $sumfill fixed, $sumpct %, $sumfill filled"
+	ammLog::Debug "We got: $sumfill fixed, $sumpct %, $sumfill filled"
 
 	# Step 2: Compute all columns size
 	typeset -i totalsize=0
@@ -133,7 +133,7 @@ function _ammTable::ColGetSize {
 	fi
 
 	# Step 3: show our column sizel
-	ammLog::Dbg "Field '$colid' is now ${__AMMTABLE_CACHE_COLSIZE[$colid]}"
+	ammLog::Debug "Field '$colid' is now ${__AMMTABLE_CACHE_COLSIZE[$colid]}"
 	echo ${__AMMTABLE_CACHE_COLSIZE[$colid]}
 }
 
@@ -189,7 +189,7 @@ function ammTable::AddColumn {
 	__AMMTABLE_COLUMNS+=("$name")
 	__AMMTABLE_COLNAME2ID[$name]="$colid"
 
-	ammLog::Dbg "Adding column '$name' ($@) pos '$colid'"
+	ammLog::Debug "Adding column '$name' ($@) pos '$colid'"
 
 	# Process column format (simple validation)
 	typeset -i r=0
@@ -244,7 +244,7 @@ function ammTable::AddColumn {
 		esac
 
 		if [[ -n "$err" ]]; then
-			ammLog::Err "Skiped invalid cfg '$cfg' for column '$name': $err"
+			ammLog::Error "Skiped invalid cfg '$cfg' for column '$name': $err"
 			r=r+1
 		fi
 	done

@@ -107,7 +107,7 @@ function ammStorage::_GetFromSysBlock {
 			return 0
 		fi
 	else
-		ammLog::Dbg "Invalid requested sysfs '$blockdev' / '$part'"
+		ammLog::Debug "Invalid requested sysfs '$blockdev' / '$part'"
 		return 1
 	fi
 }
@@ -144,7 +144,7 @@ function ammStorage::_CacheBlkData {
 			line="${line//%/}"
 			typeset name="${line%% *}"
 			name="${name#*=}"
-			ammLog::Dbg "Parsing lsblk '$name': '$line'"
+			ammLog::Debug "Parsing lsblk '$name': '$line'"
 
 			# Use regex to parse all pairs
 			while [[ "$line" =~ \ *([^=]+)=\"([^\"]*)\" ]]; do
@@ -162,7 +162,7 @@ function ammStorage::_CacheBlkData {
 
 	else
 
-		ammLog::Err "lsblk replacement is not yet done. Please install it !"
+		ammLog::Error "lsblk replacement is not yet done. Please install it !"
 		return 1
 	fi
 }
@@ -177,7 +177,7 @@ function ammStorage::ListParents {
 
 	typeset blockname="$(ammStorage::GetKernelName "$blockdev")"
 	if [[ -z "$blockname" ]]; then
-		ammLog::Wrn "Unable to get kernel name for device '$blockdev'"
+		ammLog::Warning "Unable to get kernel name for device '$blockdev'"
 		return 1
 	fi
 
@@ -196,7 +196,7 @@ function ammStorage::ListParents {
 			nvme*|mmc*)  parents="${blockname%p$part}" ;;
 			# Unknown scheme: use plain listing
 			*)
-				ammLog::Dbg "Unhandled partition naming '$blockname'. Doing listing"
+				ammLog::Debug "Unhandled partition naming '$blockname'. Doing listing"
 				typeset bpath=""
 				for bpath in /sys/class/block/*/$blockname; do
 					if [[ -d "$bpath" ]]; then
@@ -237,7 +237,7 @@ function ammStorage::ListParents {
 
 	# No special case. Should be a physical device
 	else
-		#ammLog::Err "Unable to manage '$blockname': unknown device type"
+		#ammLog::Error "Unable to manage '$blockname': unknown device type"
 		:
 	fi
 
@@ -249,7 +249,7 @@ function ammStorage::ListParents {
 		parents+="${slave##*/} "
 	done
 
-	ammLog::Dbg "Parents of '$blockdev' ($blockname / $maj:$min): $parents"
+	ammLog::Debug "Parents of '$blockdev' ($blockname / $maj:$min): $parents"
 	echo "$parents"
 }
 
@@ -260,7 +260,7 @@ function ammStorage::ListUnderlyingDevices {
 	# Get its parents recursively
 	typeset parents="$(ammStorage::ListParents "$blockdev")"
 	if [[ -z "$parents" ]]; then
-		ammLog::Dbg "Device '$blockdev' is a media storage"
+		ammLog::Debug "Device '$blockdev' is a media storage"
 		echo "$blockdev"
 	else
 		for parent in $parents; do
@@ -298,7 +298,7 @@ function ammStorage::Exists {
 		[[ -d "/sys/class/block/$blockdev" ]] && return 0
 	fi
 	# No standard path found, invalid blockdev
-	ammLog::Dbg "Invalid blockdev '$blockdev'"
+	ammLog::Debug "Invalid blockdev '$blockdev'"
 	return 1
 }
 
@@ -320,7 +320,7 @@ function ammStorage::GetKernelName {
 	if [[ "${name:0:1}" != "/" ]]; then
 		# Simple case: already real name with dev (maj:min) file
 		if [[ -e "/sys/class/block/$name/dev" ]]; then
-			ammLog::Dbg "Device '$name' maps to itself"
+			ammLog::Debug "Device '$name' maps to itself"
 			echo "$name"
 			return 0
 
@@ -328,10 +328,10 @@ function ammStorage::GetKernelName {
 		else
 			if [[ -b "/dev/$name" ]]; then
 				realpath="$(readlink -f "/dev/$name")"
-				#ammLog::Dbg "Found '$name' in /dev: '$realpath'"
+				#ammLog::Debug "Found '$name' in /dev: '$realpath'"
 			elif [[ -e "/dev/mapper/$name" ]]; then
 				realpath="$(readlink -f "/dev/mapper/$name")"
-				#ammLog::Dbg "Found '$name' in /dev/mapper: '$realpath'"
+				#ammLog::Debug "Found '$name' in /dev/mapper: '$realpath'"
 
 			# TODO: add other paths, like drbd, etc...
 			fi
@@ -341,7 +341,7 @@ function ammStorage::GetKernelName {
 		# Need real block device (dm-X instead of lvm "vgname-lvname" symlink)
 		realpath="$(readlink -f $name)"
 
-		ammLog::Dbg "Device path '$name' maps to '$realpath'"
+		ammLog::Debug "Device path '$name' maps to '$realpath'"
 
 		if [[ -e "/sys/class/block/${realpath##*/}/dev" ]]; then
 			echo "${realpath##*/}"
@@ -355,7 +355,7 @@ function ammStorage::GetKernelName {
 		# If there is an entry in /sys for this disk/virt/part... got real
 		typeset devname="${realpath##*/}"
 		if [[ -d "/sys/class/block/$devname" ]]; then
-			ammLog::Dbg "Device '$name' ($realpath) maps to device '$devname'"
+			ammLog::Debug "Device '$name' ($realpath) maps to device '$devname'"
 			echo "$devname"
 			return 0
 
@@ -364,7 +364,7 @@ function ammStorage::GetKernelName {
 			typeset maj min btest
 			read maj min < <(ammStorage::GetMajorMinor "$realpath")
 
-			ammLog::Dbg "Device '$name' ($realpath) maps to unknown block '$devname'"
+			ammLog::Debug "Device '$name' ($realpath) maps to unknown block '$devname'"
 
 			# There should be only 1 *direct* listing with this maj/min
 			for btest in /sys/class/block/*/dev; do
@@ -377,7 +377,7 @@ function ammStorage::GetKernelName {
 		fi
 	fi
 
-	ammLog::Err "Unable to get real name for device '$name'"
+	ammLog::Error "Unable to get real name for device '$name'"
 	return 1
 }
 function ammStorage::GetRealName {
@@ -392,7 +392,7 @@ function ammStorage::GetMajorMinor {
 
 	# Cannot call GetKernelName before, can create infinite loop
 	if ! ammStorage::Exists "$blockdev"; then
-		ammLog::Err "Invalid blockdev '$blockdev'. Cannot get Major/minor"
+		ammLog::Error "Invalid blockdev '$blockdev'. Cannot get Major/minor"
 		return 1
 	fi
 
@@ -409,7 +409,7 @@ function ammStorage::GetNameFromMajorMinor {
 	typeset majmin="$1"
 
 	if ! [[ -e "/sys/dev/block/$majmin" ]]; then
-		ammLog::Wrn "Device with major:minor '$majmin' does not exist"
+		ammLog::Warning "Device with major:minor '$majmin' does not exist"
 		return 1
 	fi
 
@@ -440,7 +440,7 @@ function ammStorage::GetType {
 	fi
 
 	if [[ -z "$typ" ]]; then
-		ammLog::Dbg "Unable to get the type of '$dev'"
+		ammLog::Debug "Unable to get the type of '$dev'"
 		return 1
 	fi
 
@@ -568,7 +568,7 @@ function ammStorage::GetBlockSize {
 		for parent in $(ammStorage::ListParents "$dev"); do
 			bsizetmp="$($FUNCNAME "$parent")"
 			if [[ -n "$bsizetmp" ]] && [[ -n "$bsize" ]] && [[ "$bsizetmp" != "$bsize" ]]; then
-				ammLog::Wrn "Multiple parent devices reported different block-size"
+				ammLog::Warning "Multiple parent devices reported different block-size"
 				break
 			fi
 
@@ -611,7 +611,7 @@ function ammStorage::IsFlashDrive {
 	typeset blockdev="$1"
 
 	if ! ammStorage::Exists "$blockdev"; then
-		ammLog::Err "Invalid block device '$blockdev'"
+		ammLog::Error "Invalid block device '$blockdev'"
 		return 1
 	fi
 
@@ -676,11 +676,11 @@ function ammStorage::SecureErase {
 	fi
 
 	if [[ -z "$targetdev" ]]; then
-		ammLog::Err "The element to erase '$elem' is not a device, nor a mountpoint. Skipping"
+		ammLog::Error "The element to erase '$elem' is not a device, nor a mountpoint. Skipping"
 		return 1
 	fi
 
-	ammLog::Dbg "Gathering sub-devices of '$targetdev' to erase"
+	ammLog::Debug "Gathering sub-devices of '$targetdev' to erase"
 
 	# Work on all sub-devices
 	typeset dev
@@ -695,12 +695,12 @@ function ammStorage::SecureErase {
 			# NVMe must use secure-erase
 			nvme)
 				if ! ammExec::Exists "nvme"; then
-					ammLog::Inf "No 'nvme' tool available. Will try to install it"
+					ammLog::Info "No 'nvme' tool available. Will try to install it"
 
 					# Try to install the package
 					ammLib::Require "pkg"
 					if ! ammPkg::Install "nvme"; then
-						ammLog::Err "Cannot get a working 'nvme' tool (usually from nvme-cli). Cannot secure-erase '$dev'"
+						ammLog::Error "Cannot get a working 'nvme' tool (usually from nvme-cli). Cannot secure-erase '$dev'"
 						r+=1
 						continue
 					fi

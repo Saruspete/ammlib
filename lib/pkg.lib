@@ -68,7 +68,7 @@ function ammPkg::ManagerDetect {
 		typeset -a mgr
 		typeset sublib
 		for sublib in $(ammLib::LocatePattern "pkg.*"); do
-			ammLog::Dbg "Found sublib '$sublib'"
+			ammLog::Debug "Found sublib '$sublib'"
 			if ammLib::Loadable "$sublib" >/dev/null; then
 				ammLib::Load "$sublib"
 
@@ -86,10 +86,10 @@ function ammPkg::ManagerDetect {
 			return 0
 		elif [[ ${#mgr[@]} -gt 1 ]]; then
 			#$AMMLIB_INTERACTIVE &&
-			ammLog::Wrn "Multiple package managers available: '${mgr[@]}'"
+			ammLog::Warning "Multiple package managers available: '${mgr[@]}'"
 			return 1
 		else
-			ammLog::Err "Unhandled or inexistant package manager on '$rootpath'"
+			ammLog::Error "Unhandled or inexistant package manager on '$rootpath'"
 			return 1
 		fi
 	fi
@@ -127,7 +127,7 @@ function _ammPkg::Proxy {
 
 	# Load the target library
 	if ! ammLib::Load "pkg.$lib"; then
-		ammLog::Err "Unable to load package manager '$lib' for path '$path'. This should be reported !"
+		ammLog::Error "Unable to load package manager '$lib' for path '$path'. This should be reported !"
 		return 1
 	fi
 
@@ -192,7 +192,7 @@ function ammPkg::InstallWhatProvides {
 
 		# If it's an absolute path, fast-skip
 		if [[ "${file:0:1}" == "/" ]] && [[ -e "$file" ]]; then
-			ammLog::Dbg "Skipping already installed absolute path '$file'"
+			ammLog::Debug "Skipping already installed absolute path '$file'"
 			continue
 		fi
 
@@ -205,7 +205,7 @@ function ammPkg::InstallWhatProvides {
 		case "${#provides[@]}" in
 			# None found...
 			0)
-				ammLog::Wrn "Unable to find package providing '$file'"
+				ammLog::Warning "Unable to find package providing '$file'"
 				r+=1
 				;;
 			# Only 1 pkg, use it directly
@@ -217,12 +217,12 @@ function ammPkg::InstallWhatProvides {
 				typeset pref selected=""
 				# Check our preferences in order
 				for pref in "${preferences[@]}"; do
-					ammLog::Dbg "Checking for a file in '$pref'"
+					ammLog::Debug "Checking for a file in '$pref'"
 					for pkgfile in "${!provides[@]}"; do
 						typeset pkg="${provides[$pkgfile]}"
 						# If the file starts with our current prefix, select it
 						if [[ "${pkgfile#$pref}" != "$pkgfile" ]]; then
-							ammLog::Dbg "Selecting '$pkg' providing file '$pkgfile' from preference '$pref'"
+							ammLog::Debug "Selecting '$pkg' providing file '$pkgfile' from preference '$pref'"
 							selected="$pkg"
 							break 2
 						fi
@@ -231,7 +231,7 @@ function ammPkg::InstallWhatProvides {
 				if [[ -n "$selected" ]]; then
 					pkgs+=("$selected")
 				else
-					ammLog::Wrn "No package selected from list '${provides[@]}. Very strange..."
+					ammLog::Warning "No package selected from list '${provides[@]}. Very strange..."
 					r+=1
 				fi
 				;;
@@ -242,7 +242,7 @@ function ammPkg::InstallWhatProvides {
 	if (set +u; [[ "${#pkgs[@]}" -gt 0 ]] ); then
 		ammPkg::Install "${pkgs[@]}"
 	else
-		ammLog::Wrn "No package to install"
+		ammLog::Warning "No package to install"
 	fi
 	r+=$?
 
@@ -324,14 +324,14 @@ function ammPkg::FindDeps {
 	typeset element
 	for element in "$@"; do
 		typeset type="$(ammString::Type "$element")"
-		ammLog::Dbg "Processing element '$element' (type: $type)"
+		ammLog::Debug "Processing element '$element' (type: $type)"
 
 		#
 		# URI: Download the file locally for further analysis
 		#
 		if [[ "$type" == "uri" ]]; then
 			if ! ammLib::Load http >/dev/null; then
-				ammLog::Err "Cannot load required library http to process uri '$element'. Skipping"
+				ammLog::Error "Cannot load required library http to process uri '$element'. Skipping"
 				continue
 			fi
 
@@ -339,7 +339,7 @@ function ammPkg::FindDeps {
 
 			# Download the uri
 			if ! ammHttp::FetchSmart "$element" "$destfile"; then
-				ammLog::Err "Unable to fetch uri '$element' as '$destfile'"
+				ammLog::Error "Unable to fetch uri '$element' as '$destfile'"
 				continue
 			fi
 
@@ -376,11 +376,11 @@ function ammPkg::FindDeps {
 			# For now, assume a binary. Else, just skip (may comment following test)
 			if head -n 1 "$element" | grep ELF >/dev/null 2>&1; then
 
-				ammLog::Dbg "Extracting dependencies from ELF binary '$element'"
+				ammLog::Debug "Extracting dependencies from ELF binary '$element'"
 
 				typeset file
 				for file in $(_ammPkg::DepsFindBin $element 2>/dev/null | sort -u); do
-					ammLog::Dbg "Searching package for file '$file'"
+					ammLog::Debug "Searching package for file '$file'"
 
 					# if file is not absolute, we are missing it. Add a refrence to /lib in the path
 					if [[ "${file:0:1}" != "/" ]]; then
@@ -389,19 +389,19 @@ function ammPkg::FindDeps {
 
 					# File already in cache, already found. Skip
 					if ( set +u; [[ -n "${pkgFiles[$file]}" ]] ) ; then
-						ammLog::Dbg "File $file already found its package(s): '${pkgFiles[$file]}'"
+						ammLog::Debug "File $file already found its package(s): '${pkgFiles[$file]}'"
 						continue
 
 					# Finds from which package the file comes from
 					else
 						typeset pkg="$(ammPkg::InfoWhatProvides "$file")"
 						if [[ -z "$pkg" ]]; then
-							ammLog::Wrn "Unable to find package providing file '$file'."
+							ammLog::Warning "Unable to find package providing file '$file'."
 							continue
 						fi
 
 						# Check output for multiple packages
-						[[ "${pkg// /}" != "$pkg" ]] && ammLog::Wrn "Multiple packages found providing file '$file': $pkg"
+						[[ "${pkg// /}" != "$pkg" ]] && ammLog::Warning "Multiple packages found providing file '$file': $pkg"
 
 						pkgFiles[$file]="$pkg"
 						pkgsToDl+="$pkg "
@@ -414,7 +414,7 @@ function ammPkg::FindDeps {
 				# Find the owner
 				typeset pkg="$(ammPkg::InfoWhatProvides "$element")"
 				if [[ -z "$pkg" ]]; then
-					ammLog::Wrn "Unable to find package providing file '$element'."
+					ammLog::Warning "Unable to find package providing file '$element'."
 					continue
 				fi
 
@@ -443,13 +443,13 @@ function ammPkg::ExtractWithDeps {
 	typeset dest="$1"; shift
 
 	if ! [[ -d "$dest" ]]; then
-		ammLog::Err "Destination '$dest' does not exists. Create it beforehand"
+		ammLog::Error "Destination '$dest' does not exists. Create it beforehand"
 		return 1
 	fi
 
-	ammLog::Inf "Calling dependency analysis for $@"
+	ammLog::Info "Calling dependency analysis for $@"
 	for pkg in $(ammPkg::FindDeps "$@"); do
-		ammPkg::Extract "$dest" "$pkg" || ammLog::Wrn "Error while extracting '$pkg' to '$dest': ret=$?"
+		ammPkg::Extract "$dest" "$pkg" || ammLog::Warning "Error while extracting '$pkg' to '$dest': ret=$?"
 	done
 }
 

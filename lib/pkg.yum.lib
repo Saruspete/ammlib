@@ -67,9 +67,9 @@ function _ammPkgYum::Yum {
 		fi
 	done
 
-	ammLog::Dbg "Executing yum with args: $act $opts $@"
+	ammLog::Debug "Executing yum with args: $act $opts $@"
 	if [[ "$act" =~ (.*install|.*remove|erase|clean|update.*|.+grade.*)$ ]] && [[ "$__AMMLIB_USERID" != 0 ]]; then
-		ammLog::Inf "Trying to execute 'yum $act $opts $@' as root"
+		ammLog::Info "Trying to execute 'yum $act $opts $@' as root"
 		ammExec::AsUser "root" yum --quiet $act $opts "$@"
 	else
 		yum --quiet $act $opts "$@"
@@ -92,7 +92,7 @@ function _ammPkgYum::Repoquery {
 		fi
 	done
 
-	ammLog::Dbg "Executing repoquery with args: $opts $@"
+	ammLog::Debug "Executing repoquery with args: $opts $@"
 	repoquery $opts "$@" 2>/dev/null
 }
 
@@ -163,7 +163,7 @@ function ammPkgYum::InfoWhatProvides {
 							# name-version.dist.arch
 							typeset name="${pkg%-*-*.*.*}"
 							if [[ -n "$name" ]]; then
-								ammLog::Dbg "Renamed '$pkg' to '$name.$arch'"
+								ammLog::Debug "Renamed '$pkg' to '$name.$arch'"
 								pkg="$name.$arch"
 							fi
 						fi
@@ -205,7 +205,7 @@ function ammPkgYum::DownloadRecursive {
 
 	[[ -d "$outdir" ]] || mkdir -p "$outdir"
 
-	ammLog::Dbg "Downloading into '$outdir' packages: $@"
+	ammLog::Debug "Downloading into '$outdir' packages: $@"
 
 	typeset tag pkg _junk
 	typeset -i ret=1
@@ -238,7 +238,7 @@ function ammPkgYum::DownloadRecursive {
 
 		done
 	else
-		ammLog::Err "Unable to find repotrack"
+		ammLog::Error "Unable to find repotrack"
 		return 1
 	fi
 
@@ -257,7 +257,7 @@ function ammPkgYum::Download {
 
 	[[ -d "$outdir" ]] || mkdir -p "$outdir"
 
-	ammLog::Dbg "Downloading into '$outdir' packages: $@"
+	ammLog::Debug "Downloading into '$outdir' packages: $@"
 
 	typeset f1 f2 f3 f4 _junk
 	typeset -i ret=1
@@ -266,13 +266,13 @@ function ammPkgYum::Download {
 	# Select the best available command
 	if ammExec::Exists yumdownloader; then
 		dlcmd=(yumdownloader --installroot "$root" --destdir "$outdir" "$@")
-		ammLog::Dbg "Using yumdownloader as '${dlcmd[@]}'"
+		ammLog::Debug "Using yumdownloader as '${dlcmd[@]}'"
 
 	# Need to do some checks due to yum being lazy
 	else
 		typeset cmdbase="_ammPkgYum::Yum --installroot=\"$root\" --downloadonly --downloaddir=\"$outdir\""
 		dlcmd=(eval "(" $cmdbase install "$@" ";" $cmdbase reinstall "$@" ")")
-		ammLog::Dbg "Failback to yum with '${dlcmd[@]}'"
+		ammLog::Debug "Failback to yum with '${dlcmd[@]}'"
 	fi
 
 	${dlcmd[@]} | while read f1 f2 f3 f4 _junk; do
@@ -305,7 +305,7 @@ function ammPkgYum::Download {
 function ammPkgYum::Extract {
 	typeset dst="$1"; shift
 
-	ammLog::Dbg "Extracting into '$dst' packages: $@"
+	ammLog::Debug "Extracting into '$dst' packages: $@"
 
 	typeset pkgs="" pkgname pkgfile file
 	for pkgfile in "$@"; do
@@ -320,7 +320,7 @@ function ammPkgYum::Extract {
 			pkgfile="$(ammPkgYum::Download "$__AMMLIB_DATA/pkgRpm/Packages" "$pkgname")"
 
 			if [[ -z "$pkgfile" ]]; then
-				ammLog::Err "Unable to download package '$pkgname'. Out: '$pkgfile'"
+				ammLog::Error "Unable to download package '$pkgname'. Out: '$pkgfile'"
 				continue
 			fi
 
@@ -347,7 +347,7 @@ function ammPkgYum::RepoConfigure {
 	shift 4
 
 	# Check for filename
-	[[ "${file#*.repo}" == "$file" ]] && ammLog::Wrn "The file '$file' does not end with '.repo', this likely won't work"
+	[[ "${file#*.repo}" == "$file" ]] && ammLog::Warning "The file '$file' does not end with '.repo', this likely won't work"
 
 	# Some defaults if needed
 	[[ -z "$id" ]] && id="${file##*/}" && id="${id%.repo}" && id="${id// /-}"
@@ -365,7 +365,7 @@ function ammPkgYum::RepoConfigure {
 	# Set the basic vars
 	if ! [[ -d "${file%/*}" ]]; then
 		if ! mkdir --parents "${file%/*}"; then
-			ammLog::Err "Unable to create parent dir for '$file'"
+			ammLog::Error "Unable to create parent dir for '$file'"
 			return 1
 		fi
 	fi
@@ -379,7 +379,7 @@ function ammPkgYum::RepoConfigure {
 	typeset -A extras=$(ammEnv::VarReturnArray AMMPKGYUM_REPO_DEFAULTS)
 	for extra in "$@"; do
 		if [[ "${extra//=/}" == "$extra" ]]; then
-			ammLog::Wrn "Malformated extra config: $extra (wanted format variable=value)"
+			ammLog::Warning "Malformated extra config: $extra (wanted format variable=value)"
 			continue
 		fi
 
@@ -410,7 +410,7 @@ function ammPkgYum::ReleaseSet {
 	typeset dst="$root/etc/yum/vars/releasever"
 	if ! [[ -d "${dst%/*}" ]]; then
 		if ! mkdir --parents "${dst%/*}"; then
-		ammLog::Err "Unable to create parent dir for '$file'"
+		ammLog::Error "Unable to create parent dir for '$file'"
 		return 1
 		fi
 	fi
@@ -426,7 +426,7 @@ function ammPkgYum::ReleaseGet {
 	typeset root="${1:-/}"
 
 	if [[ "$root" != "/" ]]; then
-		ammLog::Err "Different root from / is not yet supported"
+		ammLog::Error "Different root from / is not yet supported"
 		return 1
 	fi
 
@@ -447,7 +447,7 @@ function ammPkgYum::ConfigSet {
 	if ! [[ -s "$file" ]]; then
 		if ! [[ -d "${file%/*}" ]]; then
 			if ! mkdir --parents "${file%/*}"; then
-				ammLog::Err "Unable to create parent dir for '$file'"
+				ammLog::Error "Unable to create parent dir for '$file'"
 				return 1
 			fi
 		fi
@@ -478,7 +478,7 @@ function ammPkgYum::RepodataGet {
 
 	# We need http tools for this
 	if ! ammLib::Load http ; then
-		ammLog::Err "Unable to load http library."
+		ammLog::Error "Unable to load http library."
 		return 99
 	fi
 

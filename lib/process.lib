@@ -69,7 +69,7 @@ function ammProcess::PidExists {
 		if [[ -d "$base" ]]; then
 			typeset exepath="$(ammProcess::ExeGet "$pid")"
 			if [[ -z "$exepath" ]]; then
-				ammLog::Dbg "Unable to find exe path for pid $pid. Assuming from PID only"
+				ammLog::Debug "Unable to find exe path for pid $pid. Assuming from PID only"
 				return 0
 			fi
 
@@ -116,12 +116,12 @@ function ammProcess::Run {
 	typeset funcname="$1"; shift
 
 	if ! ammEnv::IsFunc "${funcname}Cmd"; then
-		ammLog::Err "Unable to run '$funcname' as not '${funcname}Cmd' is defined"
+		ammLog::Error "Unable to run '$funcname' as not '${funcname}Cmd' is defined"
 		return 1
 	fi
 
 	if ! ammEnv::IsFunc "${funcname}Parse"; then
-		ammLog::Err "Unable to run '$funcname' as not '${funcname}Parse' is defined"
+		ammLog::Error "Unable to run '$funcname' as not '${funcname}Parse' is defined"
 		return 1
 	fi
 
@@ -159,7 +159,7 @@ function ammProcess::Timeout {
 		perl -e "alarm $time; exec @ARGV" "$@"
 		ret=$?
 	else
-		ammLog::Err "Unable to find a suitable timeout function"
+		ammLog::Error "Unable to find a suitable timeout function"
 		return 1
 	fi
 
@@ -219,13 +219,13 @@ function ammProcess::PoolExists {
 
 	# Check pool
 	if ! ( set +u; [[ -n "${__AMMPROCESS_POOL[$name]}" ]] ); then
-		ammLog::Err "Unknown pool name '$name'"
+		ammLog::Error "Unknown pool name '$name'"
 		return 1
 	fi
 
 	typeset datapath="${__AMMPROCESS_POOL[$name]}"
 	if ! [[ -d "$datapath" ]]; then
-		ammLog::Err "Pool '$name' var exists but not its datapath ($datapath)"
+		ammLog::Error "Pool '$name' var exists but not its datapath ($datapath)"
 		return 1
 	fi
 
@@ -245,7 +245,7 @@ function ammProcess::PoolStart {
 	# Load the jobs todo
 	typeset -a joblist jobrunning
 	readarray joblist < "$datapath/jobs.txt"
-	ammLog::Dbg "Executing $joblist"
+	ammLog::Debug "Executing $joblist"
 
 	# Start the pool
 	typeset -i jobid procid proccnt=0
@@ -258,7 +258,7 @@ function ammProcess::PoolStart {
 		fi
 
 		# Run the job (and close stdin)
-		ammLog::Inf "Starting $jobcmd (id:$jobid) in background"
+		ammLog::Info "Starting $jobcmd (id:$jobid) in background"
 		#echo "# Starting $jobcmd" >| "$datapath/job.$jobid.out"
 		eval "$timeoutcmd $jobcmd >> '$datapath/job.$jobid.out' 2> '$datapath/job.$jobid.err' 0>/dev/null &"
 		# A bit of bookkeeping
@@ -278,14 +278,14 @@ function ammProcess::PoolStart {
 					typeset -i ret=$?
 
 					if [[ $ret -eq 127 ]]; then
-						ammLog::Wrn "We waited for pid $pid but return code 127 (= was not created)"
+						ammLog::Warning "We waited for pid $pid but return code 127 (= was not created)"
 					fi
 					[[ $ret -ne 0 ]] && nfailed+=1
 
 					# Populate return code in path and log
 					typeset -i jid="${__AMMPROCESS_POOL_PID2JOBID[$pid]}"
 					echo "$ret" > "$datapath/job.$jid.ret"
-					ammLog::Inf "Job $jid (pid:$pid) finished with return code $ret"
+					ammLog::Info "Job $jid (pid:$pid) finished with return code $ret"
 
 					unset jobrunning[$pid]
 					unset __AMMPROCESS_POOL_PID2JOBID[$pid]
@@ -295,7 +295,7 @@ function ammProcess::PoolStart {
 
 			# Check if we have reaped a process
 			if [[ $reaped -gt 0 ]]; then
-				ammLog::Dbg "Reaped $reaped processes, will start a new one"
+				ammLog::Debug "Reaped $reaped processes, will start a new one"
 
 			# No process reaped, sleep a bit to avoid busy loop
 			else
@@ -338,7 +338,7 @@ function ammProcess::RunAs {
 
 	# Exec from stdin
 	if [[ "$@" = "-" ]]; then
-		ammLog::Dbg "Reading commands to run as '$runas' from stdin"
+		ammLog::Debug "Reading commands to run as '$runas' from stdin"
 
 		# If no user specified, or we already are correct one...
 		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
@@ -351,7 +351,7 @@ function ammProcess::RunAs {
 			ret=$?
 
 		elif ammExec::Exists sudo >/dev/null && sudo -nl 2>/dev/null|grep 'may run the following commands' >/dev/null; then
-			ammLog::Dbg "Using sudo to run as '$runas' from stdin"
+			ammLog::Debug "Using sudo to run as '$runas' from stdin"
 			# maybe should parse "sudo -l" output more...
 			typeset line
 			while read line; do
@@ -360,7 +360,7 @@ function ammProcess::RunAs {
 
 		# No way to change ?
 		else
-			ammLog::Err "Cannot change from user $curruser to user $runas"
+			ammLog::Error "Cannot change from user $curruser to user $runas"
 			ret=4
 		fi
 
@@ -369,28 +369,28 @@ function ammProcess::RunAs {
 
 		# No user specified, or already correct user
 		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
-			ammLog::Dbg "Using eval to run as '$runas' cmd: '$@'"
+			ammLog::Debug "Using eval to run as '$runas' cmd: '$@'"
 			#eval "$@" 98>&- 99>&-
 			"$@" 98>&- 99>&-
 			ret=$?
 
 		# root... yay !
 		elif [[ "$curruser" = "root" ]]; then
-			ammLog::Dbg "Using su to run as '$runas' cmd: '$*'"
+			ammLog::Debug "Using su to run as '$runas' cmd: '$*'"
 			# I need to flatten, hence '$*' instead of '$@'. Beware...
 			su -m -c "$*" "$runas" 98>&- 99>&-
 			ret=$?
 
 		# Maybe handle sudo ?
 		elif ammExec::Exists sudo >/dev/null && sudo -nl 2>/dev/null|grep 'may run the following commands' >/dev/null; then
-			ammLog::Dbg "Using sudo to run as '$runas' cmd: '$@'"
+			ammLog::Debug "Using sudo to run as '$runas' cmd: '$@'"
 			# maybe should parse "sudo -l" output more...
 			sudo -n -u "$runas" "$@" 98>&- 99>&-
 			ret=$?
 
 		# Fails...
 		else
-			ammLog::Err "Cannot exec '$@' as user $runas from user $curruser"
+			ammLog::Error "Cannot exec '$@' as user $runas from user $curruser"
 			ret=4
 		fi
 	fi

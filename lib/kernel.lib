@@ -60,8 +60,8 @@ function ammKernel::ModDepAreKnown {
 
 		# All refcount are modules
 		if [[ "$(ammString::CountWords $deps)" == "$refcnt" ]]; then
-			ammLog::Dbg "Module '$kmod' has '$(ammString::CountWords $deps)' dependant modules for '$refcnt' ref counter"
-			#ammLog::Dbg 
+			ammLog::Debug "Module '$kmod' has '$(ammString::CountWords $deps)' dependant modules for '$refcnt' ref counter"
+			#ammLog::Debug 
 			return 0
 		fi
 	done < /proc/modules
@@ -93,7 +93,7 @@ function ammKernel::ModUnload {
 
 		# check if we have unknown ref for this module (show stopper)
 		if ! ammKernel::ModDepAreKnown "$mod"; then
-			ammLog::Wrn "The module '$mod' has an unknown ref that is not another kmod. Cannot unload"
+			ammLog::Warning "The module '$mod' has an unknown ref that is not another kmod. Cannot unload"
 			ret+=1
 			continue
 		fi
@@ -102,7 +102,7 @@ function ammKernel::ModUnload {
 		deps="$(ammKernel::ModDepList "$mod")"
 		for dep in $deps; do
 			if ! ammKernel::ModDepAreKnown "$dep"; then
-				ammLog::Wrn "Cannot unload mod '$dep', dependency for '$mod'. Skipping"
+				ammLog::Warning "Cannot unload mod '$dep', dependency for '$mod'. Skipping"
 				ret+=1
 				continue
 			fi
@@ -112,7 +112,7 @@ function ammKernel::ModUnload {
 	done
 
 	if [[ $ret -ne 0 ]]; then
-		ammLog::Err "One or more module cannot be unloaded. Won't start the unloading"
+		ammLog::Error "One or more module cannot be unloaded. Won't start the unloading"
 		return $ret
 	fi
 
@@ -152,7 +152,7 @@ function ammKernel::Rmmod {
 		# If this module matches
 		for mod in "$@"; do
 			if [[ $name =~ ^$mod$ ]]; then
-				ammLog::Inf "Module '$name' matched search '$mod' (refcnt:$refcnt modcnt:$modcnt deps:$deps)"
+				ammLog::Info "Module '$name' matched search '$mod' (refcnt:$refcnt modcnt:$modcnt deps:$deps)"
 				matches[$name]="$(( $refcnt - $modcnt ))"
 			fi
 		done
@@ -163,8 +163,8 @@ function ammKernel::Rmmod {
 	for mod in ${!matches[@]}; do
 		# If we have remaining refcnt, we can't unload the mod. Display insights
 		if [[ ${matches[$mod]} -gt 0 ]]; then
-			ammLog::Err "Cannot unload module '$mod': refcount is higher than mod dependencies (remains ${matches[$mod]} refs)"
-			ammLog::Err "Provide here some help for module ...."
+			ammLog::Error "Cannot unload module '$mod': refcount is higher than mod dependencies (remains ${matches[$mod]} refs)"
+			ammLog::Error "Provide here some help for module ...."
 			refcnt+=1
 		fi
 	done
@@ -175,17 +175,17 @@ function ammKernel::Rmmod {
 	# Try to unload dependencies recursively
 	for mod in ${!matches[@]}; do
 		if ! ammKernel::Rmmod ${moddep[$mod]}; then
-			ammLog::Err "Cannot unload dependencies for module '$mod'. Stopping"
+			ammLog::Error "Cannot unload dependencies for module '$mod'. Stopping"
 			return 1
 		fi
 	done
 
 	# try to unload the modules
 	for mod in ${!matches[@]}; do
-		ammLog::Inf "rmmod of $mod"
+		ammLog::Info "rmmod of $mod"
 		#/sbin/rmmod $mod || {
 		echo "rmmod $mod" || {
-			ammLog::Err "Cannot remove module '$mod'. Are you root ?"
+			ammLog::Error "Cannot remove module '$mod'. Are you root ?"
 			return 1
 		}
 	done

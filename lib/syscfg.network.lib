@@ -43,7 +43,7 @@ function ammSyscfgNetwork::NicCreate {
 	typeset iftype="$2"
 
 	if ammSyscfgNetwork::NicExists "$ifname"; then
-		ammLog::Err "Nic '$ifname' already exists"
+		ammLog::Error "Nic '$ifname' already exists"
 		return 1
 	fi
 
@@ -60,7 +60,7 @@ function ammSyscfgNetwork::NicValidate {
 	typeset iface="$1"
 
 	if ! ammSyscfgNetwork::NicExists "$iface"; then
-		ammLog::Err "Iface '$iface' does not exists"
+		ammLog::Error "Iface '$iface' does not exists"
 		return 1
 	fi
 }
@@ -235,7 +235,7 @@ function ammSyscfgNetwork::IpAddrGetMain {
 			both) ammString::IsIP   "$ip" && echo "$ip" ;;
 			any)  ammString::IsIP   "$ip" && echo "$ip"; break ;;
 			*)
-				ammLog::Err "Unknown ipfamily '$ipfamily'. Want one of: 4, 6, any, both"
+				ammLog::Error "Unknown ipfamily '$ipfamily'. Want one of: 4, 6, any, both"
 				break
 				;;
 		esac
@@ -261,7 +261,7 @@ function ammSyscfgNetwork::IpAddrGet {
 			6)   ipfilter="^inet6$" ;;
 			any) ipfilter="^inet6?$" ;;
 			*)
-				ammLog::Wrn "Unknown ipfamily: '$ipfamily'. Must be one of: 4, 6, any"
+				ammLog::Warning "Unknown ipfamily: '$ipfamily'. Must be one of: 4, 6, any"
 				return 1
 				;;
 		esac
@@ -282,7 +282,7 @@ function ammSyscfgNetwork::IpAddrAdd {
 	typeset iface="$1"; shift
 	typeset addr="$1"; shift
 
-	ammLog::Inf "ip address add '$addr' dev '$iface' $@"
+	ammLog::Info "ip address add '$addr' dev '$iface' $@"
 	ip address add "$addr" dev "$iface" "$@"
 }
 
@@ -307,7 +307,7 @@ function ammSyscfgNetwork::RouteAdd {
 	typeset route="$2"
 	typeset extra="${3:-}"
 
-	ammLog::Inf "ip route add '$route' dev '$iface' $extra"
+	ammLog::Info "ip route add '$route' dev '$iface' $extra"
 	ip route add "$route" dev "$iface" $extra
 }
 
@@ -354,7 +354,7 @@ function ammSyscfgNetwork::NSEnumerate {
 			# Skip if transcient process (proc has exited)
 			[[ -d "${netns%/ns/net}" ]] || continue
 			# Else, maybe permission error. Report as error
-			ammLog::Dbg "Cannot read namespace of '$netns'"
+			ammLog::Debug "Cannot read namespace of '$netns'"
 			r+=1
 			continue
 		fi
@@ -379,12 +379,12 @@ function ammSyscfgNetwork::NSGetFromName {
 	typeset name="$1"
 
 	if ! [[ -d "/var/run/netns" ]]; then
-		ammLog::Err "netns folder '/var/run/netns' doesn't exists. No lookup possible"
+		ammLog::Error "netns folder '/var/run/netns' doesn't exists. No lookup possible"
 		return 1
 	fi
 
 	if ! [[ -e "/var/run/netns/$name" ]]; then
-		ammLog::Err "netns name '$name' doesn't exists in '/var/run/netns'."
+		ammLog::Error "netns name '$name' doesn't exists in '/var/run/netns'."
 		return 1
 	fi
 

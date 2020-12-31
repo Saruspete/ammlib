@@ -29,12 +29,12 @@ function ammGit::RemoteFetchPath {
 	shift 3
 
 	if ! ammPath::IsEmpty "$dst"; then
-		ammLog::Err "Cannot use '$dst' as destination: destination exists and is not empty"
+		ammLog::Error "Cannot use '$dst' as destination: destination exists and is not empty"
 		return 1
 	fi
 
 	if ! [[ -d "$dst" ]] && ! mkdir "$dst"; then
-		ammLog::Err "Unable to create destination dir '$dst'"
+		ammLog::Error "Unable to create destination dir '$dst'"
 		return 1
 	fi
 

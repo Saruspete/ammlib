@@ -70,7 +70,7 @@ function ammIso::Extract {
 
 	# Try to use mount
 	if [[ $__AMMLIB_USERID -eq 0 ]]; then
-		ammLog::Inf "Bind-mounting '${iso##*/}' and copying to '$dstdir'"
+		ammLog::Info "Bind-mounting '${iso##*/}' and copying to '$dstdir'"
 		# TODO: migrate this to a temp ammlib helper
 		typeset tmpmnt="$__AMMLIB_DATATMP/loop.${iso##*/}"
 		mkdir -p "$tmpmnt"
@@ -82,22 +82,22 @@ function ammIso::Extract {
 				cp -a "$tmpmnt/" "$dstdir"
 			fi
 			if ! umount "$tmpmnt"; then
-				ammLog::Wrn "Error while unmounting '$tmpmnt'. Check once script is finished"
+				ammLog::Warning "Error while unmounting '$tmpmnt'. Check once script is finished"
 			fi
 		else
-			ammLog::Wrn "Cannot bindmount. Trying other tools"
+			ammLog::Warning "Cannot bindmount. Trying other tools"
 		fi
 	fi
 
 	typeset logmsg="Extracting '${iso##*/}' to '$dstdir' using"
 	if ammExec::Exists "7z"; then
-		ammLog::Inf "$logmsg 7z"
+		ammLog::Info "$logmsg 7z"
 		\7z x "$iso" -o"$dstdir"
 		return $?
 	fi
 
 	if ammExec::Exists "isoinfo"; then
-		ammLog::Inf "$logmsg isoinfo"
+		ammLog::Info "$logmsg isoinfo"
 		typeset isoinfovers="$(\isoinfo -version)"
 		if [[ $isoinfovers =~ isoinfo\ 3.+ ]]; then
 			\isoinfo -R -i "$iso" -X "$dstdir"
@@ -107,7 +107,7 @@ function ammIso::Extract {
 			typeset fmod fblk fusr fgrp fsize fmangled
 			typeset fcurrdir=""
 			typeset -A perms
-			ammLog::Inf "Extracting files from '$iso'"
+			ammLog::Info "Extracting files from '$iso'"
 			while read fmod fblk fusr fgrp fsize fmangled; do
 				# Skip empty lines
 				[[ -z "$fmod" ]] && continue
@@ -129,7 +129,7 @@ function ammIso::Extract {
 					continue
 				fi
 
-				ammLog::Dbg "Processing path='$fpath' fmod='$fmod' fdate='$fdate'"
+				ammLog::Debug "Processing path='$fpath' fmod='$fmod' fdate='$fdate'"
 
 				# Create folder and apply large permissions for file creation
 				if [[ "${fmod:0:1}" == "d" ]]; then
@@ -150,12 +150,12 @@ function ammIso::Extract {
 
 			# Pass 2: fix permissions
 			typeset fpath
-			ammLog::Inf "Applying permissions to extracted files"
+			ammLog::Info "Applying permissions to extracted files"
 			for fpath in "${!perms[@]}"; do
 				typeset fmod="${perms[$fpath]}"
 				typeset fmodusr="${fmod:1:3}" fmodgrp="${fmod:4:3}" fmodoth="${fmod:7:3}"
 				typeset fstr="u=${fmodusr//-/},g=${fmodgrp//-},o=${fmodoth//-}"
-				ammLog::Dbg "Setting '$fstr' ($fmod) to '$fpath'"
+				ammLog::Debug "Setting '$fstr' ($fmod) to '$fpath'"
 				chmod "$fstr" "$dstdir/$fpath"
 			done
 
@@ -164,12 +164,12 @@ function ammIso::Extract {
 	fi
 
 	if ammExec::Exists "xoriso"; then
-		ammLog::Inf "$logmsg xoriso"
+		ammLog::Info "$logmsg xoriso"
 		\xorriso -osirrox on -indev "$iso" -extract / "$dstdir"
 		return $?
 	fi
 
-	ammLog::Wrn "Unable to find any tool to extract iso"
+	ammLog::Warning "Unable to find any tool to extract iso"
 	return 1
 }
 

@@ -82,7 +82,7 @@ function _ammOptparse::OptToId {
 		echo "$id"
 		return 0
 	else
-		ammLog::Dbg "Unregistered option '$opt'"
+		ammLog::Debug "Unregistered option '$opt'"
 		return 1
 	fi
 }
@@ -115,7 +115,7 @@ function _ammOptparse::Expand {
 		# long option
 		if [[ ${opt:0:2} == "--" ]]; then
 			options+=("$opt")
-			ammLog::Dbg "Long option '$opt'"
+			ammLog::Debug "Long option '$opt'"
 
 		# Short option
 		elif [[ "${opt:0:1}" == "-" ]]; then
@@ -124,17 +124,17 @@ function _ammOptparse::Expand {
 			# Concatenated short options
 			if [[ "${#opt}" -gt 1 ]]; then
 				typeset cid="0"
-				ammLog::Dbg "Concatenated short opt '$opt'"
+				ammLog::Debug "Concatenated short opt '$opt'"
 				for (( c=0; c < ${#opt}; c+=1 )); do
 					options+=("-${opt:$c:1}")
 				done
 			else
-				ammLog::Dbg "Short opt: '$opt'"
+				ammLog::Debug "Short opt: '$opt'"
 				options+=("-$opt")
 			fi
 		# Plain value
 		else
-			ammLog::Dbg "Plain value option: '$opt'"
+			ammLog::Debug "Plain value option: '$opt'"
 			options+=("$opt")
 
 			# Special word and special action: stop all parsing
@@ -146,13 +146,13 @@ function _ammOptparse::Expand {
 		fi
 
 		if [[ -n "$val" ]]; then
-			ammLog::Dbg "Adding embedded value '$val'"
+			ammLog::Debug "Adding embedded value '$val'"
 			options+=("$val")
 		fi
 	done
 
 	# Replace original value
-	ammLog::Dbg "Expanded '${__AMMLIB_CALLOPTS[@]}' to '${options[@]}'"
+	ammLog::Debug "Expanded '${__AMMLIB_CALLOPTS[@]}' to '${options[@]}'"
 	__AMMLIB_CALLOPTS=("${options[@]}")
 }
 
@@ -181,18 +181,18 @@ function ammOptparse::AddOpt {
 	for opt in ${options//|/ }; do
 		if [[ "${opt#--}" != "$opt" ]]; then
 			id="$(_ammOptparse::OptClean "$opt")"
-			ammLog::Dbg "Using '$id' (from $opt) as ID for '$options'"
+			ammLog::Debug "Using '$id' (from $opt) as ID for '$options'"
 			break
 		fi
 	done
 
 	# Validate the ID found
 	if [[ -z "${id:-}" ]]; then
-		ammLog::Err "You must at least provide one long option"
+		ammLog::Error "You must at least provide one long option"
 		return 1
 	fi
 	if (set +u; [[ -n "${_AMMOPTPARSE_REGISTRANTS[$id]}" ]] ); then
-		ammLog::Err "The ID '$id' is already registered by ${_AMMOPTPARSE_REGISTRANTS[$id]}"
+		ammLog::Error "The ID '$id' is already registered by ${_AMMOPTPARSE_REGISTRANTS[$id]}"
 		return 1
 	fi
 
@@ -208,13 +208,13 @@ function ammOptparse::AddOpt {
 			# Short option
 			if [[ ${BASH_REMATCH[1]} == "-" ]]; then
 				if [[ "${#var}" -gt 1 ]]; then
-					ammLog::Wrn "Short option '$opt' is more than 1 char. Skipping"
+					ammLog::Warning "Short option '$opt' is more than 1 char. Skipping"
 					parseErr+=1
 					continue
 				fi
 				if (set +u; [[ -n "${_AMMOPTPARSE_OPTSHORT[$var]}" ]] ); then
 					typeset conflictid="${_AMMOPTPARSE_OPTSHORT[$var]}"
-					ammLog::Wrn "Short option '$var' (ID '$id') already registered for ID '$conflictid' at ${_AMMOPTPARSE_REGISTRANTS[$conflictid]}"
+					ammLog::Warning "Short option '$var' (ID '$id') already registered for ID '$conflictid' at ${_AMMOPTPARSE_REGISTRANTS[$conflictid]}"
 					parseErr+=1
 					continue
 				else
@@ -226,7 +226,7 @@ function ammOptparse::AddOpt {
 			else
 				if (set +u; [[ -n "${_AMMOPTPARSE_OPTLONG[$var]}" ]] ); then
 					typeset longid="${_AMMOPTPARSE_OPTLONG[$var]}"
-					ammLog::Wrn "Long option '$opt' is already registed as '$longid'"
+					ammLog::Warning "Long option '$opt' is already registed as '$longid'"
 					parseErr+=1
 					continue
 				fi
@@ -253,7 +253,7 @@ function ammOptparse::AddOpt {
 							_AMMOPTPARSE_VALTYPE[$id]='!'
 							;;
 						*)
-							ammLog::Wrn "Unhandled requirement char '${valreq:0:1}'"
+							ammLog::Warning "Unhandled requirement char '${valreq:0:1}'"
 							parseErr+=1
 							continue
 						;;
@@ -261,14 +261,14 @@ function ammOptparse::AddOpt {
 				fi
 			fi
 		else
-			ammLog::Wrn "The registered option '$opt' is invalid"
+			ammLog::Warning "The registered option '$opt' is invalid"
 			parseErr+=1
 			continue
 		fi
 	done
 
 	if [[ "$parseErr" != 0 ]]; then
-		ammLog::Wrn "$parseErr error occurred. Skipping option '$options'"
+		ammLog::Warning "$parseErr error occurred. Skipping option '$options'"
 
 		# Unregister variables. Note: I'll miss the _AMMOPTPARSE_OPTLONG["no$var"]
 		unset _AMMOPTPARSE_VALTYPE[$id]
@@ -302,7 +302,7 @@ function ammOptparse::AddActionWord {
 		stop|skip)
 			;;
 		*)
-			ammLog::Err "Invalid action '$action' for words '$words'"
+			ammLog::Error "Invalid action '$action' for words '$words'"
 			return 1
 			;;
 	esac
@@ -341,14 +341,14 @@ function ammOptparse::Parse {
 				optidstart="${opt##--skip=}"
 				;;
 			--*)
-				ammLog::Wrn "Unknown ammOptparse::Parse() option '$opt'"
+				ammLog::Warning "Unknown ammOptparse::Parse() option '$opt'"
 				;;
 			*)
 				if [[ -z "$prefix" ]]; then
-					ammLog::Dbg "Parsing options with prefix '$opt'"
+					ammLog::Debug "Parsing options with prefix '$opt'"
 					prefix="$opt"
 				else
-					ammLog::Wrn "prefix already set ($prefix) in ammOptparse::Parse(). Cannot add '$opt'"
+					ammLog::Warning "prefix already set ($prefix) in ammOptparse::Parse(). Cannot add '$opt'"
 					r+=1
 				fi
 				;;
@@ -373,13 +373,13 @@ function ammOptparse::Parse {
 
 		# Special case: -- to stop processing
 		if [[ "$var" == "--" ]]; then
-			ammLog::Dbg "Found '--' at position '$optid'. Stopping processing"
+			ammLog::Debug "Found '--' at position '$optid'. Stopping processing"
 			return $r
 		fi
 
 		# Check if we accept unparsed options, and our previous one was faulty
 		if $nounknown && [[ -n "$lastvar" ]]; then
-			ammLog::Err "Invalid unknown option '$lastvar'"
+			ammLog::Error "Invalid unknown option '$lastvar'"
 			lastvar=""
 			r+=1
 		fi
@@ -396,7 +396,7 @@ function ammOptparse::Parse {
 		lastvar="$var"
 
 
-		ammLog::Dbg "Processing option '$var' (pos: $optid)"
+		ammLog::Debug "Processing option '$var' (pos: $optid)"
 
 		# Check the word is a valid registered option (we'll take it as ref)
 		id="$(_ammOptparse::OptToId "$var")"
@@ -418,7 +418,7 @@ function ammOptparse::Parse {
 						;;
 					# Unknown operation, not filtered by AddWord ?!
 					*)
-						ammLog::Err "Unknown operation '$action' for word '$var'. How was it registered ?!"
+						ammLog::Error "Unknown operation '$action' for word '$var'. How was it registered ?!"
 						return 1
 						;;
 				esac
@@ -427,7 +427,7 @@ function ammOptparse::Parse {
 			else
 				# Should we fail on unknown options
 				if $nounknown; then
-					ammLog::Err "Invalid unknown option '$lastvar'"
+					ammLog::Error "Invalid unknown option '$lastvar'"
 					r+=1
 				fi
 				lastvar=""
@@ -442,7 +442,7 @@ function ammOptparse::Parse {
 
 		# Check if we do prefix filtering
 		if [[ -n "$prefix" ]] && [[ "${var#$prefix}" == "$var" ]]; then
-			ammLog::Dbg "Skipping option '$var' not matching prefix '$prefix'"
+			ammLog::Debug "Skipping option '$var' not matching prefix '$prefix'"
 			lastvar=""
 			continue
 		fi
@@ -462,12 +462,12 @@ function ammOptparse::Parse {
 						# try to get next value and check
 						typeset -i nextid="$(($optid+$nused))"
 						if [[ $nextid -ge ${#__AMMLIB_CALLOPTS[@]} ]]; then
-							ammLog::Err "Option '$var' wants '$nwant' parameters but $nused found '$val'. Stop parsing"
+							ammLog::Error "Option '$var' wants '$nwant' parameters but $nused found '$val'. Stop parsing"
 							return 1
 						fi
 
 						# Add next value to the list
-						ammLog::Dbg "Option '$var' consumed var '${__AMMLIB_CALLOPTS[$nextid]}' (pos $nextid)"
+						ammLog::Debug "Option '$var' consumed var '${__AMMLIB_CALLOPTS[$nextid]}' (pos $nextid)"
 						val="${val:+$val }${__AMMLIB_CALLOPTS[$nextid]}"
 						nused+=1
 					done
@@ -478,10 +478,10 @@ function ammOptparse::Parse {
 				=)
 					if (set +u; [[ -n "${__AMMLIB_CALLOPTS[$optid+1]}" ]] ); then
 						val="${__AMMLIB_CALLOPTS[$optid+1]}"
-						ammLog::Dbg "Option '$var' consumed var '$val' (pos $(($optid+1)))"
+						ammLog::Debug "Option '$var' consumed var '$val' (pos $(($optid+1)))"
 						optextra+=1
 					else
-						ammLog::Err "Option '$var' wants 1 parameter, but none found. Stop parsing"
+						ammLog::Error "Option '$var' wants 1 parameter, but none found. Stop parsing"
 						return 1
 					fi
 					;;
@@ -494,10 +494,10 @@ function ammOptparse::Parse {
 							val+="$_AMMOPTPARSE_ARRSEP"
 						fi
 						val+="${__AMMLIB_CALLOPTS[$optid+1]}"
-						ammLog::Dbg "Option '$var' consumed var '$val' (pos $(($optid+1)))"
+						ammLog::Debug "Option '$var' consumed var '$val' (pos $(($optid+1)))"
 						optextra+=1
 					else
-						ammLog::Err "Option '$var' wants 1 parameter, but none found. Stop parsing"
+						ammLog::Error "Option '$var' wants 1 parameter, but none found. Stop parsing"
 						return 1
 					fi
 					;;
@@ -506,17 +506,17 @@ function ammOptparse::Parse {
 				!)
 					# Check if the option without "no" is registered to the same ID
 					if [[ "${var:0:2}" == "no" ]] && ( set +u; [[ "${_AMMOPTPARSE_OPTLONG[${var:2}]}" == "$id" ]] ); then
-						ammLog::Dbg "Option '$var' is the negation of '${var:2}' for ID '$id'"
+						ammLog::Debug "Option '$var' is the negation of '${var:2}' for ID '$id'"
 						val="false"
 					else
-						ammLog::Dbg "Option '$var' set to true for ID '$id'"
+						ammLog::Debug "Option '$var' set to true for ID '$id'"
 						val="true"
 					fi
 					;;
 
 				# Unmanaged format
 				*)
-					ammLog::Err "Unknown required format '$valtyp'. How was it registered ?!"
+					ammLog::Error "Unknown required format '$valtyp'. How was it registered ?!"
 					return 1
 					;;
 			esac
@@ -524,7 +524,7 @@ function ammOptparse::Parse {
 
 
 		# Register the value
-		ammLog::Dbg "Setting '$id' value to '$val'"
+		ammLog::Debug "Setting '$id' value to '$val'"
 		_AMMOPTPARSE_VALUE[$id]="$val"
 
 		# Unset parsed element
@@ -540,7 +540,7 @@ function ammOptparse::Parse {
 
 	# Redo the lastvar test for last option
 	if $nounknown && [[ -n "$lastvar" ]]; then
-		ammLog::Err "Invalid unknown option '$lastvar'"
+		ammLog::Error "Invalid unknown option '$lastvar'"
 		lastvar=""
 		r+=1
 	fi
@@ -559,12 +559,12 @@ function ammOptparse::Parse {
 				# TODO: Clean this function call
 				#typeset valcall="${validator//%
 				if ! "${validator%% *}" "$val" "${validator#* }"; then
-					ammLog::Err "Option ID '$id' refused value '$val' by validator '$validator'"
+					ammLog::Error "Option ID '$id' refused value '$val' by validator '$validator'"
 					r+=1
 				fi
-				ammLog::Dbg "Option ID '$id' accepted value '$val' by validator '$validator'"
+				ammLog::Debug "Option ID '$id' accepted value '$val' by validator '$validator'"
 			else
-				ammLog::Err "Validation function '$validator' is not defined as function"
+				ammLog::Error "Validation function '$validator' is not defined as function"
 				r+=1
 			fi
 		fi
@@ -586,10 +586,10 @@ function ammOptparse::Get {
 	typeset id="$(_ammOptparse::OptToId "$elem")"
 
 	if [[ -z "$id" ]]; then
-		ammLog::Wrn "Requesting non-registered option '$elem'"
+		ammLog::Warning "Requesting non-registered option '$elem'"
 		return 1
 	fi
-	ammLog::Dbg "Requested elem '$elem' mapped to '$id'"
+	ammLog::Debug "Requested elem '$elem' mapped to '$id'"
 
 	typeset val=""
 	if (set +u; [[ -n "${_AMMOPTPARSE_VALUE[$id]}" ]] ); then

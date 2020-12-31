@@ -45,7 +45,7 @@ function ammArchiveTar::Unpack {
 			TAR_BIN="\\sudo -n \\tar"
 			TAR_OPTS+=" --owner=$user "
 		else
-			ammLog::Err "Cannot change the ownership from $usercurr to $user"
+			ammLog::Error "Cannot change the ownership from $usercurr to $user"
 			return 1
 		fi
 	fi
@@ -64,7 +64,7 @@ function ammArchiveTar::Unpack {
 		# If no transformation is done, we have one or more folder at root level.
 		# Folders always ends with "/", even "./"
 		[[ "${line##*/}" == "$line" ]] && {
-			ammLog::Wrn "One or more file found at root archive. Not stripping first level"
+			ammLog::Warning "One or more file found at root archive. Not stripping first level"
 			strip=""
 			break
 		}
@@ -81,9 +81,9 @@ function ammArchiveTar::Unpack {
 	TAR_OPTS+=" --owner $user"
 
 	# Unpack the tarball
-	ammLog::Inf "Unpacking $file with tar opts: $TAR_OPTS"
+	ammLog::Info "Unpacking $file with tar opts: $TAR_OPTS"
 	set -o pipefail
-	\tar $TAR_OPTS -x -p -f "$src" 2>&1 | ammLog::Dbg -
+	\tar $TAR_OPTS -x -p -f "$src" 2>&1 | ammLog::Debug -
 
 	ret=$?
 

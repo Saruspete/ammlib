@@ -102,16 +102,16 @@ function ammChrootUbuntu::InitFromTemplate {
 	typeset relnum="$version"
 	if ! [[ "$relnum" =~ ^[12][0-9]\.(04|10) ]]; then
 		if ! ( set +u; [[ -n "${__AMMCHROOTUBUNTU_VERSIONS[$version]}" ]] ); then
-			ammLog::Err "Invalid version '$version'"
+			ammLog::Error "Invalid version '$version'"
 			return 1
 		fi
 
 		relnum="${__AMMCHROOTUBUNTU_VERSIONS[$version]}"
-		ammLog::Dbg "Translated '$version' to release '$relnum'"
+		ammLog::Debug "Translated '$version' to release '$relnum'"
 	fi
 
 	if ! ( set +u; [[ -n "${__AMMCHROOTUBUNTU_ARCHS[$arch]}" ]] ); then
-		ammLog::Err "Invalid arch '$arch'. Need one of ${!__AMMCHROOTUBUNTU_ARCHS[@]}"
+		ammLog::Error "Invalid arch '$arch'. Need one of ${!__AMMCHROOTUBUNTU_ARCHS[@]}"
 		return 1
 	fi
 
@@ -123,7 +123,7 @@ function ammChrootUbuntu::InitFromTemplate {
 	if ! [[ -s "$dest" ]]; then
 
 		if ! ammHttp::Fetch "$url" "$dest"; then
-			ammLog::Err "Unable to download '$url'"
+			ammLog::Error "Unable to download '$url'"
 			return 1
 		fi
 	fi
@@ -131,14 +131,14 @@ function ammChrootUbuntu::InitFromTemplate {
 	# Create target chroot
 	if ! [[ -d "$chrootdir" ]]; then
 		if ! mkdir --parents "$chrootdir"; then
-			ammLog::Err "Cannot create chrootdir '$chrootdir'"
+			ammLog::Error "Cannot create chrootdir '$chrootdir'"
 			return 1
 		fi
 	fi
 
 	# Unpack file using archive
 	if ! ammExec::AsUser "root" tar -pxf "$dest" -C "$chrootdir"; then
-		ammLog::Err "Error during archive extraction '$dest' into '$chrootdir'"
+		ammLog::Error "Error during archive extraction '$dest' into '$chrootdir'"
 		return 1
 	fi
 

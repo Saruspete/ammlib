@@ -91,10 +91,10 @@ function _ammConfig::FileFind {
 	for filepath in "${AMMCONFIG_SEARCHDIR[@]}"; do
 		typeset filetest="$filepath/$filename.conf"
 		if [[ -e "$filetest" ]]; then
-			ammLog::Dbg "Found file '$filetest' for '$filename'"
+			ammLog::Debug "Found file '$filetest' for '$filename'"
 			files+=("$filetest")
 		else
-			ammLog::Dbg "Tried '$filetest' for '$filename' but not found"
+			ammLog::Debug "Tried '$filetest' for '$filename' but not found"
 		fi
 	done
 
@@ -103,7 +103,7 @@ function _ammConfig::FileFind {
 	elif [[ "$mode" == "latest" ]]; then
 		echo "${files+${files[-1]}}"
 	else
-		ammLog::Err "Unknown mode '$mode'"
+		ammLog::Error "Unknown mode '$mode'"
 	fi
 }
 
@@ -119,7 +119,7 @@ function _ammConfig::FileValidate {
 	(
 		# Try to load, safely
 		if ! PATH= source "$file"; then
-			ammLog::Err "Unable to source configuration file '$file'"
+			ammLog::Error "Unable to source configuration file '$file'"
 			return 1
 		fi
 
@@ -183,11 +183,11 @@ function ammConfig::FileLoad {
 	for file in $(_ammConfig::FileFind "$filename"); do
 		# Check file validity
 		if ! _ammConfig::FileValidate "$file"; then
-			ammLog::Wrn "Config file '$file' is not valid. Skipping"
+			ammLog::Warning "Config file '$file' is not valid. Skipping"
 			continue
 		fi
 
-		ammLog::Dbg "Loading configuration for '$filename' from '$file'"
+		ammLog::Debug "Loading configuration for '$filename' from '$file'"
 	done
 }
 
@@ -249,7 +249,7 @@ function ammConfig::VarDeclare {
 
 	# If var is already declared...
 	if (set +u; [[ -n "${__AMMCONFIG_VARS_DECL[$name]}" ]] ); then
-		ammLog::Wrn "Variable '$name' is already declared at ${__AMMCONFIG_VARS_DECL[$name]}"
+		ammLog::Warning "Variable '$name' is already declared at ${__AMMCONFIG_VARS_DECL[$name]}"
 		return 0
 	fi
 
@@ -269,7 +269,7 @@ function ammConfig::VarDeclare {
 		lowercase) vardecl+="l" ;;
 		uppercase) vardecl+="u" ;;
 		*)
-			ammLog::Err "Invalid format '$format' for '$name'. Must be one of: array assoc string integer"
+			ammLog::Error "Invalid format '$format' for '$name'. Must be one of: array assoc string integer"
 			return 1
 			;;
 	esac
@@ -284,11 +284,11 @@ function ammConfig::VarAllowOverride {
 
 	# TODO: wildcards
 	if [[ "${name//\*/}" != "$name" ]]; then
-		ammLog::Wrn "Wildcard is not yet implemented"
+		ammLog::Warning "Wildcard is not yet implemented"
 		return 1
 	# Check if var is defined
 	elif ! (set +u; [[ -n "${__AMMCONFIG_VARS_TYPE[$name]}" ]] ); then
-		ammLog::Err "Cannot allow undefined variable '$name'"
+		ammLog::Error "Cannot allow undefined variable '$name'"
 		return 1
 	fi
 }

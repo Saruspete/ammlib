@@ -46,7 +46,7 @@ function _ammPkgPortage::Portage {
 		fi
 	done
 
-	ammLog::Dbg "Executing emerge with args: $opts $@"
+	ammLog::Debug "Executing emerge with args: $opts $@"
 
 	typeset out=""
 	typeset -i r=0
@@ -58,16 +58,16 @@ function _ammPkgPortage::Portage {
 	# Sudo required
 	else
 		if [[ $__AMMLIB_USERID != 0 ]]; then
-			ammLog::Inf "Trying to execute 'emerge $opts $@' as root"
+			ammLog::Info "Trying to execute 'emerge $opts $@' as root"
 			out="$(ammExec::AsUser "root" emerge $opts "$@")"
 			r=$?
-			[[ $r -ne 0 ]] && ammLog::Err "Cannot execute 'emerge $opts' as root: return code $r"
+			[[ $r -ne 0 ]] && ammLog::Error "Cannot execute 'emerge $opts' as root: return code $r"
 		fi
 	fi
 
 	if [[ $r -ne 0 ]]; then
-		ammLog::Err "An error occured during emerge execution"
-		echo "$out" | ammLog::Err "-"
+		ammLog::Error "An error occured during emerge execution"
+		echo "$out" | ammLog::Error "-"
 	fi
 	return $r
 }
@@ -94,7 +94,7 @@ function _ammPkgPortage::Equery {
 		fi
 	done
 
-	ammLog::Dbg "Executing equery with args: $opts $@"
+	ammLog::Debug "Executing equery with args: $opts $@"
 	\equery $opts "$@"
 }
 
@@ -114,7 +114,7 @@ function _ammPkgPortage::Eix {
 		fi
 	done
 
-	ammLog::Dbg "Executing eix with args: $opts $@"
+	ammLog::Debug "Executing eix with args: $opts $@"
 	EIX_LIMIT=0 EIX_LIMIT_COMPACT=0 \eix $opts "$@" 2>/dev/null
 }
 
@@ -137,7 +137,7 @@ function ammPkgPortage::Search {
 	if ammExec::Exists "eix"; then
 		_ammPkgPortage::Eix "$@"
 	else
-		ammLog::Dbg "eix is not installed. Consider installing 'app-portage/eix' to speedup search"
+		ammLog::Debug "eix is not installed. Consider installing 'app-portage/eix' to speedup search"
 		_ammPkgPortage::Portage "--search" "$@"
 	fi
 }
@@ -175,7 +175,7 @@ function ammPkgPortage::InfoWhatProvides {
 			typeset file
 			for file in "${!secondchoice[@]}"; do
 				if (set +u; [[ -n "${foundfiles[$file]}" ]] ); then
-					ammLog::Dbg "Skipping second-choice '${secondchoice[$file]}' as $file is already provided by '${foundfiles[$file]}'"
+					ammLog::Debug "Skipping second-choice '${secondchoice[$file]}' as $file is already provided by '${foundfiles[$file]}'"
 					continue
 				fi
 				echo "${secondchoice[$file]}"
@@ -215,7 +215,7 @@ function ammPkgPortage::DownloadRecursive {
 
 	[[ -d "$outdir" ]] || mkdir -p "$outdir"
 
-	ammLog::Dbg "Downloading into '$outdir' packages: $@"
+	ammLog::Debug "Downloading into '$outdir' packages: $@"
 	:
 }
 # @description  Download an archive from configured yum repositories
@@ -229,7 +229,7 @@ function ammPkgPortage::Download {
 
 	[[ -d "$outdir" ]] || mkdir -p "$outdir"
 
-	ammLog::Dbg "Downloading into '$outdir' packages: $@"
+	ammLog::Debug "Downloading into '$outdir' packages: $@"
 	:
 }
 
@@ -240,7 +240,7 @@ function ammPkgPortage::Download {
 function ammPkgPortage::Extract {
 	typeset dst="$1"; shift
 
-	ammLog::Dbg "Extracting into '$dst' packages: $@"
+	ammLog::Debug "Extracting into '$dst' packages: $@"
 	:
 }
 

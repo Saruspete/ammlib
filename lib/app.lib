@@ -76,11 +76,11 @@ function ammApp::Init {
 	if [[ -n "$RUN_USER" ]] && [[ "$RUN_USER" != "$__AMMLIB_USERNAME" ]]; then
 		typeset -i r=99
 		# try to reexec the current script with the target user
-		ammLog::Inf "Reexecing $__AMMLIB_CALLNAME as '$RUN_USER'"
+		ammLog::Info "Reexecing $__AMMLIB_CALLNAME as '$RUN_USER'"
 		ammExec::AsUser "$RUN_USER" "$__AMMLIB_CALLNAME ${__AMMLIB_CALLOPTS_ORIG[@]}"
 		r=$?
 		if [[ $r != 0 ]]; then
-			ammLog::Err "An error occured during re-exec as '$RUN_USER'"
+			ammLog::Error "An error occured during re-exec as '$RUN_USER'"
 		fi
 		exit $r
 	fi
@@ -89,7 +89,7 @@ function ammApp::Init {
 	# No app data, first time init. Ask
 	if ! [[ -d "$DAT_BASE" ]]; then
 		if ! ammInput::GetYN "initallowed" "First time need init. Create folder structure in '$APP_ROOT' ?"; then
-			ammLog::Err "Not validated. You can ... [TODO]"
+			ammLog::Error "Not validated. You can ... [TODO]"
 			return 1
 		fi
 	fi
@@ -99,7 +99,7 @@ function ammApp::Init {
 	for p in "$APP_BASE" "$DAT_BASE" "$SRC_BASE" "$TMP_BASE"; do
 		if ! [[ -d "$p" ]]; then
 			if ! mkdir -p "$p"; then
-				ammLog::Err "Unable to create required folder '$p'"
+				ammLog::Error "Unable to create required folder '$p'"
 				return 1
 			fi
 		fi
@@ -176,7 +176,7 @@ function ammApp::GetPidPath {
 	typeset pidfolder="${pidfile%/*}"
 	if ! [[ -d "$pidfolder" ]];  then
 		if ! mkdir "$pidfolder" >/dev/null 2>&1; then
-			ammLog::Wrn "Unable to create pid folder '$pidfolder'"
+			ammLog::Warning "Unable to create pid folder '$pidfolder'"
 			return 1
 		fi
 	fi
@@ -193,7 +193,7 @@ function ammApp::GetLogPath {
 	typeset logfolder="${logfile%/*}"
 	if ! [[ -d "$logfolder" ]];  then
 		if ! mkdir "$logfolder" >/dev/null 2>&1; then
-			ammLog::Wrn "Unable to create log folder '$logfolder'"
+			ammLog::Warning "Unable to create log folder '$logfolder'"
 			return 1
 		fi
 	fi
@@ -210,7 +210,7 @@ function ammApp::GetCfgPath {
 	typeset cfgfolder="${cfgfile%/*}"
 	if ! [[ -d "$cfgfolder" ]];  then
 		if ! mkdir "$cfgfolder" >/dev/null 2>&1; then
-			ammLog::Wrn "Unable to create cfg folder '$cfgfolder'"
+			ammLog::Warning "Unable to create cfg folder '$cfgfolder'"
 			return 1
 		fi
 	fi
@@ -229,7 +229,7 @@ function ammApp::VersionSetCurrent {
 
 	# Check if target version exists
 	if ! [[ -d "$newdir" ]]; then
-		ammLog::Err "The specified new version '$version' does not exists as '$newdir'"
+		ammLog::Error "The specified new version '$version' does not exists as '$newdir'"
 		return 1
 	fi
 
@@ -238,23 +238,23 @@ function ammApp::VersionSetCurrent {
 	if [[ -e "$currdir" ]]; then
 		typeset currdirbak="current.$now"
 
-		ammLog::Wrn "The 'current' folder '$currdir' is not a symlink. Moving it as '$currdirbak'"
+		ammLog::Warning "The 'current' folder '$currdir' is not a symlink. Moving it as '$currdirbak'"
 		if ! mv "$currdir" "${currdir%/*}/${currdirbak}"; then
-			ammLog::Err "An error occured during renaming of '$currdir' to '$currdirbak'"
+			ammLog::Error "An error occured during renaming of '$currdir' to '$currdirbak'"
 			return 1
 		fi
 	fi
 
 	# Create app symlink
 	if ! ln -sf "$version" "$currdir"; then
-		ammLog::Err "Error when creating new symlink '$currdir' for '$version'"
+		ammLog::Error "Error when creating new symlink '$currdir' for '$version'"
 	fi
 
 	# Save data according to the policy
 	case "${UPG_DATAPOLICY:-}" in
 		# Plain file copy
 		copy)
-			ammLog::Inf "Copying current data to new version"
+			ammLog::Info "Copying current data to new version"
 			typeset p
 			for p in "$DAT_BASE" "$TMP_BASE"; do
 				# TODO: Check for data size & free space
@@ -270,7 +270,7 @@ function ammApp::VersionSetCurrent {
 					typeset dat="$p/current"
 					typeset bak="$p/current.before-${version}.$now"
 					if ! cp -a "$dat" "$bak"; then
-						ammLog::Err "Error while copying data from '$dat' to '$bak'. Continuing"
+						ammLog::Error "Error while copying data from '$dat' to '$bak'. Continuing"
 					fi
 				fi
 			done
@@ -278,11 +278,11 @@ function ammApp::VersionSetCurrent {
 
 		# Using filesystem snapshot
 		filesystem)
-			ammLog::Wrn "Filesystem snapshot not yet implemented..."
+			ammLog::Warning "Filesystem snapshot not yet implemented..."
 			;;
 
 		none|'')
-			ammLog::Inf "Keeping data in place for new version '$version'"
+			ammLog::Info "Keeping data in place for new version '$version'"
 			;;
 	esac
 
@@ -320,9 +320,9 @@ function ammApp::Start {
 	# User defined startup func, just use it
 	#
 	if ammEnv::IsFunc "run_start"; then
-		ammLog::Inf "Starting with custom run_start function"
+		ammLog::Info "Starting with custom run_start function"
 		appStart "$opts"
-		ammLog::Inf "Result: $?"
+		ammLog::Info "Result: $?"
 		return $?
 
 	#
@@ -334,7 +334,7 @@ function ammApp::Start {
 		typeset runas="${RUN_USER:-$__AMMLIB_USERNAME}"
 		typeset runapp="$(ammApp::GetBinPath "$version")"
 		if ! [[ -x "$runapp" ]]; then
-			ammLog::Err "Executable '$runapp' does not exists"
+			ammLog::Error "Executable '$runapp' does not exists"
 			return 1
 		fi
 
@@ -362,7 +362,7 @@ function ammApp::Start {
 			# Does the file already belong to target user
 			[[ "$(ammApp::GetOwner "$pidf")" != "$runas" ]] && {
 				\chown $runas: "$pidf" || {
-					ammLog::Err "Unable to chown '$runas' '$pidf'. The app may fail or be unmanageable"
+					ammLog::Error "Unable to chown '$runas' '$pidf'. The app may fail or be unmanageable"
 				}
 			}
 		fi
@@ -372,7 +372,7 @@ function ammApp::Start {
 		#
 		if ammString::IsTrue "$RUN_DAEMON"; then
 			typeset logfile="$(ammApp::GetLogPath "$version")"
-			ammLog::Dbg "Daemonizing and sending logs to '$logfile'"
+			ammLog::Debug "Daemonizing and sending logs to '$logfile'"
 			opts+=" >>$logfile 2>&1 0>/dev/null &"
 		fi
 
@@ -382,7 +382,7 @@ function ammApp::Start {
 		fi
 
 		# Run the process
-		ammLog::Inf "Starting with \$RUN_BIN var ($runapp $opts) as '$runas'"
+		ammLog::Info "Starting with \$RUN_BIN var ($runapp $opts) as '$runas'"
 		typeset out=""
 		typeset -i ret
 
@@ -392,16 +392,16 @@ function ammApp::Start {
 
 		# Check return value
 		if [[ $ret -ne 0 ]]; then
-			ammLog::Err "Service start return: $ret. Output:\n$out"
-			ammLog::Dbg "$(ammLog::Stackdump)"
+			ammLog::Error "Service start return: $ret. Output:\n$out"
+			ammLog::Debug "$(ammLog::Stackdump)"
 		else
-			ammLog::Inf "Result: $ret"
+			ammLog::Info "Result: $ret"
 		fi
 		return $ret
 
 	# Nothing...
 	else
-		ammLog::Err "Cannot use generic start: No function 'run_start' and no var 'RUN_BIN' defined"
+		ammLog::Error "Cannot use generic start: No function 'run_start' and no var 'RUN_BIN' defined"
 		return 1
 	fi
 
@@ -426,7 +426,7 @@ function ammApp::Stop {
 			# Standard stop: kill it with fire
 			else
 				if ! kill "$pid"; then
-					ammLog::Err "Unable to kill pid $pid"
+					ammLog::Error "Unable to kill pid $pid"
 				fi
 				# TODO: Handle cgroup or wait to send -9
 				
@@ -468,7 +468,7 @@ function ammApp::Zap {
 			rm -f "$pidfile"
 			return $?
 		else
-			ammLog::Err "Cannot remove '$pidfile' (permission error)"
+			ammLog::Error "Cannot remove '$pidfile' (permission error)"
 			return 1
 		fi
 	fi
@@ -519,33 +519,33 @@ function ammApp::IsRunning {
 							# Check if binary match
 							typeset binwant="$(ammApp::GetBinPath)"
 							if [[ "$bin" -ef "$binwant" ]]; then
-								ammLog::Dbg "Pid '$pid' found (matching binary) and running"
+								ammLog::Debug "Pid '$pid' found (matching binary) and running"
 								ammString::IsTrue "$showPid" && echo $pid
 								r=0
 							else
-								ammLog::Wrn "Pid '$pid' found, but its binary '$bin' does not match expected '$binwant'"
+								ammLog::Warning "Pid '$pid' found, but its binary '$bin' does not match expected '$binwant'"
 								r=2
 							fi
 
 						# No binary to compare with. Assuming ok
 						else
-							ammLog::Dbg "Pid ($pid) found and running"
+							ammLog::Debug "Pid ($pid) found and running"
 							ammString::IsTrue "$showPid" && echo $pid
 							r=0
 						fi
 
 					else
-						ammLog::Dbg "Process '$pidstr' not running. Stale pidfile?"
-						ammLog::Wrn "Pidfile present ($pidfile) but process ($pidstr) dead"
+						ammLog::Debug "Process '$pidstr' not running. Stale pidfile?"
+						ammLog::Warning "Pidfile present ($pidfile) but process ($pidstr) dead"
 						r=2
 					fi
 				else
-					ammLog::Dbg "Process '$pidstr' present but empty"
+					ammLog::Debug "Process '$pidstr' present but empty"
 					r=1
 				fi
 			# No pidfile, process dead or untracked
 			else
-				ammLog::Dbg "No pidfile '$pidfile' available. Consider process stopped"
+				ammLog::Debug "No pidfile '$pidfile' available. Consider process stopped"
 				r=1
 			fi
 
@@ -563,14 +563,14 @@ function ammApp::IsRunning {
 							typeset pid="${exetest#/proc/}"
 							pid="${pid%/exe}"
 
-							ammLog::Dbg "Found matching bin ($binpath) & user ($RUN_USER) as pid $pid"
+							ammLog::Debug "Found matching bin ($binpath) & user ($RUN_USER) as pid $pid"
 							ammString::IsTrue "$showPid" && echo $pid
 							r=0
 						fi
 					done
 				fi
 			else
-				ammLog::Err "No RUN_OPTPID nor RUN_BIN available. cannot check"
+				ammLog::Error "No RUN_OPTPID nor RUN_BIN available. cannot check"
 			fi
 		fi
 	fi
@@ -601,7 +601,7 @@ function ammApp::Upgrade {
 		oldpath="${oldpath##*/}"
 		versionOld="$oldpath"
 		if [[ -z "$versionOld" ]]; then
-			ammLog::Err "Unable to guess the current version. Check '$currentLink' symlink format"
+			ammLog::Error "Unable to guess the current version. Check '$currentLink' symlink format"
 			return 1
 		fi
 	fi
@@ -609,13 +609,13 @@ function ammApp::Upgrade {
 	# 0) No new version specified. Try to get the latest
 	if [[ -z "$versionNew" ]]; then
 		if ammEnv::IsFunc "appUpgradeGetLatest"; then
-			ammLog::Dbg "Calling 'appUpgradeGetLatest' to get latest version"
+			ammLog::Debug "Calling 'appUpgradeGetLatest' to get latest version"
 			versionNew="$(appUpgradeGetLatest)"
 
 			if [[ -n "$versionNew" ]]; then
-				ammLog::Inf "Found latest version: '$versionNew'"
+				ammLog::Info "Found latest version: '$versionNew'"
 			else
-				ammLog::Err "Unable to find automatically latest version"
+				ammLog::Error "Unable to find automatically latest version"
 				return 1
 			fi
 
@@ -635,7 +635,7 @@ function ammApp::Upgrade {
 
 		# No helper, no var...
 		else
-			ammLog::Err "No version specified and no helper 'appUpgradeGetLatest' defined"
+			ammLog::Error "No version specified and no helper 'appUpgradeGetLatest' defined"
 			return 1
 		fi
 	fi
@@ -643,12 +643,12 @@ function ammApp::Upgrade {
 
 	# Nothing to update
 	if [[ "$versionNew" == "$versionOld" ]]; then
-		ammLog::Inf "Latest version found: '$versionNew', same as current one. Exiting"
+		ammLog::Info "Latest version found: '$versionNew', same as current one. Exiting"
 		return 0
 	fi
 
 
-	ammLog::Inf "Upgrading from '$versionOld' to '$versionNew'"
+	ammLog::Info "Upgrading from '$versionOld' to '$versionNew'"
 	typeset r=0
 	typeset url="" urls=
 	typeset appdir="$APP_BASE/${versionNew}"
@@ -664,24 +664,24 @@ function ammApp::Upgrade {
 	# 0) Get the URL to fetch
 	if ammEnv::IsFunc "appUpgradeGetUrls"; then
 		urls="$(appUpgradeGetUrls "$versionNew")"
-		ammLog::Dbg "function appUpgradeGetUrls returned: '$urls'"
+		ammLog::Debug "function appUpgradeGetUrls returned: '$urls'"
 	elif [[ -n "${UPG_GHPROJECT}" ]]; then
 		# Try if supplied a release
-		ammLog::Dbg "Trying to get release assets from '$UPG_GHPROJECT' version '$versionNew'"
+		ammLog::Debug "Trying to get release assets from '$UPG_GHPROJECT' version '$versionNew'"
 		typeset assets="$(ammHttp::GithubReleaseGetAssets "$UPG_GHPROJECT" "$versionNew")"
 		if [[ -n "$assets" ]]; then
 			urls="$assets"
-			ammLog::Dbg "Found release assets: $urls"
+			ammLog::Debug "Found release assets: $urls"
 
 		# No asset found, try as a commit
 		else
 			typeset commit="${version#*_}"
-			ammLog::Dbg "No release matched. Trying as a commit"
+			ammLog::Debug "No release matched. Trying as a commit"
 			if ammHttp::GithubCommitExists "$UPG_GHPROJECT" "$commit"; then
 				urls="$(ammHttp::GithubArchiveGetUrl "$UPG_GHPROJECT" "$commit")"
-				ammLog::Dbg "Found commit archive: $urls"
+				ammLog::Debug "Found commit archive: $urls"
 			else
-				ammLog::Wrn "Version '$versionNew' does not match a release nor a commit of github' '$UPG_GHPROJECT'"
+				ammLog::Warning "Version '$versionNew' does not match a release nor a commit of github' '$UPG_GHPROJECT'"
 			fi
 		fi
 	fi
@@ -690,15 +690,15 @@ function ammApp::Upgrade {
 	typeset t
 	for t in "$tmpdir" "$tmpsource" "$tmpextract" "$appdir"; do
 		if ! [[ -e "$t" ]]; then
-			ammLog::Dbg "Creating folder '$t'"
+			ammLog::Debug "Creating folder '$t'"
 			mkdir -p "$t"
 		fi
 	done
 #		if ! [[ -e "$tmpdir" ]] && ! [[ -d "$tmpdir" ]]; then
-#			ammLog::Wrn "Destination folder exists but is not a folder. Moving it"
+#			ammLog::Warning "Destination folder exists but is not a folder. Moving it"
 #			typeset suffix=".$(date +%y%m%d_%H%M%S)"
 #			if ! mv "$appdir" "${appdir}${suffix}"; then
-#				ammLog::Err "Unable to rename folder '$appdir' with suffix '$suffix'"
+#				ammLog::Error "Unable to rename folder '$appdir' with suffix '$suffix'"
 #				return 1
 #			fi
 #		fi
@@ -718,12 +718,12 @@ function ammApp::Upgrade {
 			tmpdl="$tmpsource/${tmpdl##*/}"  # Keep only last filename
 
 			if [[ -s "$tmpdl" ]]; then
-				ammLog::Inf "File '$tmpdl' already present. Skipping"
+				ammLog::Info "File '$tmpdl' already present. Skipping"
 			else
-				ammLog::Inf "Downloading '$url' to '$tmpdl'"
+				ammLog::Info "Downloading '$url' to '$tmpdl'"
 				typeset dlfile="$(ammHttp::FetchSmart "$url" "$tmpdl")"
 				if ! [[ -s "$dlfile" ]]; then
-					ammLog::Err "Error while fetching '$url'"
+					ammLog::Error "Error while fetching '$url'"
 					r+=1
 				fi
 			fi
@@ -752,7 +752,7 @@ function ammApp::Upgrade {
 				# If an archive, extract it in temp folder
 				if ammArchive::FormatFromFile "$f" >/dev/null; then
 					if ! ammArchive::Extract "$f" "$tmpextract"; then
-						ammLog::Err "Error while extracting archive '$f' to '$tmpextract'"
+						ammLog::Error "Error while extracting archive '$f' to '$tmpextract'"
 						r+=1
 					fi
 				fi
@@ -762,7 +762,7 @@ function ammApp::Upgrade {
 
 	# If something during preparation failed
 	if [[ $r -gt 0 ]]; then
-		ammLog::Err "Preparation failed"
+		ammLog::Error "Preparation failed"
 		ammLog::StepEnd $r
 		return $r
 	fi
@@ -780,7 +780,7 @@ function ammApp::Upgrade {
 		# Check for bin presency
 		if [[ -n "${RUN_BIN:-}" ]]; then
 			if ! [[ -e "$tmpextract/$RUN_BIN" ]]; then
-				ammLog::Err "Unable to find '$RUN_BIN' in extracted folder '$tmpextract'"
+				ammLog::Error "Unable to find '$RUN_BIN' in extracted folder '$tmpextract'"
 				ammLog::StepEnd $r
 				return 1
 			fi
@@ -802,10 +802,10 @@ function ammApp::Upgrade {
 		appUpgradeConfigure "$versionNew" "$versionOld" "$appdir"
 		r+=$?
 	elif [[ -n "$RUN_CFG" ]]; then
-		ammLog::Dbg "Using '$RUN_CFG' (TODO! )"
+		ammLog::Debug "Using '$RUN_CFG' (TODO! )"
 		#cp "$RUN_CFG" "$CFG_ appdir"
 	else
-		ammLog::Inf "No function 'appUpgradeConfigure'. Skipping"
+		ammLog::Info "No function 'appUpgradeConfigure'. Skipping"
 	fi
 	ammLog::StepEnd
 
@@ -817,7 +817,7 @@ function ammApp::Upgrade {
 		# Generate a new network & fs namespace
 		ammUpgradeTest "$versionNew" "$versionOld"
 	else
-		ammLog::Inf "No function 'appUpgradeTest'. Skipping"
+		ammLog::Info "No function 'appUpgradeTest'. Skipping"
 	fi
 	ammLog::StepEnd
 
@@ -837,7 +837,7 @@ function ammApp::Upgrade {
 	r=0
 	typeset snapname="svcupgrade-${APP_NAME}-$(date +%s)"
 	if [[ -n "${RUN_REQUIRES:-}" ]]; then
-		ammLog::Inf "Will snapshot dependencies ($RUN_REQUIRES) as '$snapname'"
+		ammLog::Info "Will snapshot dependencies ($RUN_REQUIRES) as '$snapname'"
 
 		typeset dep
 		for dep in ${RUN_REQUIRES}; do
@@ -845,7 +845,7 @@ function ammApp::Upgrade {
 			if ! [[ -s "$script" ]] && [[ -x "$script" ]]; then
 				script="$APP_SDIR/$dep"
 				if ! [[ -s "$script" ]] && [[ -x "$script" ]]; then
-					ammLog::Wrn "Unable to find dependency '$dep' script in '$APP_SDIR'. Skipping"
+					ammLog::Warning "Unable to find dependency '$dep' script in '$APP_SDIR'. Skipping"
 					continue
 				fi
 			fi
@@ -858,18 +858,18 @@ function ammApp::Upgrade {
 				99) scriptretstr+=" (not implemented)" ;;
 				1) scriptretstr+=" (failed)"; r+=1 ;;
 			esac
-			ammLog::Inf "$scriptretstr"
+			ammLog::Info "$scriptretstr"
 		done
 	fi
 
 	# TODO call filesystem snapshot
-	ammLog::Inf "TODO: Calling filesystem Snapshot as '$snapname'"
+	ammLog::Info "TODO: Calling filesystem Snapshot as '$snapname'"
 
 	# Check if snapshot was successful
 	if [[ $r -gt 0 ]]; then
-		ammLog::Wrn "Some snapshot failed"
+		ammLog::Warning "Some snapshot failed"
 		if ! ammInput::GetYN "upgradeContinueSnapFail" "Do you want to continue ?"; then
-			ammLog::Inf "Aborting. You'll want to remove '$snapname'"
+			ammLog::Info "Aborting. You'll want to remove '$snapname'"
 			ammLog::StepEnd $r
 			return 1
 		fi
@@ -889,8 +889,8 @@ function ammApp::Upgrade {
 	fi
 
 	if [[ $r -gt 0 ]]; then
-		ammLog::Err "Start/Test of new version failed. Check or consider rollback"
-		ammLog::Err " - Logs: "
+		ammLog::Error "Start/Test of new version failed. Check or consider rollback"
+		ammLog::Error " - Logs: "
 		ammLog::StepEnd $r
 		return 1
 	fi
@@ -917,14 +917,14 @@ function ammApp::Main {
 	case "$op" in
 		start)
 			if ammApp::IsRunning; then
-				ammLog::Wrn "Already running"
+				ammLog::Warning "Already running"
 			else
 				ammApp::Start "$@"
 				r=$?
 			fi
 			;;
 		stop)
-			ammApp::IsRunning || ammLog::Wrn "Already stopped"
+			ammApp::IsRunning || ammLog::Warning "Already stopped"
 			ammApp::Stop "$@"
 			r=$?
 			;;
@@ -949,7 +949,7 @@ function ammApp::Main {
 			if ammEnv::IsFunc "appRun$op"; then
 				appRun$op "$@"
 			else
-				ammLog::Err "Usage: $0 <start|stop|restart|status|upgrade>"
+				ammLog::Error "Usage: $0 <start|stop|restart|status|upgrade>"
 
 				typeset extrafuncs="$(grep "function appRun" "$MYSELF"|grep -v '^#'|grep -Po 'appRun[^ ]+')"
 				if [[ -n "$extrafuncs" ]]; then
@@ -957,7 +957,7 @@ function ammApp::Main {
 					for extrafunc in $extrafuncs; do
 						extratxt+="${extrafunc#appRun} "
 					done
-					ammLog::Err "Extra opts: $extratxt"
+					ammLog::Error "Extra opts: $extratxt"
 				fi
 			fi
 			;;

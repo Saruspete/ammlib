@@ -27,17 +27,17 @@ function _ammChroot::OSInit {
 	(set +u; [[ -n "${__AMMCHROOT_OS:-}" ]] ) && return 0
 
 	for sublib in $(ammLib::LocatePattern "chroot.*"); do
-		ammLog::Inf "Trying to load sublib $sublib"
+		ammLog::Info "Trying to load sublib $sublib"
 
 		if ammLib::Loadable "$sublib"; then
 			ammLib::Load "$sublib"
 		else
-			ammLog::Wrn "Unable to load '$sublib'"
+			ammLog::Warning "Unable to load '$sublib'"
 		fi
 	done
 
 	if ( set +u; [[ -n "${__AMMCHROOT_OS[@]:-}" ]] ); then
-		ammLog::Wrn "No chroot sublib was loaded. Chroot unavailable"
+		ammLog::Warning "No chroot sublib was loaded. Chroot unavailable"
 		return 1
 	fi
 }
@@ -51,7 +51,7 @@ function _ammChroot::OSCall {
 	if ammIs::Func "$fname"; then
 		$fname "$@"
 	else
-		ammLog::Wrn "Requested function '$func' is not available for OS '$osname'"
+		ammLog::Warning "Requested function '$func' is not available for OS '$osname'"
 		return 1
 	fi
 }
@@ -102,7 +102,7 @@ function ammChroot::Mounted {
 				done
 
 				# We are still here, we didn't find our option
-				ammLog::Wrn "Didn't find requested opt: $lntneed in $mnt"
+				ammLog::Warning "Didn't find requested opt: $lntneed in $mnt"
 				return 1
 			done
 		fi
@@ -141,12 +141,12 @@ function ammChroot::Mount {
 
 	# Mount the target
 	if ! [[ -d "$mntdst" ]]; then
-		ammLog::Inf "Target mount '$mntdst' does not exists. Creating"
+		ammLog::Info "Target mount '$mntdst' does not exists. Creating"
 		mkdir -p "$mntdst"
 	fi
 
 	if ammChroot::Mounted "$mntdst"; then
-		ammLog::Inf "Mountpoint '$mntdst' already mounted"
+		ammLog::Info "Mountpoint '$mntdst' already mounted"
 		return 0
 	fi
 
@@ -170,7 +170,7 @@ function ammChroot::Umount {
 
 	typeset dev mntpnt fstyp opts _junk
 	while read dev mntpnt fstyp opts _junk; do
-		ammLog::Inf "Umount '$mnt' (dev:$dev fstyp:$fstyp opts:$opts)"
+		ammLog::Info "Umount '$mnt' (dev:$dev fstyp:$fstyp opts:$opts)"
 		umount "$mntpnt" 2>/dev/null
 	done < <(awk '$2=="'$mnt'" {print $2}' /proc/self/mounts|sort -r)
 }
@@ -180,7 +180,7 @@ function ammChroot::Start {
 	typeset chrootdir="$1"
 
 	if ! ammChroot::DirValidate "$chrootdir"; then
-		ammLog::Err "Invald chroot to start '$chrootdir'"
+		ammLog::Error "Invald chroot to start '$chrootdir'"
 		return 1
 	fi
 
@@ -197,20 +197,20 @@ function ammChroot::Stop {
 	typeset chrootdir="$1"
 
 	if ! ammChroot::DirValidate "$chrootdir"; then
-		ammLog::Err "Invald chroot to exec inside '$chrootdir'"
+		ammLog::Error "Invald chroot to exec inside '$chrootdir'"
 		return 1
 	fi
 
 	# 0: kill all process using the fs
-	ammLog::Inf "Killing all processes using the chroot (TODO)"
+	ammLog::Info "Killing all processes using the chroot (TODO)"
 	# TODO
 
 	# 1: umount all fs under the chroot (normal, then force, then lazy)
-	ammLog::Inf "Umounting folders under '$chrootdir'"
+	ammLog::Info "Umounting folders under '$chrootdir'"
 	typeset mnt
 	for mnt in $(awk '$2~/'${chrootdir////\\/}'/ {print $2}' /proc/mounts | sort -r); do
 		if ! ammExec::AsUser "root" umount "$mnt"; then
-			ammLog::Wrn "Unable to umount path '$mnt'"
+			ammLog::Warning "Unable to umount path '$mnt'"
 		fi
 	done
 
@@ -223,7 +223,7 @@ function ammChroot::Exec {
 	shift
 
 	if ! ammChroot::DirValidate "$chrootdir"; then
-		ammLog::Err "Invald chroot to exec inside '$chrootdir'"
+		ammLog::Error "Invald chroot to exec inside '$chrootdir'"
 		return 1
 	fi
 
@@ -254,13 +254,13 @@ function ammChroot::Create {
 	ammLog::StepBegin "Creating new chroot in '$chrootdir'"
 
 	# Bind mount
-	ammLog::Inf "Mounting system mounts"
+	ammLog::Info "Mounting system mounts"
 	typeset dir
 	for dir in proc sys dev devpts tmpfs; do
 		ammChroot::Mount "$chrootdir" "$dir"
 	done
 
-	ammLog::Inf "Initializing OS"
+	ammLog::Info "Initializing OS"
 	_ammChroot::OSCall "$osname" "Init" "$chrootdir" "$osvers"
 
 
@@ -272,9 +272,9 @@ function ammChroot::Create {
 	cp -f /etc/resolv.conf $dest/etc/resolv.conf
 
 	# Create the base system
-	ammLog::Inf "Populating the chroot with OS manager"
+	ammLog::Info "Populating the chroot with OS manager"
 	_ammChroot::OSCall "$osname" "Populate" "$chrootdir" || {
-		ammLog::Err "Error during populating chroot '$chrootdir'"
+		ammLog::Error "Error during populating chroot '$chrootdir'"
 		return 1
 	}
 
@@ -285,7 +285,7 @@ function ammChroot::Destroy {
 	typeset chrootdir="$(readlink -f $1)"
 
 	if ! ammChroot::DirValidate "$chrootdir"; then
-		ammLog::Err "Invalid chroot: '$chrootdir'"
+		ammLog::Error "Invalid chroot: '$chrootdir'"
 		return 1
 	fi
 
@@ -293,7 +293,7 @@ function ammChroot::Destroy {
 	ammLog::StepBegin "Destroying chroot '$chrootdir'"
 	
 	if ! ammChroot::Stop "$chrootdir"; then
-		ammLog::Err "Cannot stop chroot '$chrootdir'"
+		ammLog::Error "Cannot stop chroot '$chrootdir'"
 		ammLog::StepEnd 1
 		return 1
 	fi

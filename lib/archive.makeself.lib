@@ -17,7 +17,7 @@ function ammArchiveMakeself::MetaCheck {
 	for p in $(ammExec::GetPath makeself.sh makeself); do
 		if [[ -x "$p" ]] && [[ -s "$p" ]]; then
 			if grep "^MS_VERSION=" $p >/dev/null 2>&1; then
-				ammLog::Dbg "Using '$p' as makeself"
+				ammLog::Debug "Using '$p' as makeself"
 				AMMARCHIVEMAKESELF_BIN="$p"
 				return 0
 			fi
@@ -44,7 +44,7 @@ function ammArchiveMakeself::Cleanup {
 	typeset file="$1"
 
 	if ! [[ -e "$file" ]] || ! [[ -f "$file" ]]; then
-		ammLog::Err "Archive file '$file' is invalid"
+		ammLog::Error "Archive file '$file' is invalid"
 		return 1
 	fi
 

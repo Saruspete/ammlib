@@ -3,10 +3,8 @@
 typeset MYSELF="$(readlink -e $0 || realpath $0)"
 typeset MYPATH="${MYSELF%/*}"
 
-#set -o nounset -o noclobber
-#export LC_ALL=C
-#export PATH="/bin:/sbin:/usr/bin:/usr/sbin:$PATH"
-#export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
+# Change dir for shellspec
+cd "$MYPATH"
 
 # Load main library
 typeset -a ammpaths=("$MYPATH/ammlib" "$HOME/.ammlib" "/etc/ammlib" "$MYPATH/../")

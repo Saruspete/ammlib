@@ -50,13 +50,13 @@ fi
 #
 
 # Check if we are started by a valid stdin
-typeset    __AMMLIB_TTY="$(tty)"
-typeset    __AMMLIB_INTERACTIVE=true
+typeset -g  __AMMLIB_TTY="$(tty)"
+typeset -g  __AMMLIB_INTERACTIVE=true
 if [[ -z "$__AMMLIB_TTY" ]] || ! [[ -e $__AMMLIB_TTY ]]; then
 	__AMMLIB_TTY=""
 	__AMMLIB_INTERACTIVE=false
 fi
-typeset    __AMMLIB_STDOUTPIPED=false
+typeset -g  __AMMLIB_STDOUTPIPED=false
 if ! [[ -t 1 ]]; then
 	__AMMLIB_STDOUTPIPED=true
 fi
@@ -66,7 +66,7 @@ fi
 #
 
 # @description  Path where ammlib is
-typeset    __AMMLIB_REALPATH="$(readlink -f ${BASH_SOURCE[0]})"
+typeset -g  __AMMLIB_REALPATH="$(readlink -f ${BASH_SOURCE[0]})"
 
 # Check the readlink usability
 if type -t readlink >/dev/null; then
@@ -80,39 +80,39 @@ if type -t readlink >/dev/null; then
 fi
 
 # @description  How the script was called ($0)
-typeset -r  __AMMLIB_CALLNAME="$0"
+typeset -gr __AMMLIB_CALLNAME="$0"
 # @description  Options passed to the script ($@)
-typeset -a  __AMMLIB_CALLOPTS=("$@")
-typeset -ra __AMMLIB_CALLOPTS_ORIG=("$@")
+typeset -ga __AMMLIB_CALLOPTS=("$@")
+typeset -gra __AMMLIB_CALLOPTS_ORIG=("$@")
 # Empty array being unset is fixed in bash 4.4
 if [[ "${BASH_VERSINFO[0]}" -eq 4 ]] && [[ "${BASH_VERSINFO[1]}" -lt 4 ]]; then
 	[[ -z "$@" ]] && __AMMLIB_CALLOPTS=("")
 fi
 # @description  The file that loaded ammlib
-typeset -r  __AMMLIB_CALLFILE="${BASH_SOURCE[1]##*/}"
+typeset -gr __AMMLIB_CALLFILE="${BASH_SOURCE[1]##*/}"
 # @description  Path of the file that loaded ammlib
-typeset -r  __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
+typeset -gr __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
 
-typeset -r  __AMMLIB_USERNAME="$(\id -nu)"
-typeset -r  __AMMLIB_USERID="$(\id -u)"
-typeset -r  __AMMLIB_HOSTNAME="$(uname -n)"
+typeset -gr __AMMLIB_USERNAME="$(\id -nu)"
+typeset -gr __AMMLIB_USERID="$(\id -u)"
+typeset -gr __AMMLIB_HOSTNAME="$(uname -n)"
 #
 # Set and create base folders to be used by library
 #
 
 # Library scripts base path
-typeset __AMMLIB_ROOT="${__AMMLIB_REALPATH%/*}"
+typeset -g __AMMLIB_ROOT="${__AMMLIB_REALPATH%/*}"
 
 # Temporary data
-typeset __AMMLIB_DATATMP="/tmp/.ammlib.${UID:-$(id -u)}/${__AMMLIB_CALLNAME##*/}.$$"
+typeset -g __AMMLIB_DATATMP="/tmp/.ammlib.${UID:-$(id -u)}/${__AMMLIB_CALLNAME##*/}.$$"
 [[ -d "$__AMMLIB_DATATMP" ]] || mkdir -p "$__AMMLIB_DATATMP"
 
 # Persistant data
-typeset __AMMLIB_DATA="$HOME/.ammlib/data/"
+typeset -g __AMMLIB_DATA="$HOME/.ammlib/data/"
 [[ -d "$__AMMLIB_DATA" ]] || mkdir -p "$__AMMLIB_DATA"
 
 # Custom binaries
-typeset __AMMLIB_BIN="$HOME/.ammlib/bin"
+typeset -g __AMMLIB_BIN="$HOME/.ammlib/bin"
 [[ -d "$__AMMLIB_BIN" ]] || mkdir -p "$__AMMLIB_BIN"
 export PATH+=":$__AMMLIB_BIN"
 
@@ -151,7 +151,7 @@ function ammLib::TmpPathGet {
 # Hooks and events
 # -----------------------------------------------------------------------------
 
-typeset -A __AMMLIB_HOOKLIST
+typeset -gA __AMMLIB_HOOKLIST
 # This module will register dynamic arrays based on name + prefix __AMMHOOK_
 
 # @description  Will generate a variable ID from a given name
@@ -718,7 +718,7 @@ function _ammLog::ColorJoin {
 	echo "$*"
 }
 
-typeset -A __AMMLOG_TERMCODES=(
+typeset -gA __AMMLOG_TERMCODES=(
 	# Set
 	[reset]=0 [bold]=1 [dim]=2 [underline]=4 [blink]=5 [reverse]=7 [hidden]=8
 	# Reset
@@ -733,8 +733,8 @@ typeset -A __AMMLOG_TERMCODES=(
 	[bglightblack]=100 [bglightred]=101 [bglightgreen]=102 [bglightyellow]=103 [bglightblue]=104 [bglightmagenta]=105 [bglightcyan]=106 [bglightwhite]=107 [bglightdefault]=109
 )
 
-typeset -i __AMMLOG_VERBOSITY=1
-typeset -i __AMMLOG_DEPTH=0
+typeset -gi __AMMLOG_VERBOSITY=1
+typeset -gi __AMMLOG_DEPTH=0
 
 # @description  Colorize the text with values in __AMMLOG_TERMCODES
 # @$ color codes to be printed
@@ -767,17 +767,17 @@ function ammLog::Date {
 
 
 # Log will be out to stdout
-typeset __AMMLOG_FDSTD=97
-typeset __AMMLOG_FDERR=98
+typeset -g __AMMLOG_FDSTD=97
+typeset -g __AMMLOG_FDERR=98
 exec 97>&1 98>&2 # Must be plain int, not the variable
-typeset __AMMLOG_FDDBG=99
-typeset __AMMLOG_LOGFILE=""
-typeset __AMMLOG_LOGTERM=""
-typeset __AMMLOG_SILENT="0"
+typeset -g __AMMLOG_FDDBG=99
+typeset -g __AMMLOG_LOGFILE=""
+typeset -g __AMMLOG_LOGTERM=""
+typeset -g __AMMLOG_SILENT="0"
 
-typeset -i __AMMLOG_STEPDEPTH=0
-typeset -a __AMMLOG_STEPTIME
-typeset -a __AMMLOG_STEPNAME
+typeset -gi __AMMLOG_STEPDEPTH=0
+typeset -ga __AMMLOG_STEPTIME
+typeset -ga __AMMLOG_STEPNAME
 
 # @description  (private) Generic log function for logging
 # @arg $1  (string) tag

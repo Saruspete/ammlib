@@ -38,18 +38,27 @@ SS_DESTDIR="$(ammOptparse::Get "ss-destdir")"
 
 # Check version
 [[ -z "$SS_VERSION" ]] && ammLog::Die "Invalid ShellSpec version '$SS_VERSION'"
-typeset ss_assets="$(ammHttp::GithubReleaseGetAssets "shellspec/shellspec" "$SS_VERSION")"
-if [[ -z "$ss_assets" ]]; then
-	ammLog::Err "Unable to fetch assets"
+
+typeset ss_extract="$SS_DESTDIR/$SS_VERSION"
+
+# Download version if not already available
+if [[ -s "$ss_extract/shellspec" ]]; then
+	ammLog::Info "Version '$SS_VERSION' is already extracted"
+else
+
+	typeset ss_assets="$(ammHttp::GithubReleaseGetAssets "shellspec/shellspec" "$SS_VERSION")"
+	if [[ -z "$ss_assets" ]]; then
+		ammLog::Error "Unable to fetch assets"
+	fi
+
+	typeset ss_archive="$(ammHttp::FetchSmart "$ss_assets")"
+	[[ -d "$ss_extract" ]] || mkdir -p "$ss_extract"
+
+	tar -xf "$ss_archive" -C "$ss_extract" --strip-components=1
+
+	ammLog::Info "Extracted to '$ss_extract'. Creating symlink 'current' to it"
 fi
 
-typeset ss_archive="$(ammHttp::FetchSmart "$ss_assets")"
-typeset ss_extract="$SS_DESTDIR/$SS_VERSION"
-[[ -d "$ss_extract" ]] || mkdir -p "$ss_extract"
-
-tar -xf "$ss_archive" -C "$ss_extract" --strip-components=1
-
-ammLog::Inf "Extracted to '$ss_extract'. Creating symlink 'current' to it"
 typeset ss_symlink="$SS_DESTDIR/current"
 
 [[ -e "$ss_symlink" ]] && rm "$ss_symlink"

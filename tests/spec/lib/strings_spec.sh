@@ -204,9 +204,27 @@ Describe "string.lib"
 
 
 	Describe "ammString::ExpandStringBash"
-	End
+		It "Expands a string like simple bash expansion"
+			When call ammString::ExpandStringBash '{1..5}'
+			The output should eq "1 2 3 4 5 "
+		End
+		It "Expands a string like simple bash expansion with prefix and suffix"
+			When call ammString::ExpandStringBash 'hello-{1,2}_world' 'hi_{1..3}_jack' 'omg_{1,2-4,6}_wtfbbq'
+			The output should eq "hello-1_world hello-2_world hi_1_jack hi_2_jack hi_3_jack omg_1_wtfbbq omg_2-4_wtfbbq omg_6_wtfbbq "
+		End
+		It "Expands a string like bash expansion with nested groups"
+			When call ammString::ExpandStringBash 'hello_{world,master-{1..2}}'
+			The output should eq "hello_world hello_master-1 hello_master-2 "
+		End
+		It "Expands a string like bash expansion with FQDN"
+			When call ammString::ExpandStringBash 'host-{01..05}.dev.intra'
+			The output should eq "host-01.dev.intra host-02.dev.intra host-03.dev.intra host-04.dev.intra host-05.dev.intra "
+		End
 
-	Describe "ammString::ListExpand"
+		It "Expands a string like bash expansion with complex nested groups"
+			When call ammString::ExpandStringBash 'hello_{world-{01..04},master,slave{1..3}}'
+			The output should eq "hello_world-01 hello_world-02 hello_world-03 hello_world-04 hello_master hello_slave1 hello_slave2 hello_slave3 "
+		End
 	End
 
 	Describe "ammString::ExpandIntegerList"

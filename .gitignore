@@ -1,2 +1,4 @@
 data
 bin
+tests/bash_source
+tests/shellspec

@@ -9,7 +9,7 @@ typeset MYPATH="${MYSELF%/*}"
 #export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
 
 # Load main library
-typeset -a ammpaths=("$MYPATH/ammlib" "$HOME/.ammlib" "/etc/ammlib")
+typeset -a ammpaths=("$MYPATH/ammlib" "$HOME/.ammlib" "/etc/ammlib" "$MYPATH/../../ammlib")
 for ammpath in "${ammpaths[@]}" fail; do
 	[[ -e "$ammpath/ammlib" ]] && source "$ammpath/ammlib" && break
 done

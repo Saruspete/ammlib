@@ -879,7 +879,7 @@ function ammString::UUIDGenerate {
 # -----------------------------------------------------------------------------
 
 function ammString::HashMD5 {
-	typeset str="${1:--}"
+	typeset str="${1--}"
 	typeset salt="${2:-}"
 
 	if [[ "$str" == "-" ]] && [[ -n "$salt" ]]; then
@@ -909,7 +909,7 @@ function ammString::HashMD5 {
 }
 
 function ammString::HashSHA1 {
-	typeset str="${1:--}"
+	typeset str="${1--}"
 	typeset salt="${2:-}"
 
 	if [[ "$str" == "-" ]] && [[ -n "$salt" ]]; then

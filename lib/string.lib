@@ -671,34 +671,48 @@ function ammString::ExpandStringBash {
 			typeset seq="${BASH_REMATCH[2]}"
 			typeset sfx="${BASH_REMATCH[3]}"
 
-			# Composed of 2 or more sequences {seq1,seq2}
-			typeset seq2="${seq##*,}"
-			if [[ "$seq" != "$seq2" ]]; then
+			# Composed of 2 or more sequences to be reassembled 'pfx{seq0,seq1,seq2}sfx'
+			typeset seqLast="${seq##*,}"
+			if [[ "$seq" != "$seqLast" ]]; then
 				seq="${seq%,*}"
 
-				# Composite or final seq
-				if [[ "${seq//,/}" != "$seq" ]] || [[ "${seq//../}" != "${seq}" ]]; then
-					$FUNCNAME "$pfx{$seq}$sfx"
+				# TODO: check if we have the same number of opening & closing braces within
+				# all parts
+
+				# Complex seq: group composed of 'v3,v4,v5'
+				if [[ "${seq//,/}" != "$seq" ]]; then
+					# Add the { } again
+					values+=($($FUNCNAME "$pfx{$seq}$sfx"))
+				# Complex seq: sequence composed of {v1..v2}
+				elif [[ "${seq//../}" != "${seq}" ]]; then
+					# The { } should be already within the sequence
+					values+=($($FUNCNAME "$pfx$seq$sfx"))
+				# Simple seq: no more sequence, add it to the list
 				else
 					ammLog::Debug "Adding '${pfx}${seq}${sfx}'"
 					values+=("${pfx}${seq}${sfx}")
 				fi
 
-				# Composite or final seq2
-				if [[ "${seq2//,/}" != "$seq2" ]] || [[ "${seq2//../}" != "${seq2}" ]]; then
-					$FUNCNAME "$pfx{$seq2}$sfx"
+				# Complex seqLast: can only be composed of '{v1..v2}', the ',' is within seq
+				if [[ "${seqLast//,/}" != "$seqLast" ]] || [[ "${seqLast//../}" != "${seqLast}" ]]; then
+					values+=($($FUNCNAME "$pfx$seqLast$sfx"))
 				else
-					ammLog::Debug "Adding '${pfx}${seq2}${sfx}'"
-					values+=("${pfx}${seq2}${sfx}")
+					ammLog::Debug "Adding '${pfx}${seqLast}${sfx}'"
+					values+=("${pfx}${seqLast}${sfx}")
 				fi
-			# No seq2, only seq try to expand it maybe
+			# No seqLast, try to expand seq for {..}
 			else
-				# WARNING / TODO: This may be nasty here... Securization needed
 				typeset i=""
-				for i in $(eval echo $pfx{$seq}$sfx); do
-					ammLog::Debug "Adding '$i' from '$seq'"
-					values+=("$i")
-				done
+				if [[ "${seq//[.,]/}" != "$seq" ]]; then
+					# WARNING / TODO: This may be nasty here... Securization needed
+					for i in $(eval echo $pfx{$seq}$sfx); do
+						ammLog::Debug "Adding '$i' from '$seq'"
+						values+=("$i")
+					done
+				else
+					ammLog::Debug "Adding '$pfx$seq$sfx'"
+					values+=("$pfx$seq$sfx")
+				fi
 			fi
 		# Not a bash composite group, just use it raw
 		else

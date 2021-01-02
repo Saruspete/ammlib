@@ -805,7 +805,7 @@ function ammString::UUIDGenerate {
 		typeset iface="$(ip -o route get 1.0.0.0 2>/dev/null| awk 'NR==1{for(i=1; i<NF; i++) { if($i=="dev"){print $(i+1); }}}')"
 		typeset macaddr="$(cat /sys/class/net/$iface/address 2>/dev/null)"
 		if [[ -z "$macaddr" ]]; then
-			macaddr="00:11:22:33:44:55"
+			macaddr="FE:E1:DE:AD:00:00"
 			ammLog::Warning "Unable to get real MAC Interface. Using dummy $macaddr"
 		fi
 		__AMMSTRING_UUID_MACADDR="${macaddr//:/}"

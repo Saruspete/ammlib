@@ -7,199 +7,218 @@ Describe "string.lib"
 	typeset -a _demoArrayWords=(hello world pouet coin lol rofl mao)
 
 
-	Describe "ammString::Contains"
-		It "returns success if a simple string is contained in another"
-			When call ammString::Contains "wor" "hello world"
-			The status should be success
+	Describe "ammString pattern matching"
+
+		Describe "ammString::Contains"
+			It "returns success if a simple string is contained in another"
+				When call ammString::Contains "wor" "hello world"
+				The status should be success
+			End
+			It "returns success if a complex string is contained in another"
+				When call ammString::Contains "w*l" "hello world"
+				The status should be success
+			End
+			It "returns failure if the string is not contained in another"
+				When call ammString::Contains "toto" "hello world"
+				The status should be failure
+			End
 		End
-		It "returns success if a complex string is contained in another"
-			When call ammString::Contains "w*l" "hello world"
-			The status should be success
+
+		Describe "ammString::ContainsWord"
+			It "returns success if first arg is also one of other args"
+				When call ammString::ContainsWord "rofl" "${_demoArrayWords[@]}"
+				The status should be success
+			End
+			It "returns failure if first arg is not in one of other args"
+				When call ammString::ContainsWord "ohohoh" "${_demoArrayWords[@]}"
+				The status should be failure
+			End
 		End
-		It "returns failure if the string is not contained in another"
-			When call ammString::Contains "toto" "hello world"
+
+		Describe "ammString::StartsWith"
+		End
+
+		Describe "ammString::EndsWith"
+		End
+
+		Describe "ammString::IsNotEmpty"
+		End
+
+		Describe "ammString::IsEmpty"
+		End
+	End
+
+
+	Describe "ammString simple file tests"
+		Describe "ammString::IsFile"
+		End
+
+		Describe "ammString::IsDirectory"
+		End
+	End
+
+	Describe "ammString Format tests"
+		Describe "ammString::IsInteger"
+		End
+
+		Describe "ammString::IsHex"
+		End
+
+		Describe "ammString::IsYes"
+		End
+
+		Describe "ammString::IsNo"
+		End
+
+		Describe "ammString::IsYesNo"
+		End
+
+		Describe "ammString::IsTrue"
+		End
+
+		Describe "ammString::IsIPv4"
+			It "returns success if arg is an usual IPv4"
+				When call ammString::IsIPv4 "10.20.30.40"
+				The status should be success
+			End
+			It "returns success if arg is a short IPv4"
+				When call ammString::IsIPv4 "1.1"
+				The status should be success
+			End
+			It "returns failure if arg is a bad usual IPv4"
+				When call ammString::IsIPv4 "1.2.4.555"
 			The status should be failure
+			End
+			It "returns failure if arg is a bad short IPv4"
+				When call ammString::IsIPv4 "1.256"
+				The status should be failure
+			End
+		End
+
+		Describe "ammString::IsIPv6"
+			It "returns success if arg is a good full IPv6"
+				When call ammString::IsIPv6 "9999:FFFF:ABCD:EFF:0000:8a2e:0370:7334"
+				The status should be success
+			End
+			It "returns success if arg is a good short IPv6"
+				When call ammString::IsIPv6 "::1"
+				The status should be success
+			End
+			It "returns success if arg is a good short IPv6"
+				When call ammString::IsIPv6 "1::1"
+				The status should be success
+			End
+			It "returns failure if arg is a not a good full IPv6"
+				When call ammString::IsIPv6 "9999:FFFF:ABCD:EFG:0000:8a2e:0370:7334"
+				The status should be failure
+			End
+			It "returns failure if arg is a not a good short IPv6"
+				When call ammString::IsIPv6 "1::G::1"
+				The status should be failure
+			End
+		End
+
+		Describe "ammString::IsIP"
+		End
+
+		Describe "ammString::IsUri"
+		End
+
+		Describe "ammString::IsDate"
+		End
+
+		Describe "ammString::IsTime"
+		End
+
+		Describe "ammString::Type"
 		End
 	End
 
-	Describe "ammString::ContainsWord"
-		It "returns success if first arg is also one of other args"
-			When call ammString::ContainsWord "rofl" "${_demoArrayWords[@]}"
-			The status should be success
+	Describe "ammString string modifiers"
+
+		Describe "ammString::Trim"
+			It "removes trailing and ending spaces and tabs by default"
+				When call ammString::Trim "		   toto	  "
+				The stdout should eq "toto"
+			End
+
+			It "removes trailing and ending specified chars"
+				When call ammString::Trim "-- toto --" "[- ]"
+				The stdout should eq "toto"
+			End
 		End
-		It "returns failure if first arg is not in one of other args"
-			When call ammString::ContainsWord "ohohoh" "${_demoArrayWords[@]}"
-			The status should be failure
+
+		Describe "ammString::ToCapital"
 		End
-	End
 
-	Describe "ammString::StartsWith"
-	End
-
-	Describe "ammString::EndsWith"
-	End
-
-	Describe "ammString::IsNotEmpty"
-	End
-
-	Describe "ammString::IsEmpty"
-	End
-
-	Describe "ammString::IsFile"
-	End
-
-	Describe "ammString::IsDirectory"
-	End
-
-	Describe "ammString::IsInteger"
-	End
-
-	Describe "ammString::IsHex"
-	End
-
-	Describe "ammString::IsYes"
-	End
-
-	Describe "ammString::IsNo"
-	End
-
-	Describe "ammString::IsYesNo"
-	End
-
-	Describe "ammString::IsTrue"
-	End
-
-	Describe "ammString::IsIPv4"
-		It "returns success if arg is an usual IPv4"
-			When call ammString::IsIPv4 "10.20.30.40"
-			The status should be success
+		Describe "ammString::ToLower"
 		End
-		It "returns success if arg is a short IPv4"
-			When call ammString::IsIPv4 "1.1"
-			The status should be success
-		End
-		It "returns failure if arg is a bad usual IPv4"
-			When call ammString::IsIPv4 "1.2.4.555"
-			The status should be failure
-		End
-		It "returns failure if arg is a bad short IPv4"
-			When call ammString::IsIPv4 "1.256"
-			The status should be failure
+
+		Describe "ammString::ToUpper"
 		End
 	End
 
-	Describe "ammString::IsIPv6"
-		It "returns success if arg is a good full IPv6"
-			When call ammString::IsIPv6 "9999:FFFF:ABCD:EFF:0000:8a2e:0370:7334"
-			The status should be success
+	Describe "ammString multiline extraction"
+		Describe "ammString::ExtractCmdLine"
 		End
-		It "returns success if arg is a good short IPv6"
-			When call ammString::IsIPv6 "::1"
-			The status should be success
-		End
-		It "returns success if arg is a good short IPv6"
-			When call ammString::IsIPv6 "1::1"
-			The status should be success
-		End
-		It "returns failure if arg is a not a good full IPv6"
-			When call ammString::IsIPv6 "9999:FFFF:ABCD:EFG:0000:8a2e:0370:7334"
-			The status should be failure
-		End
-		It "returns failure if arg is a not a good short IPv6"
-			When call ammString::IsIPv6 "1::G::1"
-			The status should be failure
+
+		Describe "ammString::InputToLines"
 		End
 	End
 
-	Describe "ammString::IsIP"
-	End
 
-	Describe "ammString::IsUri"
-	End
-
-	Describe "ammString::IsDate"
-	End
-
-	Describe "ammString::IsTime"
-	End
-
-	Describe "ammString::Type"
-	End
-
-
-	Describe "ammString::Trim"
-		It "removes trailing and ending spaces and tabs by default"
-			When call ammString::Trim "		   toto	  "
-			The stdout should eq "toto"
+	Describe "ammString format conversion"
+		Describe "ammString::UnitToPow"
 		End
 
-		It "removes trailing and ending specified chars"
-			When call ammString::Trim "-- toto --" "[- ]"
-			The stdout should eq "toto"
+		Describe "ammString::UnitConvert"
+		End
+
+		Describe "ammString::BaseConvert"
+		End
+
+		Describe "ammString::HexToDec"
+		End
+
+		Describe "ammString::DecToHex"
+		End
+
+		Describe "ammString::IPv4ToHex"
+		End
+
+		Describe "ammString::HexToIPv4"
+		End
+
+		Describe "ammString::IntegerMin"
+		End
+
+		Describe "ammString::IntegerMax"
+		End
+
+		Describe "ammString::IntegerAverage"
+		End
+
+		Describe "ammString::IntegerSum"
 		End
 	End
 
-	Describe "ammString::ToCapital"
-	End
 
-	Describe "ammString::ToLower"
-	End
+	Describe "ammString string match and filtering"
 
-	Describe "ammString::ToUpper"
-	End
+		Describe "ammString::Filter"
+		End
 
-	Describe "ammString::ExtractCmdLine"
-	End
+		Describe "ammString::FilterTuples"
+		End
 
-	Describe "ammString::InputToLines"
-	End
+		Describe "ammString::CountWords"
+		End
 
-	Describe "ammString::UnitToPow"
-	End
+		Describe "ammString::CountLines"
+		End
 
-	Describe "ammString::UnitConvert"
-	End
-
-	Describe "ammString::BaseConvert"
-	End
-
-	Describe "ammString::HexToDec"
-	End
-
-	Describe "ammString::DecToHex"
-	End
-
-	Describe "ammString::IPv4ToHex"
-	End
-
-	Describe "ammString::HexToIPv4"
-	End
-
-	Describe "ammString::IntegerMin"
-	End
-
-	Describe "ammString::IntegerMax"
-	End
-
-	Describe "ammString::IntegerAverage"
-	End
-
-	Describe "ammString::IntegerSum"
-	End
-
-	Describe "ammString::Filter"
-	End
-
-	Describe "ammString::FilterTuples"
-	End
-
-	Describe "ammString::CountWords"
-	End
-
-	Describe "ammString::CountLines"
-	End
-
-	Describe "ammString::SortWords"
+		Describe "ammString::SortWords"
+		End
 	End
 
 

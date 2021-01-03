@@ -127,7 +127,7 @@ function _ammLib::PathGetForCaller {
 	typeset suffix="${2:-}"
 
 	# Get name and path from caller
-	typeset callingstr="$(ammLog::Stackdump 2 1)"
+	typeset callingstr="$(ammLog::Stackdump 3 1)"
 	typeset callingfile="${callingstr%%:*}"
 
 	typeset dir="$prefix/$callingfile/$suffix"

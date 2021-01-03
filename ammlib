@@ -1345,16 +1345,22 @@ function _ammPath::RecurseFolders {
 	typeset pattern srcdentry
 	for pattern in "$@"; do
 		# Remove srcpath from pattern, we'll add it after to ensure its present
-		pattern="${pattern#$srcpath/}"
+		pattern="${pattern#$srcpath}"
 		for srcdentry in "$srcpath/"$pattern; do
 			typeset srcdir="${srcdentry%/*}"
 			typeset dstdentry="${dstpath}${srcdentry#$srcpath}"
 			typeset dstdir="${dstdentry%/*}"
 
-			{ [[ "$srcdentry" == "." ]] || [[ "$dstdentry" == ".." ]]; } && continue
+			# Skip special folders (dotglob or pattern like .*)
+			{ [[ "$srcdentry" == "." ]] || [[ "$srcdentry" == ".." ]]; } && continue
+
+			if ! [[ -e "$srcdentry" ]]; then
+				ammLog::Debug "Source '$srcdentry' does not exists. Skipping"
+				continue
+			fi
 
 			# Do the operation by callback
-			$callback "$srcdentry" "$dstdentry"
+			$callback "$srcdentry" "$dstdentry" "$force"
 			rl=$?
 
 			# If the callback returned false (operation failed) maybe log something
@@ -1378,7 +1384,11 @@ function _ammPath::RecurseFolders {
 function _ammPath::CallbackCopy {
 	typeset src="$1" dst="$2" force="${3:-false}"
 
-	\cp -a "$srcfile" "$dstdir"
+	# Create parent destination directory
+	typeset parent="${dst%/*}"
+	[[ -d "$parent" ]] || mkdir -p "$parent"
+
+	\cp -a "$src" "$dst"
 }
 
 function _ammPath::CallbackHardlink {

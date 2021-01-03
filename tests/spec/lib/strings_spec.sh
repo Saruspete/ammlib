@@ -119,9 +119,33 @@ Describe "string.lib"
 		End
 
 		Describe "ammString::IsIP"
+			It "returns success if arg is an IPv4"
+				When call ammString::IsIPv4 "10.20.30.40"
+				The status should be success
+			End
+			It "returns success if arg is an IPv6"
+				When call ammString::IsIPv6 "9999:FFFF:ABCD:EFF:0000:8a2e:0370:7334"
+				The status should be success
+			End
 		End
 
 		Describe "ammString::IsUri"
+			It "returns success if arg is an http uri"
+				When call ammString::IsUri "https://github.com/Saruspete/ammlib/blob/master/README.md#bash-modular-library"
+				The status should be success
+			End
+			It "returns success if arg is a folder"
+				When call ammString::IsUri "file:///tmp/"
+				The status should be success
+			End
+			It "returns success if arg is a git+ssh uri"
+				When call ammString::IsUri "git+ssh://example.com/git/repo?param"
+				The status should be success
+			End
+			It "returns failure if arg is a host without format"
+				When call ammString::IsUri "google.com"
+				The status should be failure
+			End
 		End
 
 		Describe "ammString::IsDate"
@@ -131,6 +155,19 @@ Describe "string.lib"
 		End
 
 		Describe "ammString::Type"
+			Parameters
+				"/tmp"                "folder"
+				"10.20.30.40"         "ipv4"
+				"::1"                 "ipv6"
+				"2016-11-26"          "date"
+				"2019-01-20 19:10:00" "datetime"
+				"hello"               "string"
+			End
+
+			Example "Type of $1"
+				When call ammString::Type "$1"
+				The output should eq "$2"
+			End
 		End
 	End
 
@@ -139,22 +176,34 @@ Describe "string.lib"
 		Describe "ammString::Trim"
 			It "removes trailing and ending spaces and tabs by default"
 				When call ammString::Trim "		   toto	  "
-				The stdout should eq "toto"
+				The output should eq "toto"
 			End
 
 			It "removes trailing and ending specified chars"
 				When call ammString::Trim "-- toto --" "[- ]"
-				The stdout should eq "toto"
+				The output should eq "toto"
 			End
 		End
 
 		Describe "ammString::ToCapital"
+			It "set a random case to all lower but the first char"
+				When call ammString::ToCapital "heLlOWorLd"
+				The output should eq "Helloworld"
+			End
 		End
 
 		Describe "ammString::ToLower"
+			It "set all chars to their lower case"
+				When call ammString::ToLower "heLlOWorLd"
+				The output should eq "helloworld"
+			End
 		End
 
 		Describe "ammString::ToUpper"
+			It "set all chars to their upper case"
+				When call ammString::ToUpper "heLlOWorLd"
+				The output should eq "HELLOWORLD"
+			End
 		End
 	End
 
@@ -249,12 +298,12 @@ Describe "string.lib"
 	Describe "ammString::ExpandIntegerList"
 		It "Expands a grouped string as an ordered list"
 			When call ammString::ExpandIntegerList "7-10,11,12,5,8,1,11-14"
-			The stdout should eq "1 5 7 8 9 10 11 12 13 14 "
+			The output should eq "1 5 7 8 9 10 11 12 13 14 "
 		End
 		It "Emits a warning if an element is invalid"
 			When call ammString::ExpandIntegerList "7-10,11,12,a-f,14-16"
 			#The stderr should include "is not an integer"
-			The stdout should eq "7 8 9 10 11 12 14 15 16 "
+			The output should eq "7 8 9 10 11 12 14 15 16 "
 		End
 	End
 

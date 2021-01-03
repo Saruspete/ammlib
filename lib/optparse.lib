@@ -627,7 +627,7 @@ function ammOptparse::GetAll {
 }
 
 
-# @description Get unparsed options. To be used as 'eval set $(ammOptparse::GetUnparsedOpts)'
+# @description Get unparsed options. To be used as 'eval set -- $(ammOptparse::GetUnparsedOpts)'
 # @noarg
 function ammOptparse::GetUnparsedOpts {
 	for i in ${!__AMMLIB_CALLOPTS[@]}; do

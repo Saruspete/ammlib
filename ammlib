@@ -103,16 +103,19 @@ typeset -gr __AMMLIB_HOSTNAME="$(uname -n)"
 # Library scripts base path
 typeset -g __AMMLIB_ROOT="${__AMMLIB_REALPATH%/*}"
 
+# Allows to customize our usage by another app
+typeset -g __AMMLIB_APPNAME="${AMMLIB_APPNAME:-ammlib}"
+
 # Temporary data
-typeset -g __AMMLIB_DATATMP="/tmp/.ammlib.${UID:-$(id -u)}/${__AMMLIB_CALLNAME##*/}.$$"
+typeset -g __AMMLIB_DATATMP="/tmp/.${__AMMLIB_APPNAME}.${UID:-$(id -u)}/${__AMMLIB_CALLNAME##*/}.$$"
 [[ -d "$__AMMLIB_DATATMP" ]] || mkdir -p "$__AMMLIB_DATATMP"
 
 # Persistant data
-typeset -g __AMMLIB_DATA="$HOME/.ammlib/data/"
+typeset -g __AMMLIB_DATA="$HOME/.${__AMMLIB_APPNAME}/data/"
 [[ -d "$__AMMLIB_DATA" ]] || mkdir -p "$__AMMLIB_DATA"
 
 # Custom binaries
-typeset -g __AMMLIB_BIN="$HOME/.ammlib/bin"
+typeset -g __AMMLIB_BIN="$HOME/.${__AMMLIB_APPNAME}/bin"
 [[ -d "$__AMMLIB_BIN" ]] || mkdir -p "$__AMMLIB_BIN"
 export PATH+=":$__AMMLIB_BIN"
 

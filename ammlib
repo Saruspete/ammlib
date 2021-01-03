@@ -978,6 +978,30 @@ function _ammLog::StepPad {
 	done
 }
 
+# @description  Displays a separator with optionnal text on the middle
+# @arg $1  (string) The message to be between the separators
+# @arg $2  (string) The char to be used as separator. default '='
+function ammLog::EchoSeparator {
+	typeset msg="${1:-}"
+	typeset chr="${2:-=}"
+
+	typeset cols="${COLUMNS:-$(tput cols)}"
+	typeset -i msgSize=${#msg}
+	typeset -i sepSize=$(( $cols - $msgSize))
+	[[ $sepSize -lt 0 ]] && sepSize=10
+
+	# If we have a message, remove 2 chars as separator before & after message
+	[[ ${msgSize} -gt 0 ]] && sepSize+=-2
+	sepSize=$(($sepSize/2))
+
+	typeset sep=""
+	typeset -i i=0
+	for ((i=0; i<$sepSize; i++)); do
+		sep+="$chr"
+	done
+	echo "$sep${msg:+ $msg }$sep"
+}
+
 # @description  Show a visible step separator
 function ammLog::Step {
 	typeset name="$1"

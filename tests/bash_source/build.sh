@@ -14,9 +14,20 @@ if [[ "$ammpath" == "fail" ]]; then
 	exit 1
 fi
 
+typeset -a BASH_BUILD_VERS=(4.2 4.3 4.4 5.0 5.1)
+
 # Load the required libraries
 #ammLib::Require "optparse"
-ammLib::Require "http"
+ammLib::Require "http" "optparse"
+
+ammOptparse::AddOptGroupDesc "Build parameters"
+ammOptparse::AddOpt "-b|--build-vers@"    "Versions to download and build"
+
+ammOptparse::Parse --no-unknown || ammLog::Die "Error during option parsing"
+
+
+typeset -a BASH_BUILD_VERS2="$(ammOptparse::Get "build-vers")"
+[[ -n "${BASH_BUILD_VERS2}" ]] && BASH_BUILD_VERS=(${BASH_BUILD_VERS2[@]})
 
 
 typeset srcroot="$MYPATH/src"
@@ -26,7 +37,7 @@ typeset dstroot="$MYPATH/release"
 [[ -d "$srcroot" ]] || mkdir -p "$srcroot"
 
 
-for bashv in 4.2 4.3 4.4 5.0 5.1; do
+for bashv in ${BASH_BUILD_VERS[@]}; do
 
 	if [[ -x "$dstroot/bash-$bashv/bin/bash" ]]; then
 		ammLog::Inf "Bash $bashv already compiled"

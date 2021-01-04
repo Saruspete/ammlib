@@ -89,7 +89,9 @@ if [[ "${BASH_VERSINFO[0]}" -eq 4 ]] && [[ "${BASH_VERSINFO[1]}" -lt 4 ]]; then
 	[[ -z "$@" ]] && __AMMLIB_CALLOPTS=("")
 fi
 # @description  The file that loaded ammlib
-typeset -gr __AMMLIB_CALLFILE="${BASH_SOURCE[1]##*/}"
+# Set in 2-times to avoid bug "h" fixed in 4.4-rc1 (make_cmd.c:801)
+typeset -g  __AMMLIB_CALLFILE="${BASH_SOURCE[1]:-main}"
+typeset -gr __AMMLIB_CALLFILE="${__AMMLIB_CALLFILE##*/}"
 # @description  Path of the file that loaded ammlib
 typeset -gr __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
 

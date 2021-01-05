@@ -1,14 +1,13 @@
 # shellcheck shell=bash
 
-Describe "string.lib"
+Describe "string.lib:"
 	Include "../ammlib"
 	Before "ammLib::Require string"
 
 	typeset -a _demoArrayWords=(hello world pouet coin lol rofl mao)
 
 
-	Describe "ammString pattern matching"
-
+	Describe "pattern matching:"
 		Describe "ammString::Contains"
 			It "returns success if a simple string is contained in another"
 				When call ammString::Contains "wor" "hello world"
@@ -49,7 +48,7 @@ Describe "string.lib"
 	End
 
 
-	Describe "ammString simple file tests"
+	Describe "simple file tests:"
 		Describe "ammString::IsFile"
 		End
 
@@ -57,7 +56,7 @@ Describe "string.lib"
 		End
 	End
 
-	Describe "ammString Format tests"
+	Describe "Format tests:"
 		Describe "ammString::IsInteger"
 		End
 
@@ -171,7 +170,7 @@ Describe "string.lib"
 		End
 	End
 
-	Describe "ammString string modifiers"
+	Describe "string modifiers:"
 
 		Describe "ammString::Trim"
 			It "removes trailing and ending spaces and tabs by default"
@@ -207,7 +206,7 @@ Describe "string.lib"
 		End
 	End
 
-	Describe "ammString multiline extraction"
+	Describe "multiline extraction:"
 		Describe "ammString::ExtractCmdLine"
 		End
 
@@ -216,7 +215,7 @@ Describe "string.lib"
 	End
 
 
-	Describe "ammString format conversion"
+	Describe "format conversion:"
 		Describe "ammString::UnitToPow"
 		End
 
@@ -252,7 +251,7 @@ Describe "string.lib"
 	End
 
 
-	Describe "ammString string match and filtering"
+	Describe "string match and filtering:"
 
 		Describe "ammString::Filter"
 		End

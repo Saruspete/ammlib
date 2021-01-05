@@ -20,6 +20,16 @@ ammOptparse::AddOptGroupDesc "Complex values (array and boolean)"
 ammOptparse::AddOpt "-A|--arr@"     "Push values into an array"
 ammOptparse::AddOpt "-D|--debug!"   "Set or unset the debug mode"
 
+ammOptparse::AddOptGroup "hidden-group1" "This group is hidden, unless 'woot' action is provided" "word:woot"
+ammOptparse::AddOpt "--hidden="     "This option is only visible in --help if woot is set"
+
+ammOptparse::AddOptGroupDesc "Visible group after hidden group"
+ammOptparse::AddOpt "--foobar"      "A sample value always visible"
+ammOptparse::AddOptGroup "disabledgroup" "" "no"
+ammOptparse::AddOpt "--foodisabled" "This option is disabled by default" "no"
+ammOptparse::AddOptGroup "anyothergroup"
+ammOptparse::AddOpt "--fooenabled"  "This option is enabled"
+
 ammOptparse::AddActionWord "woot"
 
 

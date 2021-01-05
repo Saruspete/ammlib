@@ -16,6 +16,7 @@ function ammOptparse::MetaCheck {
 
 function ammOptparse::MetaInit {
 	ammOptparse::AddOpt "-h|--help" "Show this help"
+	ammOptparse::AddOpt "--help-all" "Show this help and hidden options"
 	#ammoptparse::AddOpt "--version" "Show script version" "unknown"
 }
 
@@ -23,8 +24,13 @@ function ammOptparse::MetaInit {
 # Options processing initialization
 # -----------------------------------------------------------------------------
 
+# order of all options
 typeset -ga  _AMMOPTPARSE_ORDER
-typeset -ga  _AMMOPTPARSE_DESCRIPTIONGROUP
+
+# options group state
+typeset -ga  _AMMOPTPARSE_GROUP_ID
+typeset -ga  _AMMOPTPARSE_GROUP_DESC
+typeset -gA  _AMMOPTPARSE_GROUP_ENABLED
 
 # Mapping Option => ID
 typeset -gA  _AMMOPTPARSE_OPTLONG
@@ -33,6 +39,7 @@ typeset -gA  _AMMOPTPARSE_OPTSHORT
 typeset -gA  _AMMOPTPARSE_OPTALL
 # Special words
 typeset -gA  _AMMOPTPARSE_WORDS
+typeset -gA  _AMMOPTPARSE_WORDS_ACTIVE
 
 # Options value, description and backtrace
 typeset -gA  _AMMOPTPARSE_VALUE
@@ -139,6 +146,7 @@ function _ammOptparse::Expand {
 
 			# Special word and special action: stop all parsing
 			if ( set +u; [[ -n "${_AMMOPTPARSE_WORDS[$opt]}" ]] ); then
+				_AMMOPTPARSE_WORDS_ACTIVE[$opt]="true"
 				if [[ "${_AMMOPTPARSE_WORDS[$opt]}" == "stop" ]]; then
 					skipall=true
 				fi
@@ -156,13 +164,81 @@ function _ammOptparse::Expand {
 	__AMMLIB_CALLOPTS=("${options[@]}")
 }
 
-# @description  Set the description group for the options added next
-function ammOptparse::AddOptGroupDesc {
-	typeset desc="$1"
+
+function ammOptparse::_GroupEnabled {
+	typeset groupid="${1:-}"
+
+	# Check if visibility is set at all
+	if ! (set +u; [[ -n "${_AMMOPTPARSE_GROUP_ENABLED[$groupid]}" ]] ); then
+		return 0
+	fi
+
+	typeset vis="${_AMMOPTPARSE_GROUP_ENABLED[$groupid]}"
+	case "$vis" in
+		# Action word
+		word:*)
+			typeset w="${vis#word:}"
+			( set +u; [[ -n "${_AMMOPTPARSE_WORDS_ACTIVE[$w]}" ]] )
+			return $?
+			;;
+
+		# Standard option
+		%{*})
+			[[ -n "$(ammOptparse::Get "$vis")" ]]
+			return $?
+			;;
+		yes) return 0 ;;
+		no)  return 1 ;;
+		*)
+			ammLog::Warning "Unknown visibility: '$vis' for group '${groupid}'"
+			return 1
+			;;
+	esac
+}
+
+
+
+# @description  Create a new group for options being added next
+# @arg $1  (string) ID of the group to be acted upon by later functions
+# @arg $2  (string) (optionnal) Description of the group
+# @arg $3  (string) (optionnal) Availability: default or condition for the group to be usable
+function ammOptparse::AddOptGroup {
+	typeset id="$1"
+	typeset desc="${2:-}"
+	typeset visibility="${3:-yes}"
 
 	typeset -i nextid="${_AMMOPTPARSE_ORDER+${#_AMMOPTPARSE_ORDER[@]}}"
-	_AMMOPTPARSE_DESCRIPTIONGROUP[$nextid]="$desc"
+
+	# Place the ID
+	_AMMOPTPARSE_GROUP_ID[$nextid]="$id"
+
+	# If we have description, place it
+	[[ -n "$desc" ]] && _AMMOPTPARSE_GROUP_DESC[$nextid]="$desc"
+	
+
+	# If we have a visibility condition
+	if [[ -n "$visibility" ]]; then
+		case "$visibility" in
+			word:*|%*|yes|no)
+				_AMMOPTPARSE_GROUP_ENABLED[$id]="$visibility"
+				;;
+			*)
+				ammLog::Warning "Unknown visibility format: '$visibility'"
+				;;
+		esac
+	fi
+
 }
+
+# @description  Set the description group for the options added next
+# @arg $1  (string) Description of the group
+function ammOptparse::AddOptGroupDesc {
+	typeset desc="$1"
+	typeset id="${desc// /_}"
+	id="${id//[^a-zA-Z0-9_ ]/}"
+	ammOptparse::AddOptGroup "$id" "$desc"
+}
+
 
 
 # @description  Add an option to the listing
@@ -288,6 +364,7 @@ function ammOptparse::AddOpt {
 
 	# Add the ID to the ordered listing
 	_AMMOPTPARSE_ORDER+=("$id")
+	_AMMOPTPARSE_GROUP_ID+=("${_AMMOPTPARSE_GROUP_ID+${_AMMOPTPARSE_GROUP_ID[-1]}}")
 
 }
 
@@ -404,6 +481,8 @@ function ammOptparse::Parse {
 
 			# If it's not a registerd option, maybe it's a registered word
 			if ( set +u; [[ -n "${_AMMOPTPARSE_WORDS[$var]}" ]] ); then
+				# Save the word as seen
+				_AMMOPTPARSE_WORDS_ACTIVE[$var]="true"
 				# Do the registered action
 				typeset action="${_AMMOPTPARSE_WORDS[$var]}"
 				case $action in
@@ -574,6 +653,10 @@ function ammOptparse::Parse {
 		ammOptparse::Help
 		exit 0
 	fi
+	if [[ -n "$(_ammOptparse::OptToId "help-all")" ]] && [[ "$(ammOptparse::Get "help-all")" == "true" ]]; then
+		ammOptparse::Help "all"
+		exit 0
+	fi
 
 	ammLib::HookTrigger "after:optparse:parse"
 	return $r
@@ -637,8 +720,9 @@ function ammOptparse::GetUnparsedOpts {
 
 
 # @description Generate the help from registered options
-# @noarg
+# @arg $1  (string) (optionnal) Show only enabled options (default) or all
 function ammOptparse::Help {
+	typeset showFilter="${1:-active}"
 
 	typeset optid
 	typeset -i optSize=10 descSize
@@ -647,6 +731,9 @@ function ammOptparse::Help {
 	for optid in ${_AMMOPTPARSE_OPTALL[@]}; do
 		[[ ${#optid} -gt ${optSize} ]] && optSize=${#optid}
 	done
+
+	# If some group is disabled, we must add 2 chars for ()
+	optSize+=2
 
 	# Columns of the output
 	typeset -i termSize="${COLUMNS:-$(ammExec::Exists tput && tput cols)}"
@@ -663,22 +750,38 @@ function ammOptparse::Help {
 	# Display
 	for optidnum in ${!_AMMOPTPARSE_ORDER[@]}; do
 		typeset optid="${_AMMOPTPARSE_ORDER[$optidnum]}"
+		typeset grpid="${_AMMOPTPARSE_GROUP_ID[$optidnum]}"
+		typeset grpenabled="false"
+		ammOptparse::_GroupEnabled "$grpid" && grpenabled="true"
+
+		# If the group is not active, or if help-all
+		if ! $grpenabled && [[ "$showFilter" != "all" ]]; then
+			ammLog::Debug "Group '$grpid' is not enabled. Skipping"
+			continue
+		fi
 
 		# Check and display new description group
-		if (set +u; [[ -n "${_AMMOPTPARSE_DESCRIPTIONGROUP[$optidnum]}" ]] ); then
+		if (set +u; [[ -n "${_AMMOPTPARSE_GROUP_DESC[$optidnum]}" ]] ); then
 			echo
-			echo "${_AMMOPTPARSE_DESCRIPTIONGROUP[$optidnum]}"
+			echo "${_AMMOPTPARSE_GROUP_DESC[$optidnum]}"
 		fi
 
 		# TODO: Parse opt to remove special chars like = @ !
 		typeset opts="${_AMMOPTPARSE_OPTALL[$optid]}"
 		typeset desc="${_AMMOPTPARSE_DESCRIPTION[$optid]:-}"
 
+		# If we are here and the group is disabled, mark it accordingly
+		if ! $grpenabled ; then
+			opts="($opts)"
+			desc="(disabled) $desc"
+		fi
+
 		# Append current value to the end
 		if (set +u; [[ -n "${_AMMOPTPARSE_VALUE[$optid]}" ]] ); then
 			desc+=". Current value: '$currValBold${_AMMOPTPARSE_VALUE[$optid]}$currValRst'"
 		fi
 
+		# printf is a shell builtin
 		while [[ -n "$desc" ]]; do
 			printf "  %-${optSize}.${optSize}s    %.${descSize}s\n" "$opts" "$desc"
 			desc="${desc:$descSize}"

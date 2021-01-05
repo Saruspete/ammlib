@@ -63,26 +63,35 @@ function ammIso::Extract {
 	# - FuseISO :  fuse.iso
 	# - isoinfo :  isoinfo
 	# - udisk2  :  udiskctl
-	# - xorriso :
+	# - xorriso :  xorriso
 	# - 7z      :  7z x
 	# - rar     :
 	# - bsdtar  :
 
 	# Try to use mount
-	if [[ $__AMMLIB_USERID -eq 0 ]]; then
+	if [[ $__AMMLIB_USERID -eq 0 ]] || ammExec::SudoIsAble "mount"; then
 		ammLog::Info "Bind-mounting '${iso##*/}' and copying to '$dstdir'"
 		# TODO: migrate this to a temp ammlib helper
 		typeset tmpmnt="$__AMMLIB_DATATMP/loop.${iso##*/}"
 		mkdir -p "$tmpmnt"
-		if mount -o loop "$iso" "$tmpmnt"; then
+		typeset cmdmnt="mount -o loop '$iso' '$tmpmnt'"
+		if [[ $__AMMLIB_USERID -eq 0 ]] && $cmdmnt ||
+		   [[ $__AMMLIB_USERID -gt 0 ]] && ammExec::AsUser "root" "$cmdmnt"; then
 			# A selection has been made ?
 			if [[ -n "$@" ]]; then
 				ammPath::CopyStructure "$tmpmnt" "$dstdir" "$@"
 			else
 				cp -a "$tmpmnt/" "$dstdir"
 			fi
-			if ! umount "$tmpmnt"; then
-				ammLog::Warning "Error while unmounting '$tmpmnt'. Check once script is finished"
+			# Umount the temp loop
+			if [[ $__AMMLIB_USERID -eq 0 ]]; then
+				if ! umount "$tmpmnt"; then
+					ammLog::Warning "Error while unmounting '$tmpmnt'. Check once script is finished"
+				fi
+			else
+				if ! ammExec::AsUser "root" "umount '$tmpmnt'"; then
+					ammLog::Warning "Error while sudo unmounting '$tmpmnt'. Check once script is finished"
+				fi
 			fi
 		else
 			ammLog::Warning "Cannot bindmount. Trying other tools"

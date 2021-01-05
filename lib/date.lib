@@ -9,6 +9,18 @@ function ammDate::MetaCheck {
 	ammExec::Require date
 }
 
+function ammDate::MetaInit {
+	__ammDateCurrYear="$(date +%Y)"
+	__ammDateNextYear="$(( $__ammDateCurrYear + 1 ))"
+	__ammDateCurrMonth="$(ammDate::ParseInt $(date +%m) )"
+	__ammDateNextMonth="$(( ($__ammDateCurrMonth % 12) + 1 ))"
+	__ammDateCurrDayOfMonth="$(ammDate::ParseInt $( date +%d) )"
+	__ammDateCurrDayOfWeek="$(date +%u)"
+
+	# TODO: Set a timer to update values in case of long-running script
+}
+
+
 function ammDate::ParseInt {
 	typeset int="${1:-}"
 
@@ -24,12 +36,12 @@ function ammDate::ParseInt {
 }
 
 # Simple dates. Just beware of leading 0 (octal notation)
-typeset -gi __ammDateCurrYear="$(date +%Y)"
-typeset -gi __ammDateNextYear="$(( $__ammDateCurrYear + 1 ))"
-typeset -gi __ammDateCurrMonth="$(ammDate::ParseInt $(date +%m) )"
-typeset -gi __ammDateNextMonth="$(( ($__ammDateCurrMonth % 12) + 1 ))"
-typeset -gi __ammDateCurrDayOfMonth="$(ammDate::ParseInt $( date +%d) )"
-typeset -gi __ammDateCurrDayOfWeek="$(date +%u)"
+typeset -gi __ammDateCurrYear
+typeset -gi __ammDateNextYear
+typeset -gi __ammDateCurrMonth
+typeset -gi __ammDateNextMonth
+typeset -gi __ammDateCurrDayOfMonth
+typeset -gi __ammDateCurrDayOfWeek
 
 # -----------------------------------------------------------------------------
 # Date calculation

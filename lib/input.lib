@@ -9,32 +9,31 @@ fi
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
-	# Prefix to look for
-	typeset -g  __AMMINPUT_PREFIX
+# Prefix to look for
+typeset -g  __AMMINPUT_PREFIX
 
-	# Canary for populating before get
-	typeset -g  __AMMINPUT_POPULATED
+# Canary for populating before get
+typeset -g  __AMMINPUT_POPULATED
 
-	# List of registered questions from InputRegister
-	typeset -ga __AMMINPUT_ORDER
-	typeset -gA __AMMINPUT_IDS
-	typeset -gA __AMMINPUT_DEFAULTS
-	typeset -gA __AMMINPUT_VALIDATIONCB
-	typeset -gA __AMMINPUT_HELP
+# List of registered questions from InputRegister
+typeset -ga __AMMINPUT_ORDER
+typeset -gA __AMMINPUT_IDS
+typeset -gA __AMMINPUT_DEFAULTS
+typeset -gA __AMMINPUT_VALIDATIONCB
+typeset -gA __AMMINPUT_HELP
 
-	# State for blueprint
-	typeset -gA __AMMINPUT_REPLIES
-	typeset -gA __AMMINPUT_REPLIES_FROMENV
-	typeset -gA __AMMINPUT_REPLIES_FROMCMD
+# State for blueprint
+typeset -gA __AMMINPUT_REPLIES
+typeset -gA __AMMINPUT_REPLIES_FROMENV
+typeset -gA __AMMINPUT_REPLIES_FROMCMD
 
-	typeset -gA __AMMINPUT_REPLIES_USED
-	typeset -gA __AMMINPUT_REPLIES_UNKNOWNID
+typeset -gA __AMMINPUT_REPLIES_USED
+typeset -gA __AMMINPUT_REPLIES_UNKNOWNID
 
-	# Behaviour management
-	typeset -g __AMMINPUT_BATCH_AUTOTRY
-	typeset -g __AMMINPUT_BATCH_DIE_ON_ERR
-	typeset -g __AMMINPUT_BATCH_SILENTOK
-
+# Behaviour management
+typeset -g __AMMINPUT_BATCH_AUTOTRY
+typeset -g __AMMINPUT_BATCH_DIE_ON_ERR
+typeset -g __AMMINPUT_BATCH_SILENTOK
 
 
 

@@ -9,7 +9,7 @@ typeset MYPATH="${MYSELF%/*}"
 #export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
 
 # Load main library
-typeset -a ammpaths=("$MYPATH/ammlib" "$HOME/.ammlib" "/etc/ammlib" "$MYPATH/../../ammlib")
+typeset -a ammpaths=("$MYPATH/ammlib" "$HOME/.ammlib" "/etc/ammlib" "$MYPATH/../..")
 for ammpath in "${ammpaths[@]}" fail; do
 	[[ -e "$ammpath/ammlib" ]] && source "$ammpath/ammlib" && break
 done
@@ -24,6 +24,7 @@ ammLib::Require "optparse" "http"
 
 typeset SS_VERSION="latest"
 typeset SS_DESTDIR="$MYPATH"
+typeset -i rglobal=0
 
 ammOptparse::AddOpt "--ss-version="  "ShellSpec version to download"  "latest"
 ammOptparse::AddOpt "--ss-destdir="  "ShellSpec destination dir"      "$SS_DESTDIR"
@@ -48,18 +49,28 @@ else
 
 	typeset ss_assets="$(ammHttp::GithubReleaseGetAssets "shellspec/shellspec" "$SS_VERSION")"
 	if [[ -z "$ss_assets" ]]; then
-		ammLog::Error "Unable to fetch assets"
+		ammLog::Die "Unable to fetch assets for version '$SS_VERSION'"
 	fi
 
 	typeset ss_archive="$(ammHttp::FetchSmart "$ss_assets")"
 	[[ -d "$ss_extract" ]] || mkdir -p "$ss_extract"
 
-	tar -xf "$ss_archive" -C "$ss_extract" --strip-components=1
+	if ! tar -xf "$ss_archive" -C "$ss_extract" --strip-components=1; then
+		ammLog::Warning "tar extraction failed. You may expect some failure down the line"
+	fi
 
 	ammLog::Info "Extracted to '$ss_extract'. Creating symlink 'current' to it"
 fi
 
 typeset ss_symlink="$SS_DESTDIR/current"
 
+# Create current symlink
 [[ -e "$ss_symlink" ]] && rm "$ss_symlink"
-ln -s "$ss_extract" "$ss_symlink"
+if ! ln -s "$ss_extract" "$ss_symlink"; then
+	rglobal+=$?
+	ammLog::Warning "Cannot create symlink 'current' for version '$SS_VERSION'"
+fi
+
+
+
+exit $rglobal

@@ -4,7 +4,7 @@ typeset MYSELF="$(readlink -e $0 || realpath $0)"
 typeset MYPATH="${MYSELF%/*}"
 
 # Load main library
-typeset -a ammpaths=("$MYPATH/ammlib" "$HOME/.ammlib" "/etc/ammlib" "$MYPATH/../../ammlib")
+typeset -a ammpaths=("$MYPATH/ammlib" "$HOME/.ammlib" "/etc/ammlib" "$MYPATH/../../")
 for ammpath in "${ammpaths[@]}" fail; do
 	[[ -e "$ammpath/ammlib" ]] && source "$ammpath/ammlib" && break
 done
@@ -29,6 +29,7 @@ ammOptparse::Parse --no-unknown || ammLog::Die "Error during option parsing"
 typeset -a BASH_BUILD_VERS2="$(ammOptparse::Get "build-vers")"
 [[ -n "${BASH_BUILD_VERS2}" ]] && BASH_BUILD_VERS=(${BASH_BUILD_VERS2[@]})
 
+typeset -i rglobal=0 rlocal=0
 
 typeset srcroot="$MYPATH/src"
 typeset bldroot="$MYPATH/build"
@@ -58,7 +59,9 @@ for bashv in ${BASH_BUILD_VERS[@]}; do
 	typeset bld="$bldroot/bash-$bashv"
 	mkdir -p "$bld"
 	ammLog::Inf "Extracting sources to '$bld'"
-	tar xf "$tar" -C "$bld" --strip-components=1
+	if ! tar xf "$tar" -C "$bld" --strip-components=1; then
+		ammLog::Warning "tar extraction returned error. You may expect some error down the line"
+	fi
 
 	# Build
 	(
@@ -74,7 +77,13 @@ for bashv in ${BASH_BUILD_VERS[@]}; do
 
 		ammLog::Inf "Installing in '$dst'"
 		make install | ammLog::Dbg "-"
-	)
 
-	ammLog::StepEnd $?
+		[[ -x "$dst/bin/bash" ]]
+	)
+	rlocal=$?
+	rglobal+=$rlocal
+
+	ammLog::StepEnd $rlocal
 done
+
+exit $rglobal

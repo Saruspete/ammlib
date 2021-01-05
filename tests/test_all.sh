@@ -19,6 +19,7 @@ fi
 
 # Load the required libraries
 #ammLib::Require "optparse"
+typeset -i rglobal=0 rlocal=0
 
 typeset AMMTEST_BASH_ROOT="$MYPATH/bash_source"
 typeset AMMTEST_SS_ROOT="$MYPATH/shellspec"
@@ -27,11 +28,15 @@ ammLog::StepBegin "Checking test requirements"
 
 ammLog::StepBegin "Fetching all bash versions"
 $AMMTEST_BASH_ROOT/build.sh
-ammLog::StepEnd $?
+rlocal=$?
+rglobal+=$rlocal
+ammLog::StepEnd $rlocal
 
 ammLog::StepBegin "Fetching latest ShellSpec version"
 $AMMTEST_SS_ROOT/build.sh
-ammLog::StepEnd $?
+rlocal=$?
+rglobal+=$rlocal
+ammLog::StepEnd $rlocal
 
 ammLog::StepEnd
 
@@ -40,12 +45,14 @@ ammLog::StepBegin "Starting tests"
 for bashpath in "$AMMTEST_BASH_ROOT/release/"*"/bin/bash"; do
 	typeset bashversion="${bashpath%%*/bin/bash}"
 	bashversion="${bashversion##*/}"
-	typeset -i rb=0
 
 	ammLog::StepBegin "Testing bash $bashversion"
 	$AMMTEST_SS_ROOT/current/shellspec --shell "$bashpath"
-	rb+=$?
+	rlocal=$?
+	rglobal+=$rlocal
 
-	ammLog::StepEnd $rb
+	ammLog::StepEnd $rlocal
 done
 ammLog::StepEnd
+
+exit $rglobal

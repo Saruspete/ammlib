@@ -82,30 +82,32 @@ function ammDate::Calculate {
 		day="$(( $__ammDateCurrDayOfMonth + $day ))"
 	fi
 
-	# TODO: Manage the days
-	if [[ $day -gt 31 ]]; then
-		:
-	elif [[ $day -lt 1 ]]; then
-		:
-	fi
 
+	# TODO: Manage the days
+	typeset -i moffset=0 yoffset=0
+
+	# The second offset must have 1 day removed, as days starts at 01
+	typeset -i sec="$(( ($day-1) * 86400))" # 60s * 60m * 24h
+
+	# Months are a big offset, avoid using seconds for these as drift/leap risk is high
 	if [[ $month -gt 12 ]]; then
-		typeset moffs="$(( ($month-1) % 12 +1 ))"
-		typeset yoffs="$(( $month  / 12 ))"
+		moffs="$(( ($month-1) % 12 +1 ))"
+		yoffs="$(( $month  / 12 ))"
 
 		month="$moffs"
 		year="$(( $year + $yoffs ))"
 
 	elif [[ $month -lt 1 ]]; then
 		# 12 + (negative time diff)
-		typeset moffs="$(( 12 + ( ($month-1) % 12 +1) ))"
-		typeset yoffs="$(( $month / 12 ))"
+		moffs="$(( 12 + ( ($month-1) % 12 +1) ))"
+		yoffs="$(( $month / 12 ))"
 
 		month="$moffs"
 		year="$(( $year -1 + $yoffs))"
 	fi
 
-	echo "$year-$month-$day"
+	sec+=$(ammDate::ToEpoch "$year-$month-01 00:00:00 UTC")
+	date "+%Y-%m-%d" -d "@$sec"
 }
 
 function ammDate::FirstDayOfMonth {

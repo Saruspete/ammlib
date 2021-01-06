@@ -31,9 +31,6 @@ jobs:
           - 'ubuntu:20.04'
           - 'ubuntu:20.10'
           - 'ubuntu:21.04'
-        include:
-          - distro: 'alpine:edge'
-            pre: 'apk add -U bash'
     steps:
       - name: "Git clone repo"
         uses: actions/checkout@v2

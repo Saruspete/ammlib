@@ -14,26 +14,33 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          - 'alpine:edge'
           - 'centos:7'
           - 'centos:8'
+          - 'clearlinux'
           - 'debian:9'
+          - 'debian:10'
           - 'fedora:32'
           - 'fedora:33'
+          - 'fedora:34'
+          - 'oracle:7'
+          - 'oracle:8'
+          - 'opensuse/leap:15'
+          - 'opensuse/tumbleweed'
           - 'ubuntu:16.04'
           - 'ubuntu:18.04'
           - 'ubuntu:20.04'
           - 'ubuntu:20.10'
+          - 'ubuntu:21.04'
         include:
           - distro: 'alpine:edge'
-            pre: '/sbin/apk add -U bash'
+            pre: 'apk add -U bash'
     steps:
       - name: "Git clone repo"
         uses: actions/checkout@v2
       - name: Setup bash releases
         uses: actions/cache@v2.1.3
         with:
-          path: tests/bash_source/releases/bash-*/bin/bash
+          path: tests/bash_source/release/bash-*/bin/bash
           key: bash-releases-${{ matrix.distro }}
           restore-keys: |
             bash-releases-${{ matrix.distro }}

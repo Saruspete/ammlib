@@ -42,7 +42,7 @@ ammLog::StepEnd
 
 
 ammLog::StepBegin "Starting tests"
-for bashpath in "$AMMTEST_BASH_ROOT/release/"*"/bin/bash"; do
+for bashpath in "$(ammExec::GetPath "bash")" "$AMMTEST_BASH_ROOT/release/"*"/bin/bash"; do
 	typeset bashversion="${bashpath%%*/bin/bash}"
 	bashversion="${bashversion##*/}"
 

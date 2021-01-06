@@ -15,9 +15,11 @@ function ammOptparse::MetaCheck {
 }
 
 function ammOptparse::MetaInit {
-	ammOptparse::AddOpt "-h|--help" "Show this help"
-	ammOptparse::AddOpt "--help-all" "Show this help and hidden options"
-	#ammoptparse::AddOpt "--version" "Show script version" "unknown"
+	ammOptparse::AddOptGroup "general" "General options"
+	ammOptparse::AddOpt "-h|--help"   "Show this help"
+	ammOptparse::AddOpt "--help-all"  "Show this help and module options"
+	ammOptparse::AddOpt "--help-full" "Show this help and module and hidden options"
+	#ammoptparse::AddOpt "--version"  "Show script version" "unknown"
 }
 
 # -----------------------------------------------------------------------------
@@ -164,7 +166,8 @@ function _ammOptparse::Expand {
 	__AMMLIB_CALLOPTS=("${options[@]}")
 }
 
-
+# @description   Checks if the group is enabled
+# @arg $1  (string) ID of the group
 function ammOptparse::_GroupEnabled {
 	typeset groupid="${1:-}"
 
@@ -194,6 +197,15 @@ function ammOptparse::_GroupEnabled {
 			return 1
 			;;
 	esac
+}
+
+# @description  Checks if the group is named as a module
+# @arg $1  (stringà ID of the group
+function ammOptparse::_GroupIsMod {
+	typeset groupid="$1"
+
+	# Simple check on the name: must start with "mod:"
+	[[ "${groupid#mod:}" != "$groupid" ]]
 }
 
 
@@ -235,7 +247,7 @@ function ammOptparse::AddOptGroup {
 function ammOptparse::AddOptGroupDesc {
 	typeset desc="$1"
 	typeset id="${desc// /_}"
-	id="${id//[^a-zA-Z0-9_ ]/}"
+	id="${id//[^a-zA-Z0-9_: ]/}"
 	ammOptparse::AddOptGroup "$id" "$desc"
 }
 
@@ -649,12 +661,16 @@ function ammOptparse::Parse {
 		fi
 	done
 
-	if [[ -n "$(_ammOptparse::OptToId "help")" ]] && [[ "$(ammOptparse::Get "help")" == "true" ]]; then
-		ammOptparse::Help
+	if [[ -n "$(_ammOptparse::OptToId "help-full")" ]] && [[ "$(ammOptparse::Get "help-full")" == "true" ]]; then
+		ammOptparse::Help "full"
 		exit 0
 	fi
 	if [[ -n "$(_ammOptparse::OptToId "help-all")" ]] && [[ "$(ammOptparse::Get "help-all")" == "true" ]]; then
 		ammOptparse::Help "all"
+		exit 0
+	fi
+	if [[ -n "$(_ammOptparse::OptToId "help")" ]] && [[ "$(ammOptparse::Get "help")" == "true" ]]; then
+		ammOptparse::Help
 		exit 0
 	fi
 
@@ -755,8 +771,13 @@ function ammOptparse::Help {
 		ammOptparse::_GroupEnabled "$grpid" && grpenabled="true"
 
 		# If the group is not active, or if help-all
-		if ! $grpenabled && [[ "$showFilter" != "all" ]]; then
+		if ! $grpenabled && [[ "$showFilter" != "full" ]]; then
 			ammLog::Debug "Group '$grpid' is not enabled. Skipping"
+			continue
+		fi
+
+		if ammOptparse::_GroupIsMod "$grpid" && [[ "$showFilter" != "all" ]] && [[ "$showFilter" != "full" ]]; then
+			ammLog::Debug "Group '$grpid' is a module. Skipping"
 			continue
 		fi
 

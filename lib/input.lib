@@ -84,7 +84,7 @@ function ammInput::MetaInit {
 
 # @description  Callback for Optparse before parsing
 function _ammInput::HookOptparseAddOpt {
-	ammOptparse::AddOptGroupDesc "Dynamic Input"
+	ammOptparse::AddOptGroup "mod:input" "Dynamic Input"
 	ammOptparse::AddOpt "--input-errorisfatal!" "Die on invalid entry"                   "$__AMMINPUT_BATCH_DIE_ON_ERR"
 	ammOptparse::AddOpt "--input-autotry!"      "Try automatically the current value"    "$__AMMINPUT_BATCH_AUTOTRY"
 	ammOptparse::AddOpt "--input-silent!"       "Do not show prompt if values are valid" "$__AMMINPUT_BATCH_SILENTOK"

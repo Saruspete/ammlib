@@ -38,7 +38,7 @@ function ammConfig::MetaInit {
 # Caller helpers
 # -----------------------------------------------------------------------------
 function _ammConfig::HookOptparseAddOpt {
-	ammOptparse::AddOptGroupDesc "Configuration Options"
+	ammOptparse::AddOptGroup "mod:config" "Configuration Options"
 	ammOptparse::AddOpt "--config-list!"        "List configuration fields"           "false"
 	ammOptparse::AddOpt "--config-generate!"    "Generate configuration and exit"     "false"
 	ammOptparse::AddOpt "--config-filter-name@" "Filter listed/generated vars on their name"

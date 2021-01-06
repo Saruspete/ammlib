@@ -43,10 +43,11 @@ ammLog::StepEnd
 
 ammLog::StepBegin "Starting tests"
 for bashpath in "$(ammExec::GetPath "bash")" "$AMMTEST_BASH_ROOT/release/"*"/bin/bash"; do
-	typeset bashversion="${bashpath%%*/bin/bash}"
+	typeset bashversion="${bashpath%*/bin/bash}"
 	bashversion="${bashversion##*/}"
+	[[ -z "$bashversion" ]] && bashversion="system provided bash"
 
-	ammLog::StepBegin "Testing bash $bashversion"
+	ammLog::StepBegin "Testing $bashversion ($bashpath)"
 	$AMMTEST_SS_ROOT/current/shellspec --shell "$bashpath"
 	rlocal=$?
 	rglobal+=$rlocal

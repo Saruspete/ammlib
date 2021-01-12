@@ -586,7 +586,7 @@ function ammStorage::GetBlockSize {
 # -----------------------------------------------------------------------------
 
 function ammStorage::GetScheduler {
-	
+	:
 }
 
 

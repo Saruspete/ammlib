@@ -48,7 +48,7 @@ function _ammChroot::OSCall {
 	shift 2
 
 	typeset fname="ammChroot${osname}::${func}"
-	if ammIs::Func "$fname"; then
+	if ammEnv::IsFunc "$fname"; then
 		$fname "$@"
 	else
 		ammLog::Warning "Requested function '$func' is not available for OS '$osname'"

@@ -21,6 +21,7 @@ typeset -ga AMMSTORAGE_LSBLKFIELDS
 function ammStorage::MetaCheck {
 	# Should be in util-linux
 	#ammExec::RequireOne lsblk blkid
+	:
 }
 
 function ammStorage::MetaInit {

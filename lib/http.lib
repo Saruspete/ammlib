@@ -18,6 +18,11 @@ function ammHttp::MetaCheck {
 # Generic HTTP features
 # -----------------------------------------------------------------------------
 
+function ammHttp::Get {
+	ammHttp::Fetch "$1" "${2:-}"
+}
+
+
 # @description  Fetch an url
 # @arg $1 
 # @arg $2 (path)  Directory
@@ -278,10 +283,8 @@ function ammHttp::GithubReleaseGetAssets {
 
 # Compat
 function ammHttp::GithubBranchGet {
-	ammLog::Deprecated "ammHttp::GithubBranchGetLastCommit"
-	ammHttp::GithubBranchGetLastCommit "$@"
+	ammLog::Deprecated "ammHttp::GithubBranchGetLastCommit" "$@"
 }
 function ammHttp::GithubReleaseGet {
-	ammLog::Deprecated "ammHttp::GithubReleaseGetLastVersion"
-	ammHttp::GithubReleaseGetLastVersion "$@"
+	ammLog::Deprecated "ammHttp::GithubReleaseGetLastVersion" "$@"
 }

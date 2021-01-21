@@ -1,0 +1,120 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammAppNetdata::MetaCheck {
+	ammLib::Loadable "http" "string"
+	ammExec::Require "jq"
+}
+function ammAppNetdata::MetaInit {
+	ammLib::Load "http" "string"
+
+	ammLib::HookRegister "before:optparse:parse" "ammAppNetdata::_HookOptparseAddOpt"
+	ammLib::HookRegister "after:optparse:parse" "ammAppNetdata::_HookOptparsePopulate"
+
+	typeset -g AMMAPPNETDATA_HTTP="http"
+	typeset -g AMMAPPNETDATA_HOST="127.0.0.1"
+	typeset -g AMMAPPNETDATA_PORT="19999"
+	typeset -g AMMAPPNETDATA_API="/api/v1"
+	typeset -g AMMAPPNETDATA_SEP="%7C"
+
+}
+
+function ammAppNetdata::_HookOptparseAddOpt {
+	ammOptparse::AddOptGroup "netdataconnect" "Netdata connection"
+	ammOptparse::AddOpt "--netdata-secure!"  "Use https"          "$AMMAPPNETDATA_SECURE"
+	ammOptparse::AddOpt "--netdata-host="    "Hostname to query"  "$AMMAPPNETDATA_HOST"
+	ammOptparse::AddOpt "--netdata-port="    "Port to query"      "$AMMAPPNETDATA_PORT"
+	ammOptparse::AddOpt "--netdata-api="     "Path to API"        "$AMMAPPNETDATA_API"
+}
+
+function ammAppNetdata::_HookOptparsePopulate {
+	AMMAPPNETDATA_HOST="$(ammOptparse::Get "netdata-host")"
+	AMMAPPNETDATA_PORT="$(ammOptparse::Get "netdata-port")"
+	AMMAPPNETDATA_API="$(ammOptparse::Get "netdata-api")"
+
+	if ammString::IsTrue "$(ammOptparse::Get "netdata-secure")"; then
+		AMMAPPNETDATA_HTTP="https"
+	fi
+}
+
+# -----------------------------------------------------------------------------
+# Netdata management
+# -----------------------------------------------------------------------------
+
+function ammAppNetdata::_HttpGetBaseUrl {
+	echo "$AMMAPPNETDATA_HTTP://$AMMAPPNETDATA_HOST:$AMMAPPNETDATA_PORT/$AMMAPPNETDATA_API"
+}
+
+function ammAppNetdata::_HttpGet {
+	typeset query="$1"
+
+	typeset url="$(ammAppNetdata::_HttpGetBaseUrl)/$query"
+
+	ammHttp::Get "$url" "-"
+}
+
+function ammAppNetdata::_HttpGetJson2List {
+	typeset query="$1"; shift
+	typeset jqfilter="$1"; shift
+
+	typeset -A data=()
+	typeset -a fields=("$@")
+
+	# append ',' to each element of fields (and remove last)
+	typeset    fieldsjq="${fields[@]/%/,}";
+	fieldsjq="${fieldsjq%,}"
+
+	typeset key= val= id=
+	while read key val; do
+		key="$(ammString::Trim "${key%:}" '"')"
+		val="$(ammString::Trim "${val%,}" '"')"
+
+		# Requested key, add it
+		if ammString::ContainsWord "$key" "${fields[@]}"; then
+			data[$key]="$val"
+		# New record, clean old data
+		elif [[ "$key" == "{" ]]; then
+			data=()
+		# End of record, display
+		elif [[ "$key" == "}" ]]; then
+			typeset field
+			for field in ${fields[@]}; do
+				echo -n "'${data[$field]:-}' "
+			done
+			echo
+		fi
+
+	done < <(ammAppNetdata::_HttpGet "$query" | jq -M "$jqfilter | {$fieldsjq}")
+	# TODO: Check jq usage to extract keys:
+	# https://unix.stackexchange.com/questions/406410/jq-print-key-and-value-for-all-in-sub-object
+	# jq -M -r '.charts | keys_unsorted[] as $k | "\($k), \(.[$k] | .title)" '
+	# alarms | jq -rM '.alarms | keys_unsorted[] as $k | "\($k)|\(.[$k].id)|\(.[$k].active)|\(.[$k].status)"'
+
+}
+
+# -----------------------------------------------------------------------------
+# Charts and data
+# -----------------------------------------------------------------------------
+function ammAppNetdata::ChartsList {
+	ammAppNetdata::_HttpGetJson2List "charts" ".charts[]" "id" "title"
+}
+
+
+# -----------------------------------------------------------------------------
+# Alarms
+# -----------------------------------------------------------------------------
+function ammAppNetdata::AlarmList {
+	ammAppNetdata::_HttpGetJson2List "alarms" ".charts[]" "id" "title"
+}
+
+function ammAppNetdata::AlarmLogs {
+	ammAppNetdata::_HttpGetJson2List "alarm_log" ".charts[]" "id" "title"
+}

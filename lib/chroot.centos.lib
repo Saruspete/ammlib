@@ -104,7 +104,7 @@ function ammChrootCentos::Init {
 	typeset version="$2"
 
 	# Dispatch to the 
-
+	ammChrootCentos::InitFromTemplate "$chrootdir" "$version"
 }
 
 function ammChrootCentos::InitFromTemplate {
@@ -125,6 +125,7 @@ function ammChrootCentos::InitFromTemplate {
 			# Lookup the target version (no symlink avail at the moment)
 			if (set +u; [[ -n "${__AMMCHROOTCENTOS_VERSIONS[$version]}" ]] ); then
 				release="${__AMMCHROOTCENTOS_VERSIONS[$version]}"
+				ammLog::Debug "Mapping version '$version' to relase '$release'"
 			fi
 
 			# Check for custom version passed
@@ -141,7 +142,9 @@ function ammChrootCentos::InitFromTemplate {
 			url="$AMMCHROOTCENTOS_URL_CLOUD/centos/8/${arch}/images/CentOS-8-Container"
 			[[ -n "$release" ]] && url+="-$release"
 
-			urls+=("${url}.x86_64.tar.xz" "${url}-layer.x86_64.tar.gz")
+			# For whatever reason, layers images are not always available...
+			#urls+=("${url}.x86_64.tar.xz" "${url}-layer.x86_64.tar.gz")
+			urls+=("${url}.x86_64.tar.xz")
 			;;
 
 		6|7|7.*|6.*)
@@ -192,6 +195,8 @@ function ammChrootCentos::InitFromTemplate {
 	typeset url=""
 	for url in "${urls[@]}"; do
 
+		ammLog::Debug "Processing url '$url'"
+
 		# Try to get the source from local storage
 		typeset srcname="${url##*/}";
 		typeset srcfilepath="$(ammLib::DataPathGet "images")/$srcname"
@@ -212,23 +217,27 @@ function ammChrootCentos::InitFromTemplate {
 		# If the archive does not already exists, generate it
 		if ! [[ -s "$rawfilepath" ]]; then
 
+			ammLog::Debug "Raw file '$rawfilepath' does not exists"
+
+			typeset tmpfilepath="$(ammLib::TmpPathGet "image.$version")/${url##*/}"
+
+			# Check if archive is already downloaded
+			if ! [[ -s "$tmpfilepath" ]]; then
+
+				# Download the image
+				ammLog::Info "Downloading image '$url' as '$tmpfilepath'"
+				typeset dlfilepath=
+				if ! dlfilepath="$(ammHttp::FetchSmart "$url" "$tmpfilepath")"; then
+					ammLog::Error "Unable to download image from '$url'"
+					ammLog::Error "ammHttp::FetchSmart Output: $dlfilename"
+					r+=1
+				fi
+			else
+				ammLog::Info "Using already present compressed image '$tmpfilepath'"
+			fi
+
 			# If the archive is different (compressed) we'll need to uncompress it
 			if [[ "$rawfilepath" != "$srcfilepath" ]]; then
-				typeset tmpfilepath="$(ammLib::TmpPathGet "image.$version")/${url##*/}"
-
-				# Check if archive is already downloaded
-				if ! [[ -s "$tmpfilepath" ]]; then
-
-					# Download the image
-					ammLog::Info "Downloading compressed image '$url' as '$tmpfilepath'"
-					typeset dlfilepath="$(ammHttp::FetchSmart "$url" "$tmpfilepath")"
-					if [[ -z "$dlfilepath" ]]; then
-						ammLog::Error "Unable to download image from '$url'"
-						r+=1
-					fi
-				else
-					ammLog::Info "Using already present compressed image '$tmpfilepath'"
-				fi
 
 				# Extract the compressed image
 				ammLog::Info "Extracting tmp image to raw '$rawfilepath'"
@@ -255,20 +264,34 @@ function ammChrootCentos::InitFromTemplate {
 						ammLog::Error "Unable to pre-process '$tmpfilepath'. This is a bug, please report it"
 						;;
 				esac
+
+			# Using the downloaded file directly
+			else
+				ammLog::Debug "Moving '$tmpfilepath' as '$rawfilepath'"
+				mv "$tmpfilepath" "$rawfilepath"
 			fi
 
 			if ! [[ -s "$rawfilepath" ]]; then
 				ammLog::Error "Archive didn't contain raw file '$rawfilepath'"
 				return 1
 			fi
+
+		else
+			ammLog::Debug "Raw file '$rawfilepath' already exists. Using it"
 		fi
 
 		# Extract uncompressed archive depending on type
+		typeset preprocess=
 		case "$rawfilepath" in
 			*.tar.*)
 				# tar in tar archive
 				if [[ -n "$(tar -tf "$rawfilepath"|grep ^repositories)"  ]]; then
-					tar -x -O -f "$rawfilepath" '*/layer.tar' | tar -x -C "$chrootdir"
+					# TODO: run extract tar as root
+					preprocess="$(tar -x -O -f "$rawfilepath" --wildcards '*/layer.tar' | ammExec::AsUser "root" tar -x -C "$chrootdir")"
+					if [[ $? -ne 0 ]]; then
+						ammLog::Warning "tar output returned non-0. Output:"
+						echo "$preprocess" | ammLog::Warning "-"
+					fi
 
 				# Simple archive
 				else
@@ -277,7 +300,8 @@ function ammChrootCentos::InitFromTemplate {
 				;;
 			*.raw) 
 				# Mount temp filepath
-				typeset lodev="$(ammExec::AsUser "root" losetup --find "$rawfilepath" --show --partscan --read-only)"
+
+				typeset lodev="$(ammExec::AsUser "root" losetup --find --show --partscan --read-only "$rawfilepath")"
 
 				if [[ -z "$lodev" ]]; then
 					ammLog::Error "Unable to mount raw file '$rawfilepath' using losetup"
@@ -411,20 +435,22 @@ function ammChrootCentos::Populate {
 
 
 	# Base system
-	typeset pkgs="basesystem bash busybox coreutils filesystem"
+	typeset pkgs="basesystem bash filesystem"
 	pkgs+=" rpm yum rpm-build ca-certificates"
 
 	case $version in
 		6.*|7.*)
 			# Services
 			pkgs+=" initscripts"
+			# Core utils
+			pkgs+="busybox mingetty date"
 			;;
 	esac
 
 	# Core
-	pkgs+=" chkconfig procps-ng iputils mingetty"
+	pkgs+=" chkconfig procps-ng iputils"
 	# Utils and tools
-	pkgs+=" bzip2 date gawk grep gzip info less"
+	pkgs+=" bzip2 gawk grep gzip info less"
 	#pkgs+="ncurses perl pcre sed tar tee which"
 	# Build
 	#pkgs+="elfutils findutils gcc make strace"

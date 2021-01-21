@@ -194,6 +194,9 @@ function ammString::IsUri {
 	#[[ $uri =~ ^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))? ]]
 	[[ $uri =~ ^(([^:/?#]+):)(//([^/?#]*))([^?#]*)(\?([^#]*))?(#(.*))? ]]
 }
+function ammString::IsUrl {
+	ammLog::Deprecated "ammString::IsUri" "$@"
+}
 
 function ammString::IsDate {
 	typeset date="$1"

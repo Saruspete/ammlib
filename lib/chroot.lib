@@ -261,7 +261,7 @@ function ammChroot::Create {
 	done
 
 	ammLog::Info "Initializing OS"
-	_ammChroot::OSCall "$osname" "Init" "$chrootdir" "$osvers"
+	_ammChroot::OSCall "$osname" "Init" "$chrootdir" "$osvers" || return $?
 
 
 	# Touch some files, cause dumb stuff happens...

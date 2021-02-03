@@ -233,11 +233,11 @@ function ammLib::HookTrigger {
 # -----------------------------------------------------------------------------
 # Exit code and trap management
 # -----------------------------------------------------------------------------
-typeset -A __AMMLIB_SIGNALS
-typeset -A __AMMLIB_TRAP_CALLBACKS
-typeset -A __AMMLIB_TRAP_REGISTERED
-typeset -i __AMMLIB_TRAP_WAITMAX=30
-typeset    __AMMLIB_TRAP_WAITSTEP=1
+typeset -gA __AMMLIB_SIGNALS
+typeset -gA __AMMLIB_TRAP_CALLBACKS
+typeset -gA __AMMLIB_TRAP_REGISTERED
+typeset -gi __AMMLIB_TRAP_WAITMAX=30
+typeset -g  __AMMLIB_TRAP_WAITSTEP=1
 
 # @description  Initialize and registers the signal handling trap
 # @arg $@  Signals to be traped
@@ -399,8 +399,8 @@ function _ammLib::TrapHandler {
 # -----------------------------------------------------------------------------
 # Module loading
 # -----------------------------------------------------------------------------
-typeset __AMMLIB_SEARCHPATH="${__AMMLIB_ROOT}/lib"
-typeset __AMMLIB_LOADED="ammlib lib"
+typeset -g __AMMLIB_SEARCHPATH="${__AMMLIB_ROOT}/lib"
+typeset -g __AMMLIB_LOADED="ammlib lib"
 
 # @description  Locate the library file matching given name
 # @arg $1  (string) Name of the library to be loaded (eg, process)
@@ -880,12 +880,6 @@ function ammLog::Err { ammLog::Error "$@"; }
 function ammLog::Inf { ammLog::Info "$@"; }
 function ammLog::Wrn { ammLog::Warning "$@"; }
 function ammLog::Dbg { ammLog::Debug "$@"; }
-
-alias ammLog::Err=ammLog::Error
-alias ammLog::Inf=ammLog::Info
-alias ammLog::Wrn=ammLog::Warning
-alias ammLog::Dbg=ammLog::Debug
-
 
 
 function ammLog::_DbgIsEnabled {

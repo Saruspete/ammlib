@@ -386,22 +386,30 @@ function ammChrootCentos::InitFromPackages {
 
 	ammPkgYum::ReleaseSet "$chrootdir" "$versionRelease"
 
+	typeset repoRoot="$chrootdir/etc/yum.repos.d"
+	typeset repoNew="$repoRoot/default.repo"
+	typeset repoOld="$repoRoot/disabled"
+
 	# Set provided repos
 	if [[ $# -gt 0 ]]; then
 		typeset repo
 		for repo in "$@"; do
 			typeset name="${repo%%=*}" url="${repo#*=}"
-			ammPkgYum::RepoConfigure "$chrootdir/etc/yum.repos.d/default.repo" "" "$name" "$url"
+			ammPkgYum::RepoConfigure "$repoNew" "" "$name" "$url"
 		done
 	# Or use default ones
 	else
 		typeset repoid repourl
 		for repoid in ${AMMCHROOTCENTOS_REPO_LIST[$version]}; do
 			for repourl in ${AMMCHROOTCENTOS_REPO_URLS[$repoid]}; do
-				ammPkgYum::RepoConfigure "$chrootdir/etc/yum.repos.d/default.repo" "$repoid" "" "$repourl"
+				ammPkgYum::RepoConfigure "$repoNew" "$repoid" "" "$repourl"
 			done
 		done
 	fi
+
+	# Cleanup the repo config
+	sed -i "$repoNew" -Ee '/^mirrorlist=/s/^/#/' -e "/#baseurl/s/^#//"
+
 
 	# Download the release files from our host yum version
 	typeset pkgpath="$AMMCHROOTCENTOS_PATH_CACHE/pkgs.$version"
@@ -411,8 +419,7 @@ function ammChrootCentos::InitFromPackages {
 	ammPkgRpm::Install "$chrootdir" "$pkgpath/centos-release"*
 
 	# Remove automatically added repos
-	typeset repoOld="$chrootdir/etc/yum.repos.d/disabled"
-	mkdir --parents "$repoOld"
+	[[ -d "$repoOld" ]] || mkdir --parents "$repoOld"
 	mv "$chrootdir/etc/yum.repos.d/CentOS-"*  "$repoOld"
 
 	# Import keys from chroot (or elsewhere)

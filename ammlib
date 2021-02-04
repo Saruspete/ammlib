@@ -61,6 +61,10 @@ if ! [[ -t 1 ]]; then
 	__AMMLIB_STDOUTPIPED=true
 fi
 
+if $__AMMLIB_INTERACTIVE; then
+	PS4="\033[2m$PS4\033[0m"
+fi
+
 #
 # Path management
 #

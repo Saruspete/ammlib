@@ -61,19 +61,21 @@ function _ammPkgRpm::Rpm {
 
 	# Exec the query + opts
 	ammLog::Debug "Executing rpm with args: $opts $@"
+	# May generate in stderr: "warning: $pkg: Header V3 RSA/SHA256 Signature, key ID XYZXYZ: NOKEY
 	rpm $opts "$@"
 }
 
 function ammPkgRpm::Install {
 
-	typeset -a installopts
+	typeset -a commonopts= installopts=
 	while [[ -n "${1:-}" ]]; do
 		if ammString::IsOption "$1"; then
-			installopts+=("$1")
+			commonopts+=("$1")
 			shift
 		elif [[ -d "$1" ]]; then
 			ammLog::Debug "Working in prefix '$1'. Adding '--noscripts'"
-			installopts+=("$1" "--noscripts")
+			installopts+=("--noscripts")
+			commonopts+=("$1")
 			shift
 		else
 			break
@@ -86,7 +88,7 @@ function ammPkgRpm::Install {
 		typeset pkgvers="$(_ammPkgRpm::Rpm "-qp --qf %{VERSION}-%{RELEASE}" "$pkgfile")"
 
 		#if ammPkgRpm::Installed
-		typeset curvers="$(_ammPkgRpm::Rpm "${installopts[@]} -qp --qf %{VERSION}-%{RELEASE}" "$pkgname")"
+		typeset curvers="$(_ammPkgRpm::Rpm "${commonopts[@]} -qp --qf %{VERSION}-%{RELEASE}" "$pkgname")"
 
 		# If we have a package version mismatch...
 		if [[ -n "$curvers" ]] && [[ "$curvers" != "$pkgvers" ]]; then
@@ -94,7 +96,7 @@ function ammPkgRpm::Install {
 		fi
 	done
 
-	_ammPkgRpm::Rpm "${installopts[@]}" --upgrade --oldpackage "$@"
+	_ammPkgRpm::Rpm "${commonopts[@]}" "${installopts[@]}" --upgrade --oldpackage "$@"
 }
 
 

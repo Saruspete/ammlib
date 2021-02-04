@@ -242,9 +242,15 @@ function ammChroot::Create {
 	typeset osname="$2"
 	typeset osvers="${3:-}"
 
-	[[ -d "$chrootdir" ]] || {
+	if ! [[ -d "$chrootdir" ]]; then
 		mkdir -p "$chrootdir"
-	}
+	fi
+
+	# Check if folder is clean
+	if [[ -d "$chrootdir/usr" ]] || [[ -d "$chrootdir/etc" ]]; then
+		ammLog::Error "The target chroot '$chrootdir' already contains a /etc or /usr folder"
+		return 1
+	fi
 
 	# Prepare base files
 #	echo "#!/bin/bash" > "$chrootdir/$_CHROOT_FILECMD"
@@ -260,16 +266,17 @@ function ammChroot::Create {
 		ammChroot::Mount "$chrootdir" "$dir"
 	done
 
+	# Copy resolv.conf (might be needed for package manager installation)
+	mkdir -p "$chrootdir/etc"
+	ammLog::Info "Copying host resolv.conf"
+	cp -f /etc/resolv.conf $chrootdir/etc/resolv.conf
+
 	ammLog::Info "Initializing OS"
 	_ammChroot::OSCall "$osname" "Init" "$chrootdir" "$osvers" || return $?
 
 
 	# Touch some files, cause dumb stuff happens...
-	mkdir -p "$chrootdir/etc"
 	touch "$chrootdir/etc/fstab"
-
-	# Copy resolv.conf
-	cp -f /etc/resolv.conf $chrootdir/etc/resolv.conf
 
 	# Create the base system
 	ammLog::Info "Populating the chroot with OS manager"

@@ -91,7 +91,7 @@ function _ammInput::HookOptparseAddOpt {
 	ammOptparse::AddOpt "--input-blueprint!"    "Show blueprint for this execution"      "false"
 
 	typeset id
-	for id in ${__AMMINPUT_ORDER[@]}; do
+	for id in ${__AMMINPUT_ORDER[@]:-}; do
 		ammOptparse::AddOpt "--input-$id=" "${__AMMINPUT_HELP[$id]:-Value for '$id'}" "${__AMMINPUT_DEFAULTS[$id]}"
 	done
 }

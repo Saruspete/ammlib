@@ -104,7 +104,7 @@ function _ammInput::HookOptparsePopulate {
 	__AMMINPUT_BATCH_SILENTOK="$(ammOptparse::Get "input-silent")"
 
 	typeset id
-	for id in ${__AMMINPUT_ORDER[@]}; do
+	for id in ${__AMMINPUT_ORDER[@]:-}; do
 		typeset val="$(ammOptparse::Get "input-$id")"
 		#[[ -n "$val" ]] && __AMMINPUT_REPLIES_FROMCMD[$id]="$val"
 		[[ -n "$val" ]] && __AMMINPUT_REPLIES[$id]="$val"

@@ -405,6 +405,7 @@ function ammPkgYum::_RepoSet {
 function ammPkgYum::ReleaseSet {
 	typeset root="${1:-/}"
 	typeset releasever="$2"
+	typeset distrover="${3:-centos-release}"
 
 	# Override with /etc/yum/vars
 	typeset dst="$root/etc/yum/vars/releasever"
@@ -419,7 +420,8 @@ function ammPkgYum::ReleaseSet {
 
 	# Override in yum.conf
 	ammPkgYum::ConfigSet "$root/etc/yum.conf" "releasever" "$releasever"
-	ammPkgYum::ConfigSet "$root/etc/yum.conf" "distroverpkg" "$releasever"
+	ammPkgYum::ConfigSet "$root/etc/yum.conf" "distroverpkg" "$distrover"
+	ammPkgYum::ConfigSet "$root/etc/yum.conf" "plugins" "1"
 }
 
 function ammPkgYum::ReleaseGet {

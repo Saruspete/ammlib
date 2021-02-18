@@ -327,6 +327,40 @@ function ammString::ToUpper {
 	fi
 }
 
+function ammString::Split {
+	typeset str="$1"
+	typeset sep="${2:-,}"
+
+	echo "${str//$sep/ }"
+}
+
+function ammString::Glue {
+	typeset sep="${1:-,}"
+	shift
+
+	(
+		export IFS="$sep"
+		# This is a very rare valid usage of "$*"
+		echo "$*"
+	)
+}
+
+function ammString::ToCSV {
+	typeset -a fields=("$@")
+
+	# Escape existing quotes
+	fields=("${fields[@]//\"/\"\"}");
+
+	# Add " before and after fields
+	fields=("${fields[@]/#/\"}")
+	fields=("${fields[@]/%/\"}")
+
+	# Finally echo with , as separator
+	typeset IFS=','
+	echo "${fields[*]}"
+}
+
+
 
 # @description  Clean a multi-line cmd (with \ at the end)
 #

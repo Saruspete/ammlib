@@ -33,14 +33,14 @@ if [[ -z "$BASH" ]] || [[ "$(cat /proc/$$/comm)" != "bash" ]]; then
 	:
 fi
 
-#
-
+# Minimal bash version
 if [[ "${BASH_VERSINFO[0]:-0}" -lt 4 ]]; then
 	echo >&2 "This requires bash >= 4 to run."
 	return 1 2>/dev/null
 	exit 1
 fi
 
+# Enable extdebug to have arguments
 if [[ -n "${AMMLIB_DEBUG:-}" ]]; then
 	shopt -s extdebug
 fi
@@ -1471,34 +1471,34 @@ function _ammPath::CallbackSymlink {
 function ammPath::CopyStructure {
 	typeset src="$1"
 	typeset dst="$2"
-	typeset clean="$3"
+	typeset force="$3"
 	shift 3
 
 	typeset -a patterns=("$@")
 	[[ ${#patterns[@]} -eq 0 ]] && patterns+=(".")
-	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackCopy" "$clean" "${patterns[@]}"
+	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackCopy" "$force" "${patterns[@]}"
 }
 
 function ammPath::CopyStructureHardlinks {
 	typeset src="$1"
 	typeset dst="$2"
-	typeset clean="$3"
+	typeset force="$3"
 	shift 3
 
 	typeset -a patterns=("$@")
 	[[ ${#patterns[@]} -eq 0 ]] && patterns+=("*")
-	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackHardlink" "$clean" "${patterns[@]}"
+	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackHardlink" "$force" "${patterns[@]}"
 }
 
 function ammPath::CopyStructureSymlinks {
 	typeset src="$1"
 	typeset dst="$2"
-	typeset clean="$3"
+	typeset force="$3"
 	shift 3
 
 	typeset -a patterns=("$@")
 	[[ ${#patterns[@]} -eq 0 ]] && patterns+=("*")
-	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackSymlink" "$clean" "${patterns[@]}"
+	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackSymlink" "$force" "${patterns[@]}"
 }
 
 ## Rsync for all in one

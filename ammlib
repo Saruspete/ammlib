@@ -1139,7 +1139,7 @@ function ammLog::Silence {
 
 # Log xtrace (run in another process, and shares FD)
 function ammLog::DebugStore {
-	# Check if 
+	# Check if bash debug is already enabled
 	typeset undbg=""
 	[[ "${-//x/}" == "$-" ]] && { undbg="set +x"; }
 	set -x
@@ -1148,7 +1148,7 @@ function ammLog::DebugStore {
 }
 
 function ammLog::DebugEnable {
-	exec $__AMMLOG_FDDBG> >(ammLog::DebugStore)
+	eval "exec $__AMMLOG_FDDBG> >(ammLog::DebugStore)"
 	BASH_XTRACEFD=$__AMMLOG_FDDBG
 }
 

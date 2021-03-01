@@ -11,17 +11,186 @@ fi
 
 function ammHttp::MetaCheck {
 	ammExec::RequireOne curl wget
+}
 
+function ammHttp::MetaInit {
+	ammLib::Load "string"
+
+	typeset -g  _AMMHTTP_CURL_VERSION=
+	if ammExec::Exists "curl"; then
+		_AMMHTTP_CURL_VERSION="$(\curl -V|ammString::Filter - '^curl' '' 2)"
+		ammLog::Debug "Found curl version '$_AMMHTTP_CURL_VERSION'"
+	fi
+
+	typeset -g  _AMMHTTP_WGET_VERSION=
+	if ammExec::Exists "wget"; then
+		_AMMHTTP_WGET_VERSION="$(\wget -V|ammString::Filter - '^GNU Wget' '' 3)"
+		ammLog::Debug "Found wget version '$_AMMHTTP_WGET_VERSION'"
+	fi
+
+	typeset -g _AMMHTTP_AGENT_FORCE=
+
+}
+
+# -----------------------------------------------------------------------------
+# Internal wrappers for tools
+# -----------------------------------------------------------------------------
+
+function ammHttp::_DoQuery {
+	typeset opts="$1"
+
+	# User-specified agent, forcefully
+	if [[ -n "${_AMMHTTP_AGENT_FORCE:-}" ]]; then
+		# TODO: warning: executing a user-provided variable. Might be security risk
+		if ammEnv::IsFunc "$_AMMHTTP_AGENT_FORCE" || ammExec::Exists "$_AMMHTTP_AGENT_FORCE"; then
+			$AMMHTTP_AGENT_FORCE "$@"
+		else
+			ammLog::Warning "Invalid value in AMMHTTP_AGENT_FORCE: '$AMMHTTP_AGENT_FORCE'"
+		fi
+	fi
+
+	# Last, use first available
+	if [[ -n "${_AMMHTTP_CURL_VERSION:-}" ]]; then
+		ammHttp::_DoCurl "$@"
+		return $?
+	elif [[ -n "${_AMMHTTP_WGET_VERSION}" ]]; then
+		ammHttp::_DoWget "$@"
+		return $?
+	else
+		ammLog::Error "Unable to select the target agent..."
+		return 1
+	fi
+}
+
+
+# @description  Parse incoming options and remove
+function ammHttp::_OptParse {
+
+	typeset opt
+	for opt in "$@"; do
+		[[ "${opt:0:1}" == "-" ]] && continue
+		echo "$opt"
+	done
+}
+
+function ammHttp::_DoCurl {
+	typeset opts="${1:-}"
+	shift 1
+
+	typeset path="${1%%\?*}"
+	typeset data="${1#*\?}"
+	typeset request="GET"
+
+	# Options parsing
+	typeset curlopts="" opt=
+	for opt in $(ammHttp::_OptParse ${opts:-}); do
+		typeset val="${opt#*=}"
+		case $opt in
+			# HEAD
+			head)        request="HEAD"
+			             curlopts+=" --head " ;;
+			# PUT
+			put)         request="PUT"  ;;
+			put-file=*)  request="PUT"
+			             curlopts+=" --upload-file '$val' " ;;
+			put-form=*)  request="PUT"
+			             curlopts+=" --form '$val' " ;;
+			# POST
+			post)        request="POST" ;;
+			post-file=*) request="POST"
+			             curlotps+=" --data-binary '@$val' " ;;
+			post-form=*) request="POST"
+			             curlopts+=" --form $val " ;;
+			# Query modifiers
+			json)        curlopts+=" --header 'Content-Type: application/x-www-form-urlencoded' ";;
+			follow)      curlopts+=" --location " ;;
+			nofollow)    curlopts="${curlopts// --location / /}"
+			             curlopts="${curlopts// -L / /}" ;;
+			agent=*)     curlopts+=" --user-agent '$val' " ;;
+
+			# Local modifiers
+			silent)      curlopts+=" --silent --show-error " ;;
+			dest=*)      curlopts+=" --output $val --create-dirs " ;;
+			destdir=*)   curlopts+=" --output-dir $val --create-dirs " ;;
+			cookiejar=*) curlopts+=" --cookie-jar $val " ;;
+			# curl specific options
+			parallel)    curlopts+=" -Z" ;;
+			*) ammLog::Error "Unknown option: $opt" ;;
+		esac
+	done
+
+	# Do the query for every url provided
+	typeset -i ret=0
+	\curl --request "$request" $curlopts -f --connect-timeout 10 "$@" 2>/dev/null
+	ret+=$?
+
+	return $ret
+}
+
+function ammHttp::_DoWget {
+	typeset opts="${1:-}"
+	shift 1
+
+	# Options parsing
+	typeset wgetopts=""
+	for o in ${opts:-}; do
+		typeset val="${opt#*=}"
+		case $o in
+			follow) ;;
+			nofollow)    wgetopts+=" --max-redirect=0 " ;;
+			silent)      wgetopts+=" --quiet " ;;
+			agent=*)     wgetopts+=" --user-agent='$val' " ;;
+			destdir=*)   wgetopts+=" --directory-prefix='$val' "  ;;
+			cookiejar=*) wgetopts+=" --load-cookies='$val' --save-cookies='$val' --keep-session-cookies " ;;
+			# wget specific options
+			recursive)   wgetopts+=" -r -np -e robots=off --wait 0.1 " ;;
+			*) log_err "Unknown fetch_http option: $o" ;;
+		esac
+		shift
+	done
+
+	# Do the query for every url provided
+	typeset -i ret=0
+	\wget $wgetopts --no-clobber "$@" 2>/dev/null
+	ret=$?
+
+
+	return $ret
 }
 
 # -----------------------------------------------------------------------------
 # Generic HTTP features
 # -----------------------------------------------------------------------------
 
+# @description  Do a single HTTP GET request
 function ammHttp::Get {
-	ammHttp::Fetch "$1" "${2:-}"
+	typeset url="$1"
+	typeset opts="${2:-follow}"
+
+	ammHttp::_DoQuery "$opts" "$url"
+
 }
 
+function ammHttp::Post {
+	typeset url="$1"
+	typeset data="$2"
+	typeset opts="${3:-follow}"
+
+	# File upload ?
+	if [[ -s "$data" ]]; then
+		opts+=" post-file=$data"
+
+	# JSON ?
+	elif [[ "${data:0:1}" == "{" ]]; then
+		opts+=" post-data='$data' json"
+	
+	# Simple form
+	else
+		opts+=" post-data='$data'"
+	fi
+
+	ammHttp::_DoQuery "$opts" "$url"
+}
 
 # @description  Fetch an url
 # @arg $1 
@@ -33,60 +202,11 @@ function ammHttp::Get {
 function ammHttp::Fetch {
 	typeset src="$1"
 	typeset dst="$2"
-	typeset opts="${3:-follow silent}"
+	typeset opts="${3:-follow}"
 
-	#
-	# Curl
-	#
-	if ammExec::Exists "curl"; then
-		# TODO: Manage the proxy creds
-		ammLog::Info "Fetching '$src' with curl"
+	[[ "$dst" != "-" ]] && opts+=" silent"
 
-		# Process special parameters
-		typeset curlopts=""
-		for o in ${opts:-}; do
-			case $o in
-				follow) curlopts+=" -L" ;;
-				nofollow) curlopts="${curlopts// -L/ /}" ;;
-				silent) curlopts+=" " ;;
-				*) ammLog::Error "Unknown option: $o" ;;
-			esac
-			shift
-		done
-
-		# Do the query
-		\curl $curlopts -sS -f --connect-timeout 10 -o "$dst" "$src" 2>/dev/null
-		ret=$?
-		return $ret
-
-	#
-	# wget
-	#
-	elif ammExec::Exists "wget"; then
-		ammLog::Info "Fetching '$src' with wget"
-
-		# Process special parameters
-		typeset wgetopts=""
-		for o in ${opts:-}; do
-			case $o in
-				follow) ;;
-				nofollow) wgetopts+=" --max-redirect=0" ;;
-				silent) wgetopts+=" -sS" ;;
-				recursive) wgetopts+=" -r -np -e robots=off --wait 0.1" ;;
-				*) log_err "Unknown fetch_http option: $o" ;;
-			esac
-			shift
-		done
-
-		# Do the fetch
-		\wget 2>&1 $wgetopts -O "$dst" "$src"
-		ret=$?
-		return $ret
-
-	else
-		ammLog::Error "Unable to find curl not wget for fetch_http"
-		return 99
-	fi
+	ammHttp::Get "$src" "$opts dest=$dst"
 }
 
 function ammHttp::FetchSmart {
@@ -181,13 +301,17 @@ function ammHttp::Push {
 
 # TODO: use tools like jq to parse json APIs and use private keys
 
+#
+# Github
+#
+
 function ammHttp::GithubBranchGetLastCommit {
 	typeset projectpath="$1"
 	typeset branch="${2:-master}"
 
 	# Get the atom feed, and grep the related tag...
 	typeset url="https://github.com/$projectpath/commits/${branch}.atom"
-	typeset out="$(ammHttp::Fetch "$url" "-")"
+	typeset out="$(ammHttp::Get "$url" "-")"
 	typeset commitid="${out#*<id>tag:github.com,2008:Grit::Commit/}"
 	commitid="${commitid%%</id>*}"
 	typeset commitdate="${out#*<updated>}"
@@ -202,7 +326,7 @@ function ammHttp::GithubCommitExists {
 	typeset commit="$2"
 
 	typeset url="https://github.com/$projectpath/commit/$commit"
-	[[ "$(ammHttp::Fetch "$url" "-" 2>/dev/null)" != "Not Found" ]]
+	[[ "$(ammHttp::Get "$url" "-" 2>/dev/null)" != "Not Found" ]]
 }
 
 function ammHttp::GithubArchiveGetUrl {
@@ -219,7 +343,7 @@ function ammHttp::GithubReleaseGetLastVersion {
 
 	# Try with the simple http
 	typeset url="https://github.com/$projectpath/releases/$tag"
-	typeset out="$(ammHttp::Fetch "$url" "-" "nofollow")"
+	typeset out="$(ammHttp::Get "$url" "-" "nofollow")"
 	# curl will output the html with new location href
 	# wget will show the redirect url
 	typeset vers="$(echo "$out"| grep -Po 'releases/tag/.+[" ]' | cut -d/ -f 3 | tr -d '"')"
@@ -234,7 +358,7 @@ function ammHttp::GithubReleaseGetLastVersion {
 
 	# Test from atom feed
 	url="https://github.com/$projectpath/releases.atom"
-	out="$(ammHttp::Fetch "$url" "-")"
+	out="$(ammHttp::Get "$url" "-")"
 	typeset vers="${out#*<id>tag:github.com,2008:Repository/*/}"
 	if [[ "$vers" != "$out" ]]; then
 		vers="${vers%%</id*}"
@@ -244,7 +368,7 @@ function ammHttp::GithubReleaseGetLastVersion {
 
 	# Else, test with api
 	url="https://api.github.com/repos/$projectpath/releases"
-	out="$(ammHttp::Fetch "$url" "-")"
+	out="$(ammHttp::Get "$url" "-")"
 	if ammExec::Exists jq; then
 		vers="$(echo "$out" | jq '.[0].tag_name')"
 		vers="${vers//\"/}"
@@ -265,7 +389,7 @@ function ammHttp::GithubReleaseGetAssets {
 	typeset assetfilter="${3:-}"
 
 	typeset url="https://api.github.com/repos/$projectpath/releases/tags/$tag"
-	typeset out="$(ammHttp::Fetch "$url" "-")"
+	typeset out="$(ammHttp::Get "$url" "-")"
 	typeset urls=""
 
 	#
@@ -287,4 +411,24 @@ function ammHttp::GithubBranchGet {
 }
 function ammHttp::GithubReleaseGet {
 	ammLog::Deprecated "ammHttp::GithubReleaseGetLastVersion" "$@"
+}
+
+
+#
+# cgit
+#
+function ammHttp::CGitTagGet {
+	typeset urlrepo="$1"
+
+	typeset url="$urlrepo/refs/tags"
+
+	typeset line
+	while read line; do
+		ammLog::Debug "Testing line '$line'"
+		if [[ $line =~ /.+/tag/\?h=([-_\.0-9a-zA-Z]+)\'\> ]]; then
+			echo "${BASH_REMATCH[1]}"
+		fi
+	done < <(ammHttp::Get "$url" "-")
+
+
 }

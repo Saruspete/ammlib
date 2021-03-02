@@ -1,0 +1,138 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammIpmi::MetaCheck {
+	ammExec::RequireOne ipmitool ipmi
+}
+#function ammIpmi::MetaInit {
+#}
+
+# -----------------------------------------------------------------------------
+# IPMI Control and helpers
+# -----------------------------------------------------------------------------
+
+function ammIpmi::_Query {
+	
+	if ammExec::Exists "ipmitool"; then
+		ammIpmi::_ipmitool "$@"
+	else
+		ammIpmi::_ipmiutil "$@"
+	fi
+}
+
+
+function ammIpmi::_ipmitool {
+	typeset host="$1"
+	typeset user="$2"
+	typeset pass="$3"
+	shift 3
+
+	typeset opts="-I lanplus -U '$user'"
+	typeset elevate=false
+
+	# If any of those are available, use 
+	if [[ -n "$pass" ]]; then
+		opts+=" -P '$pass'"
+	elif [[ -n "${IPMI_PASSWORD:-}${IPMITOOL_PASSWORD:-}" ]]; then
+		opts+=" -E"
+	fi
+
+	# No host, or no user, assume using local dev and clear previous creds
+	if [[ -z "$host" ]] || [[ -z "$user" ]]; then
+		if [[ -c "/dev/ipmi0" ]]; then
+			opts="-I open"
+			ammLog::Debug "Using 'open' interface as no host or no user provided"
+			if ! [[ -w "/dev/ipmi0" ]]; then
+				ammLog::Info ""
+				elevate=true
+			fi
+
+		# TODO: add option for USB (AMI)
+		elif false; then
+			:
+		fi
+
+	fi
+
+	typeset output=""
+	if $elevate; then
+		output="$(ammExec::AsUser "root" ipmitool $opts "$@")"
+	else
+		output="$(ipmitool $opts "$@")"
+	fi
+
+	#
+}
+
+# -----------------------------------------------------------------------------
+# IPMI Chassis management
+# -----------------------------------------------------------------------------
+
+function ammIpmi::ChassisQuery {
+	typeset host="$1"
+	typeset user="$2"
+	typeset pass="$3"
+
+	typeset vendor=""
+	typeset -A infos=
+
+	if [[ "$vendor" == "Dell" ]]; then
+
+		# Fan Control Board (FCB) fw version:
+		# 01 69 1b 03 09 06 26 00 00 04 ff 00 01 2a 2f ff ff 0f c2 00 00 01 04 01 04 31 c5 11 ff 0f
+		# FCB Version = 4th and 5th bytes (from the left) of the output. (03 09)
+		# Fan table version = 6th byte (06)
+		# node slot  = 10th byte (04)
+		typeset -a chassisData=$(ammIpmi::_Query "$host" "$user" "$pass" "raw 0x30 0x12")
+		if [[ -n "${chassisData}" ]]; then
+			infos["fan_ctrl_brd_version"]="${chassisData[3]}${chassisData[4]}"
+			infos["fan_tbl_version"]="${chassisData[5]}"
+			infos["slot_number"]="${chassisData[9]}"
+		fi
+	fi
+
+	ammEnv::VarReturnArray "infos"
+}
+
+
+
+# Interesting stuff
+cat >/dev/null <<-'EOT'
+====== Dell ======
+http://poweredgec.dell.com/latest_poweredge-14g.html
+https://gist.github.com/phil21/9b09be862d611c3d8d99
+
+Get reservation for task:
+  raw 0x30 0x01
+
+
+
+
+===== SuperMicro =====
+https://forums.servethehome.com/index.php?threads/supermicro-ipmi-fan-speed-control-gpu-system.23740/
+https://forums.servethehome.com/index.php?resources/supermicro-x9-x10-x11-fan-speed-control.20/
+4027GR-TR
+Get speed mode: (std=50%, optimal=30%, full=100%, heavy=50%/75%)
+  raw 0x30 0x45 0x00
+  Result: 00 = std,  01 = full, 02 = optimal, 04 = heavy
+Set duty cycle ( Z = zone, N = speed)
+  raw 0x30 0x70 0x66 0x01 0xZZ 0xNN
+
+Set fans in "Zone 1", "Zone 2",... "Zone 4" to 30%
+  raw 0x30 0x91 0x5A 0x3 0x10 0x4D
+  raw 0x30 0x91 0x5A 0x3 0x11 0x4D
+  raw 0x30 0x91 0x5A 0x3 0x12 0x4D
+  raw 0x30 0x91 0x5A 0x3 0x13 0x4D
+  # 0x4D = range of 00-FF
+
+====== Misc ======
+
+EOT

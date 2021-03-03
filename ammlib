@@ -34,8 +34,8 @@ if [[ -z "$BASH" ]] || [[ "$(cat /proc/$$/comm)" != "bash" ]]; then
 fi
 
 # Minimal bash version
-if [[ "${BASH_VERSINFO[0]:-0}" -lt 4 ]]; then
-	echo >&2 "This requires bash >= 4 to run."
+if [[ "${BASH_VERSINFO[0]:-}${BASH_VERSINFO[1]:-0}" -lt 42 ]]; then
+	echo >&2 "This requires bash >= 4.2 to run."
 	return 1 2>/dev/null
 	exit 1
 fi

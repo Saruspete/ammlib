@@ -29,9 +29,9 @@ I wouldn't use Shell to create a web server, and I wouldn't use python or perl t
 ## General Requirements and targeted environment
 
 ### Target systems
- - target shell: **bash4.1** ([see available features](https://wiki-dev.bash-hackers.org/scripting/bashchanges))
+ - target shell: **bash4.2** ([see available features](https://wiki-dev.bash-hackers.org/scripting/bashchanges))
  - target Kernel: **Linux**
- - target Distribution (modular): RHEL 6+, Debian, Gentoo (and more )
+ - target Distribution (modular): RHEL 7+, Debian, Gentoo (and more )
 
 While most libraries provides generic features only tied to the shell (or coreutils), some libraries are very tied to the Distribution: packages management, chroot generation, system configuration...
 
@@ -97,13 +97,20 @@ typeset iface=lo
 
 typeset tmppath
 for tmppath in "$base/"*; do
-	if [[ "${tmppath##*/}" == "$iface" ]] && {
+	if [[ "${tmppath##*/}" == "$iface" ]]; then
 		echo "Iface $iface found !"
-	}
+	fi
 done
 ```
 
+Alternatively, you can use `compgen -G` to explicitely expand a glob pattern:
 
+```bash
+typeset ifacePath
+for ifacePath in $(compgen -G "/sys/class/net/*"); do
+    echo "${ifacePath##*/}"
+done
+```
 
 #### Tabs and spaces
 
@@ -188,7 +195,7 @@ function multiply {
 
 The easiest idiom for this is using a subshell + disabling set -o :
 ```bash
-typeset -A array=([banana]="yellow", [apple]="red")
+typeset -A array=([banana]="yellow" [apple]="red")
 # this will fail due to "set -o nounset", even with a default value
 [[ -n "${array[pear]}" ]]
 # So disable it in a subshell

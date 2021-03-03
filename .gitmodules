@@ -1,0 +1,3 @@
+[submodule "doc/shdoc"]
+	path = doc/shdoc
+	url = https://github.com/reconquest/shdoc.git

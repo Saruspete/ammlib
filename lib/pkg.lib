@@ -53,7 +53,7 @@ function ammPkg::ManagerDetect {
 	# RPM: Redhat, Centos, Mandriva
 	elif [[ -s "$rootpath/var/lib/yum/uuid" ]]; then
 		echo "yum"
-	elif [[ -s "$rootpath/var/lib/dnf/groups.json" ]]; then
+	elif [[ -d "$rootpath/var/lib/dnf" ]]; then
 		#echo "dnf"
 		echo "yum"
 	elif [[ -s "$rootpath/var/lib/rpm/Packages" ]]; then

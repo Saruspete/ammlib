@@ -1730,13 +1730,21 @@ function ammExec::AsUser {
 	return $ret
 }
 
+# @description:  Returns the full path of the first usable binary in $PATH
+# @arg $1  (string) Binary to search in $PATH
+# @exitcode 0  if binary was found
+# @exitcode 1  if binary wat not found
 function ammExec::GetPath {
 	typeset bin="$1"
 
 	typeset p
 	for p in ${PATH//:/ }; do
-		[[ -x "$p/$bin" ]] && echo "$p/$bin"
+		if [[ -x "$p/$bin" ]]; then
+			echo "$p/$bin"
+			return 0
+		fi
 	done
+	return 1
 }
 
 # @description  Check if one or more command are available in PATH

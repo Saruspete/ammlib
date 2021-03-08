@@ -77,7 +77,7 @@ function ammApp::Init {
 		typeset -i r=99
 		# try to reexec the current script with the target user
 		ammLog::Info "Reexecing $__AMMLIB_CALLNAME as '$RUN_USER'"
-		ammExec::AsUser "$RUN_USER" "$__AMMLIB_CALLNAME ${__AMMLIB_CALLOPTS_ORIG[@]}"
+		ammExec::AsUser "$RUN_USER" "$__AMMLIB_CALLNAME ${__AMMLIB_CALLOPTS_ORIG:+${__AMMLIB_CALLOPTS_ORIG[@]}}"
 		r=$?
 		if [[ $r != 0 ]]; then
 			ammLog::Error "An error occured during re-exec as '$RUN_USER'"
@@ -312,7 +312,7 @@ function ammApp::Start {
 
 	# Add common options
 	if [[ -n "$RUN_OPTCOMMON" ]]; then
-		opts+=" $RUN_OPTCOMMON"
+		opts+=" $RUN_OPTCOMMON "
 	fi
 
 

@@ -1162,6 +1162,53 @@ function ammLog::WriteTerm {
 }
 
 # -----------------------------------------------------------------------------
+# System helpers
+# -----------------------------------------------------------------------------
+
+# @description  Get the ID of the current system
+function ammSys::OSIdGet {
+
+	if [[ -e "/etc/os-release" ]]; then
+		(
+			. "/etc/os-release"
+			if [[ -n "${ID:-}" ]]; then
+				echo "$ID"
+			else
+				return 1
+			fi
+		)
+		[[ "$?" -eq 0 ]] && return
+	fi
+
+	typeset -a releases=(centos redhat gentoo suse)
+	typeset   release
+	for release in "${releases}"; do
+		if [[ -e "/etc/${release}-release" ]]; then
+			echo "$release"
+			return
+		fi
+	done
+
+	echo "unknown"
+}
+
+# @description  Get the version of the current system
+function ammSys::OSVersionGet {
+	
+	if [[ -e "/etc/os-release" ]]; then
+		(
+			. "/etc/os-release"
+			if [[ -n "${VERSION_ID:-}" ]]; then
+				echo "$VERSION_ID"
+			else
+				return 1
+			fi
+		)
+		[[ "$?" -eq 0 ]] && return
+	fi
+}
+
+# -----------------------------------------------------------------------------
 # Environment helpers
 # -----------------------------------------------------------------------------
 

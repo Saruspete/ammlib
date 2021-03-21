@@ -722,7 +722,7 @@ function ammLib::ListFunctions {
 # Embedded Logging
 # -----------------------------------------------------------------------------
 
-function _ammLog::ColorJoin {
+function ammLog::_ColorJoin {
 	typeset IFS="$1"; shift
 	echo "$*"
 }
@@ -757,7 +757,7 @@ function ammLog::Color {
 		shift
 	done
 
-	echo -ne "${esc}$(_ammLog::ColorJoin ";" ${codes[@]+"${codes[@]}"})m"
+	echo -ne "${esc}$(ammLog::_ColorJoin ";" ${codes[@]+"${codes[@]}"})m"
 }
 
 # @description  Returns the Time for the logs
@@ -793,7 +793,7 @@ typeset -ga __AMMLOG_STEPNAME
 # @arg $2  (string) format, passed to ammLog::Color, thus keys of $__AMMLOG_TERMCODES
 # @arg $@  (string[]) Text to be logged. If only "-", read as stdin.
 # @stdout  (string) Resulting log
-function _ammLog::Log {
+function ammLog::_Log {
 	# Remove tracing if enabled to limit spam
 	typeset redbg=""
 	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
@@ -804,7 +804,7 @@ function _ammLog::Log {
 	typeset color="$(ammLog::Color $fmt)"
 	typeset colorrst="$(ammLog::Color reset)"
 	typeset date="$(ammLog::Time)"
-	typeset pad="$(_ammLog::StepPad)"
+	typeset pad="$(ammLog::_StepPad)"
 
 
 	# Read stdin
@@ -842,7 +842,7 @@ function _ammLog::Log {
 }
 
 
-function _ammLog::Write {
+function ammLog::_Write {
 	typeset tar="$1"; shift
 	typeset fmt="$2"; shift
 	typeset color=""
@@ -851,7 +851,7 @@ function _ammLog::Write {
 # @description  Log a fatal error and terminate script
 # @arg $@  Log text for fatal error. If "-", text is read from stdin
 function ammLog::Die {
-	_ammLog::Log "DIE" "bold red reverse" "$@"
+	ammLog::_Log "DIE" "bold red reverse" "$@"
 	exit 255
 }
 
@@ -859,24 +859,23 @@ function ammLog::Die {
 # @arg $@  Error text to log. If "-", text is read from stdin
 function ammLog::Error {
 	# TODO: add calling path
-	_ammLog::Log "ERR" "bold red" "$@"
+	ammLog::_Log "ERR" "bold red" "$@"
 }
 
 # @description  Log a warning
 # @arg $@  warning text to log. If "-", text is read from stdin
 function ammLog::Warning {
-	_ammLog::Log "WRN" "bold yellow" "$@"
+	ammLog::_Log "WRN" "bold yellow" "$@"
 }
 
 # @description  Log an information
 # @arg $@  Info text to log. If "-", text is read from stdin
 function ammLog::Info {
-	_ammLog::Log "INF" "bold green" "$@"
+	ammLog::_Log "INF" "bold green" "$@"
 }
 
-# @description  Log an information, about simple steps, not needed to be shown if no error
-function ammLog::Trace {
-	_ammLog::Log "TRC" "bold blue" "$@"
+function ammLog::Notice {
+	ammLog::_Log "INF" "bold green" "$@"
 }
 
 # Legacy
@@ -916,7 +915,7 @@ function ammLog::Debug {
 		# Get the caller
 		typeset callerdbg="${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]} ${FUNCNAME[1]}"
 
-		_ammLog::Log "DBG" "bold blue reverse" "[$callerdbg] $@"
+		ammLog::_Log "DBG" "bold blue reverse" "[$callerdbg] $@"
 
 	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
 	else
@@ -969,7 +968,7 @@ function ammLog::UnavailableFunc {
 }
 
 
-function _ammLog::StepPad {
+function ammLog::_StepPad {
 	typeset step="${1:-$__AMMLOG_STEPDEPTH}"
 
 	typeset i
@@ -1053,7 +1052,7 @@ function ammLog::StepEnd {
 
 	__AMMLOG_STEPDEPTH+=-1
 
-	#typeset txt="$(_ammLog::StepPrefix $__AMMLOG_STEPDEPTH"
+	#typeset txt="$(ammLog::_StepPrefix $__AMMLOG_STEPDEPTH"
 	typeset -i time="$(($(date +%s) - ${__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]} ))"
 	typeset txt="<< End: ${__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]}. Took:${time}s"
 	[[ -n "$ret" ]] && txt+=" Ret:'$ret'"

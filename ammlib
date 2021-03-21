@@ -100,7 +100,7 @@ typeset -gr __AMMLIB_CALLFILE="${__AMMLIB_CALLFILE##*/}"
 typeset -gr __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
 
 typeset -gr __AMMLIB_USERNAME="$(\id -nu)"
-typeset -gr __AMMLIB_USERID="$(\id -u)"
+typeset -gr __AMMLIB_USERID="${UID:-$(\id -u)}"
 typeset -gr __AMMLIB_HOSTNAME="$(uname -n)"
 #
 # Set and create base folders to be used by library
@@ -113,7 +113,7 @@ typeset -g __AMMLIB_ROOT="${__AMMLIB_REALPATH%/*}"
 typeset -g __AMMLIB_APPNAME="${AMMLIB_APPNAME:-ammlib}"
 
 # Temporary data
-typeset -g __AMMLIB_DATATMP="/tmp/.${__AMMLIB_APPNAME}.${UID:-$(id -u)}/${__AMMLIB_CALLNAME##*/}.$$"
+typeset -g __AMMLIB_DATATMP="/tmp/.${__AMMLIB_APPNAME}.${__AMMLIB_USERID}/${__AMMLIB_CALLNAME##*/}.$$"
 [[ -d "$__AMMLIB_DATATMP" ]] || mkdir -p "$__AMMLIB_DATATMP"
 
 # Persistant data

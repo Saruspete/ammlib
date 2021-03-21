@@ -1,11 +1,12 @@
 
-* [_ammPkgYum::Yum](#_ammPkgYumYum)
-* [ammPkgYum::DownloadRecursive](#ammPkgYumDownloadRecursive)
-* [ammPkgYum::Download](#ammPkgYumDownload)
-* [ammPkgYum::Extract](#ammPkgYumExtract)
+* [function _ammPkgYum::Yum {](#function-ammpkgyumyum-)
+* [function ammPkgYum::DownloadRecursive {](#function-ammpkgyumdownloadrecursive-)
+* [function ammPkgYum::Download {](#function-ammpkgyumdownload-)
+* [function ammPkgYum::Extract {](#function-ammpkgyumextract-)
+* [function ammPkgYum::ReleaseSet {](#function-ammpkgyumreleaseset-)
 
 
-## _ammPkgYum::Yum
+## function _ammPkgYum::Yum {
 
  (private) proxy for rpm executable
 
@@ -13,7 +14,7 @@
 
 * $1  (string) Action for RPM to exec
 
-## ammPkgYum::DownloadRecursive
+## function ammPkgYum::DownloadRecursive {
 
  Download an archive from configured yum repositories and all dependencies
 
@@ -26,7 +27,7 @@
 
 *  (path[]) List of archives downloaded
 
-## ammPkgYum::Download
+## function ammPkgYum::Download {
 
  Download an archive from configured yum repositories
 
@@ -39,7 +40,7 @@
 
 *  (path[]) List of archives downloaded
 
-## ammPkgYum::Extract
+## function ammPkgYum::Extract {
 
  Extract one or more packages into provided path
 
@@ -47,4 +48,8 @@
 
 * $1  (path)     Where to extract the archives
 * $@  (string[]) Archives or package names to be extracted
+
+## function ammPkgYum::ReleaseSet {
+
+ Override a release version var
 

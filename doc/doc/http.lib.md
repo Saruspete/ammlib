@@ -1,10 +1,21 @@
 
-* [ammHttp::Fetch](#ammHttpFetch)
+* [function ammHttp::_OptParse {](#function-ammhttpoptparse-)
+* [function ammHttp::Get {](#function-ammhttpget-)
+* [function ammHttp::Fetch {](#function-ammhttpfetch-)
 
 
-## ammHttp::Fetch
+## function ammHttp::_OptParse {
+
+ Parse incoming options and remove
+
+## function ammHttp::Get {
+
+ Do a single HTTP GET request
+
+## function ammHttp::Fetch {
 
  Fetch an url
+
 ### Arguments
 
 * $1 

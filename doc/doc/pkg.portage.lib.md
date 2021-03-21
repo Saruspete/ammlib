@@ -1,11 +1,13 @@
 
-* [_ammPkgPortage::Emerge](#_ammPkgPortageEmerge)
-* [ammPkgPortage::DownloadRecursive](#ammPkgPortageDownloadRecursive)
-* [ammPkgPortage::Download](#ammPkgPortageDownload)
-* [ammPkgPortage::Extract](#ammPkgPortageExtract)
+* [function _ammPkgPortage::Portage {](#function-ammpkgportageportage-)
+* [function _ammPkgPortage::Portageq {](#function-ammpkgportageportageq-)
+* [function _ammPkgPortage::Equery {](#function-ammpkgportageequery-)
+* [function ammPkgPortage::DownloadRecursive {](#function-ammpkgportagedownloadrecursive-)
+* [function ammPkgPortage::Download {](#function-ammpkgportagedownload-)
+* [function ammPkgPortage::Extract {](#function-ammpkgportageextract-)
 
 
-## _ammPkgPortage::Emerge
+## function _ammPkgPortage::Portage {
 
  (private) proxy for rpm executable
 
@@ -13,7 +15,15 @@
 
 * $1  (string) Action for RPM to exec
 
-## ammPkgPortage::DownloadRecursive
+## function _ammPkgPortage::Portageq {
+
+ Query the portage database
+
+## function _ammPkgPortage::Equery {
+
+Wrapper for equery, provided by app-portage/gentoolkit. See portageq
+
+## function ammPkgPortage::DownloadRecursive {
 
  Download an archive from configured yum repositories and all dependencies
 
@@ -26,7 +36,7 @@
 
 *  (path[]) List of archives downloaded
 
-## ammPkgPortage::Download
+## function ammPkgPortage::Download {
 
  Download an archive from configured yum repositories
 
@@ -39,7 +49,7 @@
 
 *  (path[]) List of archives downloaded
 
-## ammPkgPortage::Extract
+## function ammPkgPortage::Extract {
 
  Extract one or more packages into provided path
 

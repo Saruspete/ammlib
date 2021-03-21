@@ -1,8 +1,12 @@
 
-* [ammArchiveTar::Unpack](#ammArchiveTarUnpack)
+* [function ammArchiveTar::Unpack {](#function-ammarchivetarunpack-)
 
 
-## ammArchiveTar::Unpack
+## function ammArchiveTar::Unpack {
 
+ Extract an archive file
 
-function ammArchiveTar::Unpack {
+### Arguments
+
+* $1  
+

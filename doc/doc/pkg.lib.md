@@ -1,14 +1,15 @@
 
-* [ammPkg::ManagerDetect](#ammPkgManagerDetect)
-* [_ammPkg::Proxy](#_ammPkgProxy)
-* [ammPkg::Installed](#ammPkgInstalled)
-* [ammPkg::InfoWhatProvides](#ammPkgInfoWhatProvides)
-* [_ammPkg::DepsFindBin](#_ammPkgDepsFindBin)
-* [ammPkg::FindDeps](#ammPkgFindDeps)
-* [ammPkg::ExtractWithDeps](#ammPkgExtractWithDeps)
+* [function ammPkg::ManagerDetect {](#function-ammpkgmanagerdetect-)
+* [function _ammPkg::Proxy {](#function-ammpkgproxy-)
+* [function ammPkg::Installed {](#function-ammpkginstalled-)
+* [function ammPkg::InfoWhatProvides {](#function-ammpkginfowhatprovides-)
+* [function ammPkg::InstallWhatProvides {](#function-ammpkginstallwhatprovides-)
+* [function _ammPkg::DepsFindBin {](#function-ammpkgdepsfindbin-)
+* [function ammPkg::FindDeps {](#function-ammpkgfinddeps-)
+* [function ammPkg::ExtractWithDeps {](#function-ammpkgextractwithdeps-)
 
 
-## ammPkg::ManagerDetect
+## function ammPkg::ManagerDetect {
 
 Detect the package manager for a given path
 
@@ -20,7 +21,7 @@ Detect the package manager for a given path
 
 *  The package manager library name (without "pkg." prefix). ex: "yum"
 
-## _ammPkg::Proxy
+## function _ammPkg::Proxy {
 
 (private) dispatch generic pkg call to selected submodule
 
@@ -30,9 +31,10 @@ Detect the package manager for a given path
 * $2  (path)(optionnal)
 * $@  (any) argument to pass to the selected function
 
-## ammPkg::Installed
+## function ammPkg::Installed {
 
-@description: Check if a given package is installed
+Check if a given package is installed
+
 ### Arguments
 
 * $@  (string) Package or string to be checked against
@@ -41,14 +43,19 @@ Detect the package manager for a given path
 
 *  List of given string and the matching packages
 
-## ammPkg::InfoWhatProvides
+## function ammPkg::InfoWhatProvides {
 
  List packages that provides a specified
+
 ### Arguments
 
 * $@  (string) Path or glob of a searched file
 
-## _ammPkg::DepsFindBin
+## function ammPkg::InstallWhatProvides {
+
+ Install packages that provides specified file
+
+## function _ammPkg::DepsFindBin {
 
 Private: lists all libraries needed by a file and all these libraries dependencies too
 
@@ -60,7 +67,7 @@ Private: lists all libraries needed by a file and all these libraries dependenci
 
 * List of libraries path with matching file (their full path)
 
-## ammPkg::FindDeps
+## function ammPkg::FindDeps {
 
 Smart extractor for a package, binary or feature and its dependencies
 
@@ -68,7 +75,7 @@ Smart extractor for a package, binary or feature and its dependencies
 
 * **...** (string): List of packages, binaries or urls to extract, with their dependencies
 
-## ammPkg::ExtractWithDeps
+## function ammPkg::ExtractWithDeps {
 
  Extract required dependencies for a package, binary or feature
 

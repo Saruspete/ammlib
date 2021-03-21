@@ -1,119 +1,128 @@
 
-* [ammLib::HookNameToVarname](#ammLibHookNameToVarname)
-* [ammLib::HookExists](#ammLibHookExists)
-* [ammLib::HookRegister](#ammLibHookRegister)
-* [ammLib::HookListCallbacks](#ammLibHookListCallbacks)
-* [ammLib::HookTrigger](#ammLibHookTrigger)
-* [_ammLib::TrapInit](#_ammLibTrapInit)
-* [ammLib::TrapRegister](#ammLibTrapRegister)
-* [_ammLib::TrapHandler](#_ammLibTrapHandler)
-* [ammLib::Locate](#ammLibLocate)
-* [ammLib::LocatePattern](#ammLibLocatePattern)
-* [ammLib::NameFromPath](#ammLibNameFromPath)
-* [ammLib::GetSymbols](#ammLibGetSymbols)
-* [ammLib::IsSublib](#ammLibIsSublib)
-* [ammLib::MetaGetPrefix](#ammLibMetaGetPrefix)
-* [ammLib::Loadable](#ammLibLoadable)
-* [ammLib::Load](#ammLibLoad)
-* [ammLib::Unload](#ammLibUnload)
-* [ammLib::Require](#ammLibRequire)
-* [ammLib::ListModules](#ammLibListModules)
-* [ammLog::Color](#ammLogColor)
-* [ammLog::Time](#ammLogTime)
-* [ammLog::Date](#ammLogDate)
-* [_ammLog::Log](#_ammLogLog)
-* [ammLog::Die](#ammLogDie)
-* [ammLog::Err](#ammLogErr)
-* [ammLog::Wrn](#ammLogWrn)
-* [ammLog::Inf](#ammLogInf)
-* [ammLog::Dbg](#ammLogDbg)
-* [ammLog::Deprecated](#ammLogDeprecated)
-* [_ammLog::StepPad](#_ammLogStepPad)
-* [ammLog::Step](#ammLogStep)
-* [ammLog::StepBegin](#ammLogStepBegin)
-* [ammLog::StepEnd](#ammLogStepEnd)
-* [ammLog::Stackdump](#ammLogStackdump)
-* [ammLog::MissingBin](#ammLogMissingBin)
-* [ammLog::Silence](#ammLogSilence)
-* [ammLog::WriteTerm](#ammLogWriteTerm)
-* [ammEnv::PathAdd](#ammEnvPathAdd)
-* [ammEnv::LibAdd](#ammEnvLibAdd)
-* [ammEnv::ManAdd](#ammEnvManAdd)
-* [ammEnv::IsFunc](#ammEnvIsFunc)
-* [ammEnv::IsVar](#ammEnvIsVar)
-* [ammPath::Decompose](#ammPathDecompose)
-* [ammPath::IsSecure](#ammPathIsSecure)
-* [ammPath::IsWritable](#ammPathIsWritable)
-* [ammPath::CopyStructure](#ammPathCopyStructure)
-* [ammExec::AsUser](#ammExecAsUser)
-* [ammExec::Exists](#ammExecExists)
-* [ammExec::RequestOne](#ammExecRequestOne)
-* [ammExec::Require](#ammExecRequires)
-* [ammExec::RequireOne](#ammExecRequiresOne)
+* [function _ammLib::PathGetForCaller {](#function-ammlibpathgetforcaller-)
+* [function ammLib::HookNameToVarname {](#function-ammlibhooknametovarname-)
+* [function ammLib::HookRegister {](#function-ammlibhookregister-)
+* [function ammLib::HookListCallbacks {](#function-ammlibhooklistcallbacks-)
+* [function ammLib::HookTrigger {](#function-ammlibhooktrigger-)
+* [function _ammLib::TrapInit {](#function-ammlibtrapinit-)
+* [function ammLib::TrapRegister {](#function-ammlibtrapregister-)
+* [function _ammLib::TrapHandler {](#function-ammlibtraphandler-)
+* [function ammLib::Locate {](#function-ammliblocate-)
+* [function ammLib::LocatePattern {](#function-ammliblocatepattern-)
+* [function ammLib::NameFromPath {](#function-ammlibnamefrompath-)
+* [function ammLib::GetSymbols {](#function-ammlibgetsymbols-)
+* [function ammLib::IsSublib {](#function-ammlibissublib-)
+* [function ammLib::IsLoaded {](#function-ammlibisloaded-)
+* [function ammLib::MetaGetPrefix {](#function-ammlibmetagetprefix-)
+* [function ammLib::Loadable {](#function-ammlibloadable-)
+* [function ammLib::Load {](#function-ammlibload-)
+* [function ammLib::Unload {](#function-ammlibunload-)
+* [function ammLib::Require {](#function-ammlibrequire-)
+* [function ammLib::ListModules {](#function-ammliblistmodules-)
+* [function ammLog::Color {](#function-ammlogcolor-)
+* [function ammLog::Time {](#function-ammlogtime-)
+* [function ammLog::Date {](#function-ammlogdate-)
+* [function ammLog::_DbgIsEnabled {](#function-ammlogdbgisenabled-)
+* [function _ammLog::Log {](#function-ammloglog-)
+* [function ammLog::Die {](#function-ammlogdie-)
+* [function ammLog::Error {](#function-ammlogerror-)
+* [function ammLog::Warning {](#function-ammlogwarning-)
+* [function ammLog::Info {](#function-ammloginfo-)
+* [function ammLog::Debug {](#function-ammlogdebug-)
+* [function ammLog::Deprecated {](#function-ammlogdeprecated-)
+* [function ammLog::UnavailableFunc {](#function-ammlogunavailablefunc-)
+* [function ammLog::EchoSeparator {](#function-ammlogechoseparator-)
+* [function ammLog::Step {](#function-ammlogstep-)
+* [function ammLog::StepBegin {](#function-ammlogstepbegin-)
+* [function ammLog::StepEnd {](#function-ammlogstepend-)
+* [function ammLog::Stackdump {](#function-ammlogstackdump-)
+* [function ammLog::MissingBin {](#function-ammlogmissingbin-)
+* [function ammLog::Silence {](#function-ammlogsilence-)
+* [function ammLog::TracingLog {](#function-ammlogtracinglog-)
+* [function ammLog::TracingEnable {](#function-ammlogtracingenable-)
+* [function ammLog::WriteTerm {](#function-ammlogwriteterm-)
+* [function ammEnv::PathAdd {](#function-ammenvpathadd-)
+* [function ammEnv::LibAdd {](#function-ammenvlibadd-)
+* [function ammEnv::ManAdd {](#function-ammenvmanadd-)
+* [function ammEnv::IsFunc {](#function-ammenvisfunc-)
+* [function ammEnv::IsVar {](#function-ammenvisvar-)
+* [function ammPath::Decompose {](#function-ammpathdecompose-)
+* [function ammPath::IsSecure {](#function-ammpathissecure-)
+* [function ammPath::IsWritable {](#function-ammpathiswritable-)
+* [function ammPath::IsEmpty {](#function-ammpathisempty-)
+* [function _ammPath::RecurseFolders {](#function-ammpathrecursefolders-)
+* [function ammPath::CopyStructure {](#function-ammpathcopystructure-)
+* [function ammExec::AsUser {](#function-ammexecasuser-)
+* [function ammExec::Exists {](#function-ammexecexists-)
+* [function ammExec::RequestOne {](#function-ammexecrequestone-)
+* [function ammExec::Require {](#function-ammexecrequire-)
+* [function ammExec::RequireOne {](#function-ammexecrequireone-)
+* [function ammExec::IsExecutable {](#function-ammexecisexecutable-)
 
 
-## ammLib::HookNameToVarname
+## function _ammLib::PathGetForCaller {
+
+ Path of the file that loaded ammlib
+
+## function ammLib::HookNameToVarname {
 
  Will generate a variable ID from a given name
-function ammLib::HookNameToVarname {
-## ammLib::HookExists
 
-	typeset -u name="$1"
-
-Remove any non-alphanum char
-	name="${name//[^a-zA-Z0-9]/}"
-	echo "__AMMLIB_HOOK_$name"
-}
-
-function ammLib::HookExists {
-## ammLib::HookRegister
+## function ammLib::HookRegister {
 
  Register a callback to a hook
+
 ### Arguments
 
 * $1  (string) Name of the hook to register
 * $2  (function) Callback
 
-## ammLib::HookListCallbacks
+## function ammLib::HookListCallbacks {
 
  List registered callbacks for an even
+
 ### Arguments
 
 * $1  (string) name of the hook to list callbacks
 
-## ammLib::HookTrigger
+## function ammLib::HookTrigger {
 
  Trigger a hook
+
 ### Arguments
 
 * $1  (string) Name of the hook to trigger
 * $@  (string) arguments to pass to the callbacks
 
-## _ammLib::TrapInit
+## function _ammLib::TrapInit {
 
-@description:  Initialize and registers the signal handling trap
+ Initialize and registers the signal handling trap
+
 ### Arguments
 
 * $@  Signals to be traped
 
-## ammLib::TrapRegister
+## function ammLib::TrapRegister {
 
-@description:  Registers a callback
+ Registers a callback
+
 ### Arguments
 
 * $1  The callback to call upon trap
 * $@  The signals to register on. Can be alises: EXITALL or EXITERR
 
-## _ammLib::TrapHandler
+## function _ammLib::TrapHandler {
 
  (private) TRAP handler to clean
+
 ### Arguments
 
 * $1  Name of the signal
 
-## ammLib::Locate
+## function ammLib::Locate {
 
  Locate the library file matching given name
+
 ### Arguments
 
 * $1  (string) Name of the library to be loaded (eg, process)
@@ -122,9 +131,10 @@ function ammLib::HookExists {
 
 *  (path) Path of the first matching file (in $__AMMLIB_SEARCHPATH)
 
-## ammLib::LocatePattern
+## function ammLib::LocatePattern {
 
  Locate all libraries that starts with the given pattern
+
 ### Arguments
 
 * $1  The pattern to search against
@@ -133,37 +143,52 @@ function ammLib::HookExists {
 
 *  (path) the list of libraries that matches the given pattern
 
-## ammLib::NameFromPath
+## function ammLib::NameFromPath {
+
+### Arguments
+
 * $1  (path) The file path to get the name from
 
 ### Output on stdout
 
 *  (string) name of the library
 
-## ammLib::GetSymbols
+## function ammLib::GetSymbols {
 
  List all symbols and functions for packing
+
 ### Arguments
 
 * $@  (path[]) List of files to extract symbols from
 
-## ammLib::IsSublib
+## function ammLib::IsSublib {
 
  Check if the given libname is a sub-library
+
 ### Exit codes
 
 *  **0**: on success
 
-## ammLib::MetaGetPrefix
+## function ammLib::IsLoaded {
+
+ Check if a given libname is loaded
+
+### Exit codes
+
+*  **0**: if loaded
+
+## function ammLib::MetaGetPrefix {
 
  Get the function name for the library' constructor
+
 ### Arguments
 
 * $1  (string) library name
 
-## ammLib::Loadable
+## function ammLib::Loadable {
 
- Test if a library is loadable (it's requirements are met)
+ Test if a library is loadable (MetaCheck) and display its path
+
 ### Arguments
 
 * $@  (string[]) Name of the library
@@ -173,9 +198,10 @@ function ammLib::HookExists {
 * **0**:  If all modules are loadable
 * 1+ if one or more module cannot be loaded
 
-## ammLib::Load
+## function ammLib::Load {
 
  Load a library
+
 ### Arguments
 
 * $@  (string[]) Library name to be loaded
@@ -185,49 +211,60 @@ function ammLib::HookExists {
 * **0**: if all modules were loaded successfully
 * 1+ if one or more module failed to load
 
-## ammLib::Unload
+## function ammLib::Unload {
 
  Unload a module from the current session
+
 ### Arguments
 
 * $@   (string[]) List of modules to unload
 
-## ammLib::Require
+## function ammLib::Require {
 
  Similar to ammLibLoad but exit if a module cannot be loaded
+
 ### Arguments
 
 * $@  (string[]) List of modules to be loaded
 
-## ammLib::ListModules
+## function ammLib::ListModules {
 
 List modules currently available
+
 _Function has no arguments._
 
-## ammLog::Color
+## function ammLog::Color {
 
  Colorize the text with values in __AMMLOG_TERMCODES
-## ammLog::Time
+
+## function ammLog::Time {
 
  Returns the Time for the logs
+
 _Function has no arguments._
 
 ### Output on stdout
 
 *  Date format HH:MM:SS
 
-## ammLog::Date
+## function ammLog::Date {
 
  Returns the Date for the logs
+
 _Function has no arguments._
 
 ### Output on stdout
 
 *  Dat format yyyy-mm-dd
 
-## _ammLog::Log
+## function ammLog::_DbgIsEnabled {
+
+ Checks if AMMLIB_DEBUG variable is set and needs to do some job
+
+## function _ammLog::Log {
 
  (private) Generic log function for logging
+
 ### Arguments
 
 * $1  (string) tag
@@ -238,157 +275,187 @@ _Function has no arguments._
 
 *  (string) Resulting log
 
-## ammLog::Die
+## function ammLog::Die {
 
  Log a fatal error and terminate script
+
 ### Arguments
 
 * $@  Log text for fatal error. If "-", text is read from stdin
 
-## ammLog::Err
+## function ammLog::Error {
 
  Log an error
+
 ### Arguments
 
 * $@  Error text to log. If "-", text is read from stdin
 
-## ammLog::Wrn
+## function ammLog::Warning {
 
  Log a warning
+
 ### Arguments
 
 * $@  warning text to log. If "-", text is read from stdin
 
-## ammLog::Inf
+## function ammLog::Info {
 
  Log an information
+
 ### Arguments
 
 * $@  Info text to log. If "-", text is read from stdin
 
-## ammLog::Dbg
+## function ammLog::Debug {
 
  Log a debug info
+
 ### Arguments
 
 * $@  Debug text to log. If "-", text is read from stdin
 
-## ammLog::Deprecated
+## function ammLog::Deprecated {
 
  Log a warning about function deprecation
-function ammLog::Deprecated {
-## _ammLog::StepPad
 
-	typeset replacement="$1"
-	typeset message="${2:-}"
+## function ammLog::UnavailableFunc {
 
-	typeset callee="$(ammLog::Stackdump 2 1)"
-	typeset callstack="$(ammLog::Stackdump 3 1)"
+ Set a function as unavailable
 
-	ammLog::Wrn "Function '$callee' (called from $callstack) is deprectated. Update your code to use '$replacement' instead"
-	[[ -n "$message" ]] && ammLog::Wrn "  $message"
-}
+### Arguments
 
+* $1  function
+* $2  reason
 
-function _ammLog::StepPad {
-## ammLog::Step
+## function ammLog::EchoSeparator {
+
+ Displays a separator with optionnal text on the middle
+
+### Arguments
+
+* $1  (string) The message to be between the separators
+* $2  (string) The char to be used as separator. default '='
+
+## function ammLog::Step {
 
  Show a visible step separator
-function ammLog::Step {
-## ammLog::StepBegin
+
+## function ammLog::StepBegin {
 
  Mark a new step in the actions
+
 ### Arguments
 
 * # @args $1  (string) The name of the step to be displayed
 
-## ammLog::StepEnd
+## function ammLog::StepEnd {
 
  Mark the end of a started step
+
 ### Arguments
 
 * $1  (int) return code
 * $2  (string) Message to be displayed
 
-## ammLog::Stackdump
+## function ammLog::Stackdump {
 
-@description:  Display the stackdump of current script
+ Display the stackdump of current script
+
 ### Arguments
 
 * $1  (int) Stack levels to skip. Default 1 (= skip this function)
 * $2  (int) Max levels to return. Default 255
 
-## ammLog::MissingBin
+## function ammLog::MissingBin {
 
  Log for a missing binary, and try to find the packages providing them
+
 ### Arguments
 
 * $@  List of missing binaries to search for
 
-## ammLog::Silence
+## function ammLog::Silence {
 
  Disable or enable logging
+
 ### Arguments
 
 * $1  (string) Wanted state: 0 to disable logging, "onlyerr" to only log errors, anything else to enable logging
 
-## ammLog::WriteTerm
+## function ammLog::TracingLog {
+
+ Log xtrace as ammlog
+
+## function ammLog::TracingEnable {
+
+ Enable tracing 'set -x' into dedicated file
+
+## function ammLog::WriteTerm {
 
  Log a message to the terminal (not through stdout). Only if session is interactive
+
 ### Arguments
 
 * $1  (string) message to be written
 
-## ammEnv::PathAdd
+## function ammEnv::PathAdd {
 
  Add a path to PATH
+
 ### Arguments
 
 * $1  (string)(optionnal). Can be "before" or "after" (default)
 * $@  (path[]) List of paths to be added to the env var
 
-## ammEnv::LibAdd
+## function ammEnv::LibAdd {
 
  Add a path to LD_LIBRARY_PATH
+
 ### Arguments
 
 * $1  (string)(optionnal). Can be "before" or "after" (default)
 * $@  (path[]) List of paths to be added to the env var
 
-## ammEnv::ManAdd
+## function ammEnv::ManAdd {
 
  Add a path to MANPATH
+
 ### Arguments
 
 * $1  (string)(optionnal). Can be "before" or "after" (default)
 * $@  (path[]) List of paths to be added to the env var
 
-## ammEnv::IsFunc
+## function ammEnv::IsFunc {
 
  Check if given name is a function
+
 ### Exit codes
 
 * **0**:  is a function
 * **1**:  is not a function
 
-## ammEnv::IsVar
+## function ammEnv::IsVar {
 
  Check if name if a variable
+
 ### Exit codes
 
 * **0**:  is a defined variable
 * **1**:  is not a variable
 
-## ammPath::Decompose
+## function ammPath::Decompose {
 
  Decompose a path to a list of all its folders
+
 ### Arguments
 
 * $1  (path) The path to decompose
 
-## ammPath::IsSecure
+## function ammPath::IsSecure {
 
  Check if the full path of a file is secure for the current user
+
 ### Arguments
 
 * $1  (path) File or folder to check
@@ -398,9 +465,10 @@ function ammLog::Step {
 * **0**:   Path is secure
 * >=**1**:  Path has a number of insecurities, shown as stdout
 
-## ammPath::IsWritable
+## function ammPath::IsWritable {
 
  Check if we can create the requested path
+
 ### Arguments
 
 * $1  (path) File or folder to check
@@ -409,26 +477,45 @@ function ammLog::Step {
 
 * **0**:  Path is writable
 
-## ammPath::CopyStructure
+## function ammPath::IsEmpty {
+
+ Check if a folder contains something
+
+### Arguments
+
+* $1  (path) Path to the folder to check
+
+## function _ammPath::RecurseFolders {
 
  Copy a selection of files with their relative structure
+
 ### Arguments
 
 * $1  (path) Source path where to find the content
 * $2  (path) Destination path where to copy content
 * $@  (string) files or patterns to copy from source to destination
 
-## ammExec::AsUser
+## function ammPath::CopyStructure {
+
+ Copy a structure to another
+
+### Arguments
+
+* $1
+
+## function ammExec::AsUser {
 
  Execute a command as a different user
+
 ### Arguments
 
 * $1  (string) User to run the command as
 * $@  (string) the command to run, and its arguments. if "-", command is read from stdin
 
-## ammExec::Exists
+## function ammExec::Exists {
 
  Check if one or more command are available in PATH
+
 ### Arguments
 
 * $@  (string) the executables to search for
@@ -438,9 +525,10 @@ function ammLog::Step {
 * **0**: if all are found
 * **1**: if at least one is not found
 
-## ammExec::RequestOne
+## function ammExec::RequestOne {
 
  Check if at least one given command is available in PATH
+
 ### Arguments
 
 * $@  (string) the executables to search for
@@ -450,14 +538,23 @@ function ammLog::Step {
 * **0**: if at least one is found
 * **1**: if none are found
 
-## ammExec::Require
+## function ammExec::Require {
 
  Same as ammExecExists but calls ammLog::Die and terminate the script if any requested binary is not found
+
 ### Arguments
 
 * $@  (string) Binaries to search for in PATH
 
-## ammExec::RequireOne
+## function ammExec::RequireOne {
 
  Same as ammExecRequestOne but calls ammLog::Die and terminates if none of requested binary is found
-function ammExec::RequireOne {
+
+## function ammExec::IsExecutable {
+
+ Check if provided path is executable
+
+### Arguments
+
+* $1  Path to the file to be tested
+

@@ -1,10 +1,11 @@
 
-* [ammSyscfgNetwork::NicInfo](#ammSyscfgNetworkNicInfo)
+* [function ammSyscfgNetwork::NicInfo {](#function-ammsyscfgnetworknicinfo-)
 
 
-## ammSyscfgNetwork::NicInfo
+## function ammSyscfgNetwork::NicInfo {
 
-@description: Display information about a given NIC
+Display information about a given NIC
+
 ### Arguments
 
 * $1  Name of the NIC

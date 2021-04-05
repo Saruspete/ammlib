@@ -61,18 +61,18 @@ typeset -g  __AMMTABLE_DISPLAYSEP="|"
 typeset -g  __AMMTABLE_CACHE_TERMSIZE=0
 typeset -ga __AMMTABLE_CACHE_COLSIZE=()
 
-function _ammTable::TermCols {
+function ammTable::_TermCols {
 	echo "${COLUMNS:-$(tput cols)}"
 }
 
-function _ammTable::DataMaxSize {
+function ammTable::_DataMaxSize {
 	typeset column
 }
 
-function _ammTable::ColGetSize {
+function ammTable::_ColGetSize {
 	typeset colid="$1"
 
-	typeset termsize="$(_ammTable::TermCols)"
+	typeset termsize="$(ammTable::_TermCols)"
 	ammLog::Debug "Getting colsize for column id '$colid' (term=$termsize)"
 
 	# try cache
@@ -88,17 +88,18 @@ function _ammTable::ColGetSize {
 
 	# Step 1: check what we have
 	typeset -i colidloop=0
-	typeset -i sumfill=0 sumpct=0 sumfixed=0
+	typeset -i sumfill=0 sumpct=0 sumfixed=0 sumfit=0
 	for colidloop in ${!__AMMTABLE_COLUMNS[@]}; do
 		typeset cfgsize="${__AMMTABLE_COLCFG_SIZE[$colidloop]}"
 		case $cfgsize in
 			[0-9]|[0-9]*[0-9]) sumfixed+=$cfgsize      ;;
 			[0-9]*%)           sumpct+="${cfgsize%\%}" ;;
 			fill)              sumfill+=1              ;;
+			fit)               sumfit+=1               ;;
 		esac
 	done
 
-	ammLog::Debug "We got: $sumfill fixed, $sumpct %, $sumfill filled"
+	ammLog::Debug "We got: $sumfixed fixed, $sumpct %, $sumfill filled" #, $sumfit fitted"
 
 	# Step 2: Compute all columns size
 	typeset -i totalsize=0
@@ -119,6 +120,10 @@ function _ammTable::ColGetSize {
 			fill)
 				# (Total - deadsize - fixed - pct) /  nb "fill" fields 
 				colsize=$(( ( $termsize - (3*${#__AMMTABLE_COLUMNS[@]}) - $sumfixed - $(( $sumpct * $termsize / 100 )) ) / $sumfill -1 ))
+				;;
+
+			fit)
+				ammLog::Error "TODO: Fitting is not yet done"
 				;;
 		esac
 
@@ -313,6 +318,10 @@ function ammTable::SetHeaderRepeat {
 # @description  Display the table
 function ammTable::Display {
 
+
+	# Warmup the cache
+	ammTable::_ColGetSize 0 >/dev/null
+
 	# Display the header on first invocation
 	if [[ "$__AMMTABLE_DISPLAYPOS" == "0" ]]; then
 		ammTable::DisplayHeader
@@ -331,7 +340,7 @@ function ammTable::Display {
 
 function ammTable::DisplayHeader {
 
-	typeset colid= colnum="${#__AMMTABLE_COLUMNS[@]}" termsize="$(_ammTable::TermCols)"
+	typeset colid= colnum="${#__AMMTABLE_COLUMNS[@]}" termsize="$(ammTable::_TermCols)"
 	# "dead" termcols: 1 for seperator, 2 for space between
 	typeset -i colsdead="$(($colnum*3 + 1))" colid=0
 
@@ -348,7 +357,7 @@ function ammTable::DisplayHeader {
 		fi
 
 		typeset colname="${__AMMTABLE_COLUMNS[$colid]}"
-		typeset -i len="$(_ammTable::ColGetSize $colid)"
+		typeset -i len="$(ammTable::_ColGetSize $colid)"
 
 		printf " %-${len}.${len}s $__AMMTABLE_DISPLAYSEP" "$colname"
 	done
@@ -376,7 +385,7 @@ function ammTable::DisplayRow {
 		# Display each column according to cfg
 		echo -n "$__AMMTABLE_DISPLAYSEP"
 		for colid in ${!__AMMTABLE_COLUMNS[@]}; do
-			typeset len="$(_ammTable::ColGetSize $colid)"
+			typeset len="$(ammTable::_ColGetSize $colid)"
 			typeset data="${datas[$colid]:-}"
 
 			# Skip hidden columns

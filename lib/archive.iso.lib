@@ -1,0 +1,37 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammArchiveIso::MetaCheck {
+	ammLib::Loadable iso
+}
+
+function ammArchiveIso::MetaInit {
+	ammLib::Load iso
+}
+
+# -----------------------------------------------------------------------------
+# Base operations: extract and create
+# -----------------------------------------------------------------------------
+
+# @description  Extract a makeself archive to specified folder
+function ammArchiveIso::Unpack {
+	typeset file="$1"
+	typeset dest="$2"
+
+	ammIso::Extract "$@"
+}
+
+function ammArchiveIso::Pack {
+	typeset dest="$1"
+	shift
+
+	ammIso::Create "$@" "$dest"
+}

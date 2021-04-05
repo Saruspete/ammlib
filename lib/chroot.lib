@@ -15,7 +15,7 @@ function ammChroot::MetaCheck {
 }
 
 function ammChroot::MetaInit {
-	_ammChroot::OSInit
+	ammChroot::_OSInit
 	ammLib::Load  fs string
 }
 # -----------------------------------------------------------------------------
@@ -23,7 +23,7 @@ function ammChroot::MetaInit {
 # -----------------------------------------------------------------------------
 
 # Scan and populate the OS List
-function _ammChroot::OSInit {
+function ammChroot::_OSInit {
 	(set +u; [[ -n "${__AMMCHROOT_OS:-}" ]] ) && return 0
 
 	for sublib in $(ammLib::LocatePattern "chroot.*"); do
@@ -42,7 +42,7 @@ function _ammChroot::OSInit {
 	fi
 }
 
-function _ammChroot::OSCall {
+function ammChroot::_OSCall {
 	typeset osname="$(ammString::ToCapital "$1")"
 	typeset func="$(ammString::ToCapital "$2")"
 	shift 2
@@ -68,12 +68,12 @@ function _ammChroot::OSCall {
 function ammChroot::OSNameValidate {
 	typeset name="$1"
 
-	_ammChroot::OSInit
+	ammChroot::_OSInit
 	ammString::ContainsWord "$name" "$__AMMCHROOT_OS"
 }
 
 function ammChroot::OSNameList {
-	_ammChroot::OSInit
+	ammChroot::_OSInit
 	echo $__AMMCHROOT_OS
 }
 
@@ -272,7 +272,7 @@ function ammChroot::Create {
 	cp -f /etc/resolv.conf $chrootdir/etc/resolv.conf
 
 	ammLog::Info "Initializing OS"
-	_ammChroot::OSCall "$osname" "Init" "$chrootdir" "$osvers" || return $?
+	ammChroot::_OSCall "$osname" "Init" "$chrootdir" "$osvers" || return $?
 
 
 	# Touch some files, cause dumb stuff happens...
@@ -280,10 +280,10 @@ function ammChroot::Create {
 
 	# Create the base system
 	ammLog::Info "Populating the chroot with OS manager"
-	_ammChroot::OSCall "$osname" "Populate" "$chrootdir" "$osvers" || {
+	if ! ammChroot::_OSCall "$osname" "Populate" "$chrootdir" "$osvers"; then
 		ammLog::Error "Error during populating chroot '$chrootdir'"
 		return 1
-	}
+	fi
 
 	ammLog::StepEnd
 }

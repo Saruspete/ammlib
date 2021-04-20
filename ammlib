@@ -70,17 +70,21 @@ fi
 #
 
 # @description  Path where ammlib is
-typeset -g  __AMMLIB_REALPATH="$(readlink -f ${BASH_SOURCE[0]})"
+typeset -g  __AMMLIB_REALPATH="$(realpath ${BASH_SOURCE[0]} 2>/dev/null)"
 
 # Check the readlink usability
-if type -t readlink >/dev/null; then
-	[[ "$(readlink -f "$__AMMLIB_REALPATH")" -ef "$__AMMLIB_REALPATH" ]] || {
-		echo "Readlink exists ($(type "readlink")) but does not behave properly."
+if type -t realpath >/dev/null; then
+	if ! [[ "$(realpath "$__AMMLIB_REALPATH")" -ef "$__AMMLIB_REALPATH" ]]; then
+		echo "realpath exists ($(type "realpath")) but does not behave properly."
 		echo "Please check your existing environment before retrying. Stopping here."
-		echo "(press any key to exit)"
-		read -s -n 1 key
+		if $__AMMLIB_INTERACTIVE; then
+			echo "(press any key to exit)"
+			read -s -n 1 key
+		else
+			echo "Exiting"
+		fi
 		exit 1
-	}
+	fi
 fi
 
 # @description  How the script was called ($0)

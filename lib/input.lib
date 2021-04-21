@@ -36,9 +36,10 @@ typeset -g __AMMINPUT_BATCH_DIE_ON_ERR
 typeset -g __AMMINPUT_BATCH_SILENTOK
 
 
+typeset -g __AMMINPUT_OPTS_ADDED
 
 function ammInput::MetaCheck {
-	ammLib::Require string
+	ammLib::Loadable string
 }
 function ammInput::MetaInit {
 	ammLib::Require string
@@ -75,6 +76,7 @@ function ammInput::MetaInit {
 		__AMMINPUT_BATCH_DIE_ON_ERR=true
 	fi
 
+	__AMMINPUT_OPTS_ADDED=false
 
 	# Register for option parsing
 	ammLib::HookRegister "before:optparse:parse" "_ammInput::HookOptparseAddOpt"
@@ -84,16 +86,19 @@ function ammInput::MetaInit {
 
 # @description  Callback for Optparse before parsing
 function _ammInput::HookOptparseAddOpt {
-	ammOptparse::AddOptGroup "mod:input" "Dynamic Input"
-	ammOptparse::AddOpt "--input-errorisfatal!" "Die on invalid entry"                   "$__AMMINPUT_BATCH_DIE_ON_ERR"
-	ammOptparse::AddOpt "--input-autotry!"      "Try automatically the current value"    "$__AMMINPUT_BATCH_AUTOTRY"
-	ammOptparse::AddOpt "--input-silent!"       "Do not show prompt if values are valid" "$__AMMINPUT_BATCH_SILENTOK"
-	ammOptparse::AddOpt "--input-blueprint!"    "Show blueprint for this execution"      "false"
+	if ! $__AMMINPUT_OPTS_ADDED; then
+		ammOptparse::AddOptGroup "mod:input" "Dynamic Input"
+		ammOptparse::AddOpt "--input-errorisfatal!" "Die on invalid entry"                   "$__AMMINPUT_BATCH_DIE_ON_ERR"
+		ammOptparse::AddOpt "--input-autotry!"      "Try automatically the current value"    "$__AMMINPUT_BATCH_AUTOTRY"
+		ammOptparse::AddOpt "--input-silent!"       "Do not show prompt if values are valid" "$__AMMINPUT_BATCH_SILENTOK"
+		ammOptparse::AddOpt "--input-blueprint!"    "Show blueprint for this execution"      "false"
 
-	typeset id
-	for id in ${__AMMINPUT_ORDER[@]:-}; do
-		ammOptparse::AddOpt "--input-$id=" "${__AMMINPUT_HELP[$id]:-Value for '$id'}" "${__AMMINPUT_DEFAULTS[$id]}"
-	done
+		typeset id
+		for id in ${__AMMINPUT_ORDER[@]:-}; do
+			ammOptparse::AddOpt "--input-$id=" "${__AMMINPUT_HELP[$id]:-Value for '$id'}" "${__AMMINPUT_DEFAULTS[$id]}"
+		done
+	fi
+	__AMMINPUT_OPTS_ADDED=true
 }
 
 # @description  Callback for Optparse after parsing

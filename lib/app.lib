@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammApp::MetaCheck {
-	ammLib::Require archive input string
+	ammLib::Loadable archive input string
 }
 
 function ammApp::MetaInit {
@@ -25,13 +25,14 @@ function ammApp::MetaInit {
 #  This library allows to manage easily application that behave like daemons, without
 #  having requirements on the host system
 #
-# Handled cases for the calling script:
-# - directly called (eg, support restart application)
-# - direct symlink (eg, startup script)
-# - symlink name (eg, same script with multiple instances)
-#
-# The application name is found by its calling name
-# The data path is found relative to the real script (file, not symlink)
+
+# Features:
+# - in-place application download, deploy, configure and upgrade
+# - secure upgrade: leverage system snapshot features or copy data & dependencies
+#   tests in namespace for app validation before switching. easy rollback
+# - works on its calling name: symlink the same script multiple times to have
+#   multiples instances.
+# - Per-instance configuration:  "instance.d/config"
 
 
 # Return codes
@@ -57,6 +58,7 @@ function ammApp::Init {
 
 
 	# Can be overridden
+	typeset -g RUN_VERS="${RUN_VERS:-current}"
 	typeset -g RUN_USER="${RUN_USER:-$(ammApp::GetOwner ${APP_SDIR}/${APP_INST})}"
 	typeset -g RUN_BIN="${RUN_BIN:-}"
 	typeset -g RUN_CFG="${RUN_CFG:-}"
@@ -65,13 +67,20 @@ function ammApp::Init {
 	typeset -g RUN_OPTSTOP="${RUN_OPTSTOP:-}"
 	typeset -g RUN_OPTPID="${RUN_OPTPID:-}"
 	typeset -g RUN_DAEMON="${RUN_DAEMON:-}"
-	typeset -g RUN_WORKDIR="${RUN_WORKDIR:-$(readlink -f "$DAT_BASE")/current}"
+	typeset -g RUN_WORKDIR="${RUN_WORKDIR:-"$DAT_BASE/$RUN_VERS"}"
 
 	# Check for cfg override
 	if [[ -e "${APP_SDIR}/${APP_INST}.d/config" ]]; then
 		# TODO: Check for path chmod and other security
 		source "${APP_SDIR}/${APP_INST}.d/config"
 	fi
+
+	# Check for per-version override
+	if [[ -e "${APP_SDIR}/${APP_INST}.d/config-${RUN_VERS}" ]]; then
+		# TODO: Check for path chmod and other security
+		source "${APP_SDIR}/${APP_INST}.d/config-${RUN_VERS}"
+	fi
+
 
 	# Check running user and reexec it here if needed
 	if [[ -n "$RUN_USER" ]] && [[ "$RUN_USER" != "$__AMMLIB_USERNAME" ]]; then
@@ -176,7 +185,7 @@ function ammApp::GetPidPath {
 
 	typeset pidfolder="${pidfile%/*}"
 	if ! [[ -d "$pidfolder" ]];  then
-		if ! mkdir "$pidfolder" >/dev/null 2>&1; then
+		if ! mkdir -p "$pidfolder" >/dev/null 2>&1; then
 			ammLog::Warning "Unable to create pid folder '$pidfolder'"
 			return 1
 		fi
@@ -313,15 +322,15 @@ function ammApp::Start {
 
 	# Add common options
 	if [[ -n "$RUN_OPTCOMMON" ]]; then
-		opts+=" $RUN_OPTCOMMON "
+		opts+="$RUN_OPTCOMMON "
 	fi
 
 
 	#
 	# User defined startup func, just use it
 	#
-	if ammEnv::IsFunc "run_start"; then
-		ammLog::Info "Starting with custom run_start function"
+	if ammEnv::IsFunc "appStart"; then
+		ammLog::Info "Starting with custom appStart function"
 		appStart "$opts"
 		ammLog::Info "Result: $?"
 		return $?
@@ -354,18 +363,18 @@ function ammApp::Start {
 		#
 		if [[ -n "$RUN_OPTPID" ]]; then
 			pidf="$(ammApp::GetPidPath "$version")"
-			opts+=" $RUN_OPTPID $pidf"
+			opts+="${RUN_OPTPID}${pidf} "
 		fi
 
 		# If pidfile, check it has access to the file
 		if [[ -n "$pidf" ]] && [[ -e "$pidf" ]]; then
 
 			# Does the file already belong to target user
-			[[ "$(ammApp::GetOwner "$pidf")" != "$runas" ]] && {
+			if [[ "$(ammApp::GetOwner "$pidf")" != "$runas" ]]; then
 				\chown $runas: "$pidf" || {
 					ammLog::Error "Unable to chown '$runas' '$pidf'. The app may fail or be unmanageable"
 				}
-			}
+			fi
 		fi
 
 		#
@@ -374,7 +383,7 @@ function ammApp::Start {
 		if ammString::IsTrue "$RUN_DAEMON"; then
 			typeset logfile="$(ammApp::GetLogPath "$version")"
 			ammLog::Debug "Daemonizing and sending logs to '$logfile'"
-			opts+=" >>$logfile 2>&1 0>/dev/null &"
+			opts+=" >>$logfile 2>&1 0>/dev/null & "
 		fi
 
 		# Append optionnal arguments
@@ -382,12 +391,19 @@ function ammApp::Start {
 			opts+="$@"
 		fi
 
-		# Run the process
-		ammLog::Info "Starting with \$RUN_BIN var ($runapp $opts) as '$runas'"
-		typeset out=""
-		typeset -i ret
+		# Closing unwanted FDs
+		typeset fdToClose="" fd=
+		for fd in /proc/$$/*; do
+			if [[ $fd -gt 2 ]]; then
+				fdToClose+="$fd>&- "
+			fi
+		done
 
-		out="$(eval "$runapp $opts 2>&1 99>&- 98>&-")"
+		# Run the process
+		typeset -i ret
+		typeset out="" finalCmd="$runapp $opts 2>&1 $fdToClose"
+		ammLog::Info "Starting '$finalCmd' with \$RUN_BIN var ($runapp $opts) as '$runas'"
+		out="$(eval "$finalCmd")"
 		ret=$?
 
 

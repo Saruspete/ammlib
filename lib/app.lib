@@ -43,6 +43,7 @@ function ammApp::MetaInit {
 # @description  Initialize application vars
 function ammApp::Init {
 
+
 	# Set my path according to these
 	typeset -gr APP_ROOT="$(realpath "${1:-$__AMMLIB_CALLPATH/..}")"
 	typeset -gr APP_INST="${__AMMLIB_CALLFILE}"
@@ -105,11 +106,11 @@ function ammApp::Init {
 		fi
 	done
 
-	# Clean the paths for absolute value
-	typeset -gr APP_BASE="$(readlink -f $APP_BASE)"
-	typeset -gr DAT_BASE="$(readlink -f $DAT_BASE)"
-	typeset -gr SRC_BASE="$(readlink -f $SRC_BASE)"
-	typeset -gr TMP_BASE="$(readlink -f $TMP_BASE)"
+	# Clean the paths for absolute value, and set read-only
+	typeset -gr APP_BASE="$(realpath $APP_BASE)"
+	typeset -gr DAT_BASE="$(realpath $DAT_BASE)"
+	typeset -gr SRC_BASE="$(realpath $SRC_BASE)"
+	typeset -gr TMP_BASE="$(realpath $TMP_BASE)"
 
 	# Sanity checks
 	[[ -z "$APP_BASE" ]] && { echo >&2 "Unable to find APP_BASE value"; return 1; }
@@ -291,7 +292,7 @@ function ammApp::VersionSetCurrent {
 
 function ammApp::VersionGetCurrent {
 
-	typeset realdir="$(readlink -f $(ammApp::GetAppDir))"
+	typeset realdir="$(realpath $(ammApp::GetAppDir))"
 	realdir="${realdir%/}"
 	echo "${realdir##*/}"
 }
@@ -507,7 +508,7 @@ function ammApp::IsRunning {
 							typeset bin=""
 							# Direct symlink reading
 							if [[ -r "$proc/exe" ]]; then
-								bin="$(readlink -f "$proc/exe" 2>/dev/null)"
+								bin="$(realpath "$proc/exe" 2>/dev/null)"
 							fi
 
 							# fallback to cmdline parsing
@@ -622,7 +623,7 @@ function ammApp::Upgrade {
 	typeset versionOld="${RUN_VERS:-}"
 	typeset currentLink="$APP_BASE/current"
 	if [[ -z "$versionOld" ]] && [[ -L "$currentLink" ]]; then
-		typeset oldpath="$(readlink -f "$currentLink")"
+		typeset oldpath="$(realpath "$currentLink")"
 		oldpath="${oldpath%/}"
 		oldpath="${oldpath##*/}"
 		versionOld="$oldpath"

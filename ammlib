@@ -87,8 +87,6 @@ if type -t realpath >/dev/null; then
 	fi
 fi
 
-# @description  How the script was called ($0)
-typeset -gr __AMMLIB_CALLNAME="$0"
 # @description  Options passed to the script ($@)
 typeset -ga __AMMLIB_CALLOPTS=("$@")
 typeset -gra __AMMLIB_CALLOPTS_ORIG=("$@")
@@ -96,12 +94,24 @@ typeset -gra __AMMLIB_CALLOPTS_ORIG=("$@")
 if [[ "${BASH_VERSINFO[0]}" -eq 4 ]] && [[ "${BASH_VERSINFO[1]}" -lt 4 ]]; then
 	[[ -z "$@" ]] && __AMMLIB_CALLOPTS=("")
 fi
+
+# Check for stdin load (cat|bash  or bash -c "...")
+if [[ -z "$0" ]] || ! [[ -e "$0" ]]; then
+	typeset -gr __AMMLIB_CALLNAME="stdin.$0.$$"
+	typeset -gr __AMMLIB_CALLFILE="stdin.$0.$$"
+	typeset -gr __AMMLIB_CALLPATH="$(pwd -P)"
+else
+	# @description  How the script was called ($0)
+	typeset -gr __AMMLIB_CALLNAME="$0"
+	# @description  Name of the file that was called
+	typeset -gr  __AMMLIB_CALLFILE="${0##*/}"
+	# Set in 2-times to avoid bug "h" fixed in 4.4-rc1 (make_cmd.c:801)
+	typeset -g  __AMMLIB_CALLPATH="$(realpath "${BASH_SOURCE[-1]%/*}")"
+fi
+
+
 # @description  The file that loaded ammlib
-# Set in 2-times to avoid bug "h" fixed in 4.4-rc1 (make_cmd.c:801)
-typeset -g  __AMMLIB_CALLFILE="${BASH_SOURCE[1]:-main}"
-typeset -gr __AMMLIB_CALLFILE="${__AMMLIB_CALLFILE##*/}"
-# @description  Path of the file that loaded ammlib
-typeset -gr __AMMLIB_CALLPATH="${__AMMLIB_CALLNAME%/*}"
+typeset -gr __AMMLIB_LOADERFILE="${BASH_SOURCE[1]:-stdin}"
 
 typeset -gr __AMMLIB_USERNAME="$(\id -nu)"
 typeset -gr __AMMLIB_USERID="${UID:-$(\id -u)}"
@@ -1086,6 +1096,7 @@ function ammLog::Stackdump {
 	extdbg="${extdbg##*$'\t'}"
 
 	typeset -i i j argoff=0
+	# TODO: handle when called without file (stdin)
 	for i in ${!BASH_SOURCE[@]}; do
 		if [[ $i -lt $skip ]]; then
 			argoff+=${BASH_ARGC[$i]:-0}
@@ -1328,7 +1339,7 @@ function ammEnv::PathIsWritable {
 # @arg $1  (path) The path to decompose
 function ammPath::Decompose {
 	typeset path="$1"
-	path="$(readlink -m "$path")"
+	path="$(realpath "$path")"
 	while [[ -n "$path" ]]; do
 		echo "$path"
 		path="${path%/*}"

@@ -409,7 +409,7 @@ function ammOptparse::AddActionWord {
 function ammOptparse::Parse {
 
 	typeset -i r=0
-	typeset nounknown=false
+	typeset nounknown=false dohelp=true
 	typeset prefix=""
 	typeset -i optidstart=0
 
@@ -425,6 +425,9 @@ function ammOptparse::Parse {
 		case $opt in
 			--no-unknown)
 				nounknown=true
+				;;
+			--no-help)
+				dohelp=false
 				;;
 			--skip=*)
 				optidstart="${opt##--skip=}"
@@ -661,17 +664,20 @@ function ammOptparse::Parse {
 		fi
 	done
 
-	if [[ -n "$(_ammOptparse::OptToId "help-full")" ]] && [[ "$(ammOptparse::Get "help-full")" == "true" ]]; then
-		ammOptparse::Help "full"
-		exit 0
-	fi
-	if [[ -n "$(_ammOptparse::OptToId "help-all")" ]] && [[ "$(ammOptparse::Get "help-all")" == "true" ]]; then
-		ammOptparse::Help "all"
-		exit 0
-	fi
-	if [[ -n "$(_ammOptparse::OptToId "help")" ]] && [[ "$(ammOptparse::Get "help")" == "true" ]]; then
-		ammOptparse::Help
-		exit 0
+	# Only parse help if enabled (to avoid stopping on pre-checks)
+	if [[ "$dohelp" == "true" ]]; then
+		if [[ -n "$(_ammOptparse::OptToId "help-full")" ]] && [[ "$(ammOptparse::Get "help-full")" == "true" ]]; then
+			ammOptparse::Help "full"
+			exit 0
+		fi
+		if [[ -n "$(_ammOptparse::OptToId "help-all")" ]] && [[ "$(ammOptparse::Get "help-all")" == "true" ]]; then
+			ammOptparse::Help "all"
+			exit 0
+		fi
+		if [[ -n "$(_ammOptparse::OptToId "help")" ]] && [[ "$(ammOptparse::Get "help")" == "true" ]]; then
+			ammOptparse::Help
+			exit 0
+		fi
 	fi
 
 	ammLib::HookTrigger "after:optparse:parse"

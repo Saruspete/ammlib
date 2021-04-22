@@ -10,7 +10,11 @@ fi
 # -----------------------------------------------------------------------------
 
 function ammArchiveMakeself::MetaCheck {
-	ammExec::Require grep
+	ammExec::Requires grep
+	ammExec::Exists makeself makeself.sh || ammLib::Requires http
+}
+
+function ammArchiveMakeself::MetaInit {
 
 	# check if we have the script in our usual search path
 	typeset p

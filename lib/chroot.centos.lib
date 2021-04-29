@@ -437,13 +437,19 @@ function ammChrootCentos::InitFromPackages {
 		return 1
 	fi
 
+	# remove default repos again, coming from previous yum package installation
+	rm "$chrootdir/etc/yum.repos.d/CentOS-"*
+
 	# Note: for DNF, already looks in --installroot
 	#    --setopt=reposdir="$chrootdir/etc/yum.repos.d" \
 	#    --setopt=logfile="$chrootdir/var/log/yum.log" \
 	#    --setopt=config_file_path="$chrootdir/etc/yum/yum.conf" \
 
 	# Avoid installation of docs and other langs
-	ammExec::AsUser "root" sed -i  "$chrootdir/etc/yum.conf" -e "/distroverpkg=centos-release/a\ override_install_langs=en_US.utf8\ntsflags=nodocs"
+	typeset yumcfg="$chrootdir/etc/yum.conf"
+	ammPkgYum::ConfigSet "$yumcfg" "override_install_langs" "en_US.utf8"
+	ammPkgYum::ConfigSet "$yumcfg" "tsflags"                "nodocs"
+	ammPkgYum::ConfigSet "$yumcfg" "plugins"                "1"
 
 	# Remove non-native RPMdb (from host)
 	ammExec::AsUser "root" mv "$chrootdir/var/lib/rpm" "$chrootdir/var/lib/rpm.host"
@@ -452,8 +458,12 @@ function ammChrootCentos::InitFromPackages {
 	for key in "$chrootdir/etc/pki/rpm-gpg/RPM-GPG-KEY-"*; do
 		ammChroot::Exec "$chrootdir" rpm --import "${key#$chrootdir}"
 	done
-	ammChroot::Exec "$chrootdir" yum install -y yum rpm
 
+	# And reinstall from the target repo config
+	ammChroot::Exec "$chrootdir" yum install -y yum rpm
+	
+	# and remove default repos, yet again
+	rm "$chrootdir/etc/yum.repos.d/CentOS-"*
 }
 
 

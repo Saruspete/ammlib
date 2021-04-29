@@ -1195,7 +1195,7 @@ function ammSys::OSIdGet {
 		[[ "$?" -eq 0 ]] && return
 	fi
 
-	typeset -a releases=(centos redhat gentoo suse)
+	typeset -a releases=(centos redhat gentoo debian ubuntu suse)
 	typeset   release
 	for release in "${releases}"; do
 		if [[ -e "/etc/${release}-release" ]]; then
@@ -1209,7 +1209,8 @@ function ammSys::OSIdGet {
 
 # @description  Get the version of the current system
 function ammSys::OSVersionGet {
-	
+
+	# Use generic os-release
 	if [[ -e "/etc/os-release" ]]; then
 		(
 			. "/etc/os-release"
@@ -1221,6 +1222,44 @@ function ammSys::OSVersionGet {
 		)
 		[[ "$?" -eq 0 ]] && return
 	fi
+
+	# system doesn't have the LSB packages. Try custom
+	typeset osid="$(ammSys::OSIdGet)"
+	# Parse /etc/${osid}-release
+	if [[ -s "/etc/${osid}-release" ]]; then
+		typeset releaseStr="$(< "/etc/${osid}-release")"
+		case $osid in
+			gentoo)  # Gentoo Base System release 2.7
+				releaseStr="${releaseStr##* }"
+				;;
+			centos|redhat)  # CentOS Linux release 7.7.1908 (Core) || CentOS Linux release 8.3.2011
+				releaseStr="${releaseStr##*release }"
+				releaseStr="${releaseStr%% *}"
+				;;
+			*)
+				releaseStr=""
+				;;
+		esac
+	fi
+
+	# Debian /etc/${osid}_version
+	if [[ -z "$releaseStr" ]] && [[ -s "/etc/${osid}_version" ]]; then
+		typeset releaseStr="$(< "/etc/${osid}_version")"
+		case $osid in
+			debian|ubuntu)
+				;;
+			*)
+				releaseStr=""
+				;;
+		esac
+	fi
+
+	if [[ -n "$releaseStr" ]]; then
+		echo "$releaseStr"
+		return 0
+	fi
+
+	echo "unknown"
 }
 
 # -----------------------------------------------------------------------------

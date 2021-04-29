@@ -12,12 +12,12 @@ readonly MYPATH="${MYSELF%/*}"
 
 . $MYPATH/../ammlib
 
-ammLib::Require network process
+ammLib::Require "network" "process"
 
 ammLog::Inf "Will try to connect to 127.0.0.1:1112, every second, up to 30 times"
 ammLog::Inf "You can exec: 'nc -l 1112' to make it listen"
 
-ammProcess::Until "ammNetworkPortOpen 127.0.0.1 1112 1" 30 1
+ammProcess::Until "ammNetwork::PortOpen 127.0.0.1 1112 1" 30 1
 case $? in
 	0)  ammLog::Inf "Connection successful" ;;
 	*)  ammLog::Err "Unable to connect after timeout" ;;

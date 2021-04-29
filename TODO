@@ -19,7 +19,6 @@ waituntilping
 
 
 ==== Exec
-runas
 SetTimeout
 
 ==== String
@@ -29,7 +28,6 @@ SetTimeout
 
 
 ==== Pkg
-
 List
 ListVersions
 Install
@@ -41,8 +39,6 @@ Upgrade
 sublib: rpm yum dpkg apt emerge
 
 ==== Chroot
-
-Create
 SetKernel
 InstallDevel
 InstallDebug

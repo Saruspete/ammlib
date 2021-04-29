@@ -49,14 +49,14 @@ function ammAppNetdata::_HookOptparsePopulate {
 # Netdata management
 # -----------------------------------------------------------------------------
 
-function ammAppNetdata::_HttpGetBaseUrl {
+function ammAppNetdata::HttpGetBaseUrl {
 	echo "$AMMAPPNETDATA_HTTP://$AMMAPPNETDATA_HOST:$AMMAPPNETDATA_PORT/$AMMAPPNETDATA_API"
 }
 
 function ammAppNetdata::_HttpGet {
 	typeset query="$1"
 
-	typeset url="$(ammAppNetdata::_HttpGetBaseUrl)/$query"
+	typeset url="$(ammAppNetdata::HttpGetBaseUrl)/$query"
 
 	ammHttp::Get "$url" "-"
 }
@@ -107,6 +107,27 @@ function ammAppNetdata::ChartsList {
 	ammAppNetdata::_HttpGetJson2List "charts" ".charts[]" "id" "title"
 }
 
+function ammAppNetdata::ChartDataGet {
+	typeset chart="$1"
+	typeset format="${2:-json}"
+	
+}
+
+function ammAppNetdata::ChartExportToFiles {
+	typeset destdir="$1"
+	typeset options="${2:-}"
+	shift 2
+
+	# Leverage some features of curl like parallel download
+	if ammExec::IsAvailable curl; then
+		:
+	else
+		# Try pooled get
+		:
+		#ammHttp::
+	fi
+
+}
 
 # -----------------------------------------------------------------------------
 # Alarms

@@ -1230,7 +1230,7 @@ function ammSys::OSVersionGet {
 			if [[ -n "${VERSION_ID:-}" ]]; then
 				echo "$VERSION_ID"
 			else
-				return 1
+				exit 1
 			fi
 		)
 		[[ "$?" -eq 0 ]] && return
@@ -1242,8 +1242,11 @@ function ammSys::OSVersionGet {
 	if [[ -s "/etc/${osid}-release" ]]; then
 		typeset releaseStr="$(< "/etc/${osid}-release")"
 		case $osid in
-			gentoo)  # Gentoo Base System release 2.7
-				releaseStr="${releaseStr##* }"
+			gentoo) # Special case: use the profile version
+				typeset profile="$(realpath "/etc/portage/make.profile")"
+				profile="${profile##*/linux/}"
+				profile="${profile#*/}"
+				releaseStr="${profile%%/*}"
 				;;
 			centos|redhat)  # CentOS Linux release 7.7.1908 (Core) || CentOS Linux release 8.3.2011
 				releaseStr="${releaseStr##*release }"

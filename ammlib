@@ -40,7 +40,7 @@ if [[ "${BASH_VERSINFO[0]:-}${BASH_VERSINFO[1]:-0}" -lt 42 ]]; then
 	exit 1
 fi
 
-# Enable extdebug to have arguments
+# Enable extdebug to have arguments for trace
 if [[ -n "${AMMLIB_DEBUG:-}" ]]; then
 	shopt -s extdebug
 fi
@@ -788,6 +788,23 @@ function ammLog::Date {
 	date '+%y-%m-%d'
 }
 
+# @description  Checks if AMMLIB_DEBUG variable is set and needs to do some job
+function ammLog::_DbgIsEnabled {
+	# Early tests
+	[[ $__AMMLOG_VERBOSITY -ge 2 ]] && return 0
+	[[ -z "${AMMLIB_DEBUG:-}" ]] && return 1
+	[[ "$AMMLIB_DEBUG" == "all" ]] && return 0
+
+	# Remove leading "amm"
+	typeset func="${1##amm}"
+
+	# If the lib is within the debug, or only the func
+	if [[ "${AMMLIB_DEBUG//$func/}" != "$AMMLIB_DEBUG" ]] || [[ "$AMMLIB_DEBUG" =~ (^|,)${func%%::*}(,|$) ]]; then
+		return 0
+	fi
+	return 1
+}
+
 
 # Log will be out to stdout
 typeset -g __AMMLOG_FDSTD=97
@@ -892,28 +909,6 @@ function ammLog::Notice {
 	ammLog::_Log "INF" "bold green" "$@"
 }
 
-# Legacy
-function ammLog::Err { ammLog::Error "$@"; }
-function ammLog::Inf { ammLog::Info "$@"; }
-function ammLog::Wrn { ammLog::Warning "$@"; }
-function ammLog::Dbg { ammLog::Debug "$@"; }
-
-
-function ammLog::_DbgIsEnabled {
-	# Early tests
-	[[ $__AMMLOG_VERBOSITY -ge 2 ]] && return 0
-	[[ -z "${AMMLIB_DEBUG:-}" ]] && return 1
-	[[ "$AMMLIB_DEBUG" == "all" ]] && return 0
-
-	# Remove leading "amm"
-	typeset func="${1##amm}"
-
-	# If the lib is within the debug, or only the func
-	if [[ "${AMMLIB_DEBUG//$func/}" != "$AMMLIB_DEBUG" ]] || [[ "$AMMLIB_DEBUG" =~ (^|,)${func%%::*}(,|$) ]]; then
-		return 0
-	fi
-	return 1
-}
 
 # @description  Log a debug info
 # @arg $@  Debug text to log. If "-", text is read from stdin
@@ -945,6 +940,15 @@ function ammLog::Debug {
 	# Restart tracing if was enabled
 	$redbg
 }
+
+# Legacy helpers
+function ammLog::Err { ammLog::Error "$@"; }
+function ammLog::Inf { ammLog::Info "$@"; }
+function ammLog::Wrn { ammLog::Warning "$@"; }
+function ammLog::Dbg { ammLog::Debug "$@"; }
+
+
+
 
 # @description  Log a warning about function deprecation
 function ammLog::Deprecated {
@@ -1151,9 +1155,10 @@ function ammLog::Silence {
 	fi
 }
 
-# Log xtrace (run in another process, and shares FD)
-function ammLog::DebugStore {
-	# Check if bash debug is already enabled
+# @description  Log xtrace as ammlog
+# @noarg
+function ammLog::TracingLog {
+	# Check if bash trace is already enabled
 	typeset undbg=""
 	[[ "${-//x/}" == "$-" ]] && { undbg="set +x"; }
 	set -x
@@ -1161,10 +1166,18 @@ function ammLog::DebugStore {
 	$undbg
 }
 
-function ammLog::DebugEnable {
-	eval "exec $__AMMLOG_FDDBG> >(ammLog::DebugStore)"
+# @description  Enable tracing 'set -x' into dedicated file
+function ammLog::TracingEnable {
+	typeset dest="${1:-}"
+	if [[ -z "$dest" ]]; then
+		dest="$(ammLib::DataPathGet "tracing")"
+	fi
+
+	eval "exec $__AMMLOG_FDDBG>$dest"
+	#eval "exec $__AMMLOG_FDDBG> >(ammLog::TracingLog)"
 	BASH_XTRACEFD=$__AMMLOG_FDDBG
 }
+
 
 # @description  Log a message to the terminal (not through stdout). Only if session is interactive
 # @arg $1  (string) message to be written

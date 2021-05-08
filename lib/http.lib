@@ -353,8 +353,8 @@ function ammHttp::GithubReleaseList {
 	typeset projectpath="$1"
 	typeset showrc="${2:-false}"
 
-	# Go through the API (more than 10 releases)
-	typeset url="https://api.github.com/repos/$projectpath/releases"
+	# Go through the API to have more than 10 releases. More than 100 needs paging (&page=X)
+	typeset url="https://api.github.com/repos/$projectpath/releases?per_page=100"
 	typeset -i cnt=0
 
 	# If jq is available, use it

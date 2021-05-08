@@ -312,6 +312,14 @@ function ammHttp::GithubBranchGetLastCommit {
 	# Get the atom feed, and grep the related tag...
 	typeset url="https://github.com/$projectpath/commits/${branch}.atom"
 	typeset out="$(ammHttp::Get "$url" "-")"
+
+	# Try again with "main" branch if default
+	if [[ "$out" == "Not Found" ]] && [[ -z "${2:-}" ]]; then
+		branch="main"
+		url="https://github.com/$projectpath/commits/${branch}.atom"
+		out="$(ammHttp::Get "$url" "-")"
+	fi
+
 	typeset commitid="${out#*<id>tag:github.com,2008:Grit::Commit/}"
 	commitid="${commitid%%</id>*}"
 	typeset commitdate="${out#*<updated>}"
@@ -337,7 +345,58 @@ function ammHttp::GithubArchiveGetUrl {
 	echo "$url"
 }
 
+# @description  List all available releases
+# @arg  $1 (string) project path, in format "username/reponame"
+# @arg  $2 (bool) show also pre-releases
+# @stdout   one result per line:  tag  publicationTS  name
+function ammHttp::GithubReleaseList {
+	typeset projectpath="$1"
+	typeset showrc="${2:-false}"
+
+	# Go through the API (more than 10 releases)
+	typeset url="https://api.github.com/repos/$projectpath/releases"
+	typeset -i cnt=0
+
+	# If jq is available, use it
+	if ammExec::Exists "jq"; then
+		typeset tag prerelease date name
+		while read tag prerelease date name; do
+			# remove string interp from jq
+			tag="${tag#\"}" ; name="${name%\"}"
+			# skip pre-releases
+			[[ "$prerelease" == "true" ]] && [[ "$showrc" == "false" ]] && continue
+			date="$(date -d "$date" +%s)"
+			echo "$tag $date $name"
+			cnt+=1
+		done < <(ammHttp::Get "$url" "-" | jq '.[] | "\(.tag_name) \(.prerelease) \(.published_at) \(.name)"')
+	# fallback to awk (more risky to output updates)
+	else
+		typeset tag prerelease date name
+		while read tag prerelease date name; do
+			[[ "$prerelease" == "true" ]] && [[ "$showrc" == "false" ]] && continue
+			date="$(date -d "$date" +%s)"
+			echo "$tag $date $name"
+			cnt+=1
+		done < <(ammHttp::Get "$url" "-" | awk '
+			$1 == "\"tag_name\":"   { gsub(/[,"]/,"",$2); tag=$2; }
+			$1 == "\"prerelease\":" { gsub(/[,"]/,"",$2); prerelease=$2; }
+			$0 ~ /^    "name":/     { gsub(/[,"]/,"",$2); name=$2; }
+			$0 ~ /^    "published_at":/ { gsub(/[,"]/,"",$2); date=$2; }
+			$0 ~ /^  },$/ {
+				print tag,prerelease,date,name
+				tag=prerelease=date=name="\"\""
+			}
+		')
+	fi
+
+	[[ "$cnt" -gt 0 ]]
+}
+
 function ammHttp::GithubReleaseGetLastVersion {
+	ammLog::Deprecated "ammHttp::GithubReleaseGetLatest" "$@"
+}
+
+function ammHttp::GithubReleaseGetLatest {
 	typeset projectpath="$1"
 	typeset tag="${2:-latest}"
 

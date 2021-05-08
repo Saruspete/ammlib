@@ -916,6 +916,7 @@ function ammLog::Debug {
 
 	# Remove tracing if enabled to limit spam
 	typeset redbg=""
+	# "shopt -q -o xtrace" seems faster (not by much)
 	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
 
 	# Only send to log on verbose level
@@ -1930,3 +1931,4 @@ function ammExec::RequireOne {
 function ammExec::IsExecutable {
 	[[ -f "$1" ]] && [[ -x "$1" ]]
 }
+

@@ -44,7 +44,7 @@ function ammApp::MetaInit {
 function ammApp::Init {
 
 	# Set my path according to these
-	typeset -gr APP_ROOT="${1:-$__AMMLIB_CALLPATH/..}"
+	typeset -gr APP_ROOT="$(realpath "${1:-$__AMMLIB_CALLPATH/..}")"
 	typeset -gr APP_INST="${__AMMLIB_CALLFILE}"
 	typeset -gr APP_SDIR="${__AMMLIB_CALLPATH}"
 	typeset -gr APP_GRPN="${APP_INST%%-*}"
@@ -578,6 +578,26 @@ function ammApp::IsRunning {
 	return $r
 }
 
+# List available versions to be used for upgrade
+function ammApp::VersionList {
+
+	# Github project
+	if [[ -n "$UPG_GHPROJECT" ]]; then
+		ammLib::Require "http"
+		ammHttp::GithubReleaseList "$UPG_GHPROJECT"
+		return $?
+	# Custom function
+	elif ammEnv::IsFunc "appUpgradeVersionList"; then
+		ammUpgradeVersionList
+		return $?
+	# No listing available
+	else
+		ammLog::Error "No helper function to list available version"
+		return 1
+	fi
+}
+
+
 # 
 # Upgrade steps:
 # 0) Get latest version string if none provided and check if update needed
@@ -942,8 +962,12 @@ function ammApp::Main {
 			r=$?
 			;;
 		upgrade)
-			ammApp::Upgrade "$@"
-			r=$?
+			if ammString::IsTrue "${UPG_LIST:-false}"; then
+				ammApp::VersionList
+			else
+				ammApp::Upgrade "$@"
+				r=$?
+			fi
 			;;
 		*)
 			if ammEnv::IsFunc "appRun$op"; then

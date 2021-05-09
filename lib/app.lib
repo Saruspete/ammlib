@@ -584,7 +584,13 @@ function ammApp::VersionList {
 	# Github project
 	if [[ -n "$UPG_GHPROJECT" ]]; then
 		ammLib::Require "http"
-		ammHttp::GithubReleaseList "$UPG_GHPROJECT"
+		typeset tag ts name
+		typeset fmt="%-20.20s  %-32.32s  %s\n"
+		printf "$fmt" "Version" "Release date (days ago)" "friendly name"
+		while read tag ts name; do
+			typeset daysago="$(( ($(date +%s)-$ts) / (3600*24) ))"
+			printf "$fmt" "$tag" "$(date -d "@$ts" "+%Y-%m-%d %H:%M:%S") ($daysago)" "$name"
+		done < <(ammHttp::GithubReleaseList "$UPG_GHPROJECT")
 		return $?
 	# Custom function
 	elif ammEnv::IsFunc "appUpgradeVersionList"; then

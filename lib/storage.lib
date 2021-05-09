@@ -523,10 +523,9 @@ function ammStorage::GetTransport {
 # -----------------------------------------------------------------------------
 # Filesystem details
 # -----------------------------------------------------------------------------
-
-function ammStorage::GetMountpoint {
-	typeset dev="$(ammStorage::GetKernelName "$1")"
-	[[ -z "$dev" ]] && return 1
+function ammStorage::_ParseProc {
+	typeset bdev="$1"
+	typeset field="$2"
 
 	typeset bdev mntpnt fstyp mntopts _junk
 	while read bdev mntpnt fstyp mntopts _junk; do
@@ -535,11 +534,36 @@ function ammStorage::GetMountpoint {
 
 		bdev="$(ammStorage::GetKernelName "$bdev")"
 		if [[ "$bdev" == "$dev" ]]; then
-			echo "$mntpnt"
+			eval echo "\$$field"
 			return 0
 		fi
 	done < /proc/mounts
 	return 1
+}
+
+
+function ammStorage::GetFsType {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	# Try /proc/mounts for an already mounted fs
+	typeset fstyp="$(ammStorage::_ParseProc "$dev" "fstyp")"
+	if [[ -n "$fstyp" ]]; then
+		echo "$fstyp"
+		return 0
+	fi
+
+	# TODO Try with fs.lib discovery
+
+	return 1
+}
+
+
+function ammStorage::GetMountpoint {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	ammStorage::_ParseProc "$dev" "mntpnt"
 }
 
 
@@ -580,6 +604,27 @@ function ammStorage::GetBlockSize {
 	echo $bsize
 }
 
+# @seealso:  https://www.seagate.com/fr/fr/tech-insights/advanced-format-4k-sector-hard-drives-master-ti/
+function ammStorage::GetBlockSizeAvail {
+	typeset dev="$(ammStorage::GetKernelName "$1")"
+	[[ -z "$dev" ]] && return 1
+
+	# nvme id-ns /dev/nvme0n1
+	# lbaf  0 : ms:0   lbads:9  rp:0x2 (in use)
+	# lbaf  1 : ms:0   lbads:12 rp:0 
+	### Or full text:
+	# LBA Format 0 : Metadata Size: 0 bytes - Data Size: 512 bytes - Relative Performance: 0x2 Good (in use)
+	# LBA Format 1 : Metadata Size: 0 bytes - Data Size: 4096 bytes - Relative Performance: 0x1 Better
+
+	# smartctl -c /dev/nvme0n1
+	# Supported LBA Sizes (NSID 0x1)
+	# Id Fmt  Data  Metadt  Rel_Perf
+	# 0 +     512       0         2
+	# 1 -    4096       0         0
+
+
+
+}
 
 # -----------------------------------------------------------------------------
 # Queue management
@@ -644,10 +689,15 @@ function ammStorage::DeviceMapperGet {
 
 		case $btype in
 			# LVM
-			linear)
+			linear|thin)
+				# majmin-src  holders?
+				;;
+			thin-pool)
+				# majmin-src   majmin-dst
 				;;
 			# Crypto
 			crypt)
+				# algo  key   offset?   majmin-src  blocksize?
 				;;
 
 			*)
@@ -655,8 +705,10 @@ function ammStorage::DeviceMapperGet {
 		esac
 
 
-	done < <(ammExec::AsUser "root" "dmsetup table --concise")
+	done < <(ammExec::AsUser "root" "dmsetup table --concise" | tr ';' '\n')
 }
+
+
 
 
 # -----------------------------------------------------------------------------

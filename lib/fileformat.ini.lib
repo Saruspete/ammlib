@@ -1,0 +1,101 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+#function ammFileformatIni::MetaCheck {
+#	ammExec::Require awk
+#}
+function ammFileformatIni::MetaInit {
+	ammLib::Load string
+}
+
+# -----------------------------------------------------------------------------
+# Manage ini configuration files
+# -----------------------------------------------------------------------------
+
+function ammFileformatIni::SetValue {
+	typeset file="$1"
+	typeset section="${2:-}"
+	typeset key="$3"
+	typeset value="$4"
+	typeset stripComments="${5:-false}"
+
+	# Empty file, easy
+	if ! [[ -s "$file" ]]; then
+		if [[ -n "$section" ]]; then
+			echo >>"$file"  "[$section]"
+		fi
+		echo >>"$file"  "$key = $value"
+		return $?
+	fi
+
+	typeset fileTmp="$file.new.$$"
+
+	#
+	# Pure bash implementation. A bit slow, alternative in awk should be added
+	#
+
+	# Read the file to find existing
+	typeset line inTargetSection=false inSection="" foundTarget=false
+	[[ -z "$section" ]] && inTargetSection=true
+	while read lineRaw; do
+		typeset line="$lineRaw"
+
+		# Don't double entries and speedup processing
+		if [[ "$foundTarget" != "true" ]]; then
+			# Remove leading comment, if asked to
+			if [[ "$stripComments" == "true" ]]; then
+				while [[ "${line#[; ]}" != "$line" ]]; do
+					line="${line#[; ]}"
+				done
+			fi
+
+			# Remove ending comment (maybe too greedy ?)
+			line="$(ammString::Trim "${line%%;*}")"
+
+			# New section
+			if [[ "${line:0:1}" == "[" ]] && [[ "${line: -1:1}" == "]" ]]; then
+				# Check if we were in the right one, and must add key before leaving
+				if [[ "$inTargetSection" == "true" ]]; then
+					echo >> "$fileTmp" "$key = $value"
+					inTargetSection=false
+					foundTarget=true
+				fi
+
+				inSection="${line:1:$((${#line}-2))}"
+				if [[ "$inSection" == "$section" ]]; then
+					inTargetSection=true
+					# Special case: stripping leading comments and in section
+					if [[ "$stripComments" == "true" ]]; then
+						lineRaw="$line"
+					fi
+				fi
+			fi
+
+			# Check for current key to replace
+			if [[ "$inTargetSection" == "true" ]] && [[ $line =~ ^[[:space:]]*$key[[:space:]]*=.* ]]; then
+				lineRaw="$key = $value"
+				foundTarget=true
+			fi
+		fi
+
+		# Append new line to tmp file
+		echo >>"$fileTmp" "$lineRaw"
+	done < "$file"
+
+	# Check if we must add a new section
+	if [[ "$foundTarget" != "true" ]]; then
+		[[ -n "$section" ]] && echo >> "$fileTmp"  "[$section]"
+		echo >> "$fileTmp"  "$key = $value"
+	fi
+
+	# Copy content to avoid changing inode
+	cp "$fileTmp" "$file"
+}

@@ -26,18 +26,18 @@ There's a few of these habits to get, and you'll see bash is just like any other
 I wouldn't use Shell to create a web server, and I wouldn't use python or perl to call many other executables.
 
 
-Now a bit of debunk (usually told by people that doesn't master this topic, or simply didn't read the man and think they know it):
+Now a bit of debunk usually told by people that doesn't master this topic, or simply didn't read the man and think they know it. (Note: they are available for all bash scripts, not only this lib):
 
-- *It's not prod-ready*. That's the black-swan: because you never saw prod-quality script doesn't mean they don't exists.
-- *You can't have correct logging in shell*. **Wrong**: Just use the `trap exit` builtin
-- *set -x is unusable*: Please read the man, and check for `PS4` & `BASH_XTACEFD` (see **Good use of PS4 for tracing** at the end of this readme), which are used in this lib
+- *It's not prod-ready*. That's a **black-swan**: because you never saw prod-quality script doesn't mean they don't exists.
+- *You can't have correct logging in shell*. **Wrong**: Just use the `trap exit` builtin to capture fatal errors or normal exit, and use `BASH_SOURCE` `BASH_LINENO` and `FUNCNAME` array within your logging
+- *set -x is unusable*: Please **read the man**, and check for `PS4` & `BASH_XTACEFD` (see **Good use of PS4 for tracing** at the end of this readme), which are used in this lib
 - *I need metrics like execution time, memory, page-faults...*. That's what `time` binary do (binary, not builtin)
-- *I'd need retry in case of failure*. If you don't want a wrapper script, just re-exec the script in the `trap exit` builtin.
+- *I'd need retry in case of failure*. If you don't want a wrapper script, just **re-exec** the script in the `trap exit` builtin.
 - *We're using cloud and S3 storage for XYZ*. Please check [rclone](https://rclone.org/)
 - *Unit-tests are required*. Good news, [shellspec](https://github.com/shellspec/shellspec) has your back ! (And is used in this lib).
 - *Code-coverage is a must-have*. shellspec integrates use [kcov](https://github.com/SimonKagstrom/kcov) to do that. You can also check [bashcov](https://github.com/infertux/bashcov).
 - *Git is required*. Well, scripts are among the best candidates for SCM as they are text only. No binary in the repo, so it's solved by itself
-- *Bash ecosystem is no-match for XYZ*. Bash is available everywhere, very small, works on all OS. It only lacks an stdlib, which this lib try to fill.
+- *Bash ecosystem is no-match for XYZ*. Bash is available everywhere, very small, works on all OS. It only **lacks a stdlib, which this lib try to fill.**
 - *Maintaining large shell scripts is a PITA*. Well... maintaining any low-standard source code is a PITA. This is your emotions talking, not facts.
 
 Truth is: scripts can wrap any binary already available on the system. If you're just developping a self-contained app, or working in an environment you fully control, that's piece of cake job.

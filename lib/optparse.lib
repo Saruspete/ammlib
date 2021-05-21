@@ -149,7 +149,7 @@ function _ammOptparse::Expand {
 			# Special word and special action: stop all parsing
 			if ( set +u; [[ -n "$opt" ]] && [[ -n "${_AMMOPTPARSE_WORDS[$opt]}" ]] ); then
 				_AMMOPTPARSE_WORDS_ACTIVE[$opt]="true"
-				if [[ "${_AMMOPTPARSE_WORDS[$opt]}" == "stop" ]]; then
+				if [[ "${_AMMOPTPARSE_WORDS[$opt]}" == "break" ]]; then
 					skipall=true
 				fi
 			fi
@@ -387,7 +387,7 @@ function ammOptparse::AddActionWord {
 	typeset action="$1"; shift
 
 	case "$action" in
-		skip|break|continue)
+		break|continue)
 			;;
 		*)
 			if ! ammEnv::IsFunc "$action"; then
@@ -503,11 +503,11 @@ function ammOptparse::Parse {
 				typeset action="${_AMMOPTPARSE_WORDS[$var]}"
 				case $action in
 					# Stop parsing more options
-					stop)
+					break)
 						lastvar=""
 						break
 						;;
-					skip)
+					continue)
 						lastvar=""
 						continue
 						;;

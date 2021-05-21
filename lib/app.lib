@@ -966,6 +966,11 @@ function ammApp::Upgrade {
 function ammApp::Main {
 	typeset op="${1:-}"; shift
 
+	if [[ -z "${APP_ROOT:-}" ]]; then
+		ammLog::Error "The script didn't call ammApp::Init before ammApp::Main"
+		return 99
+	fi
+
 	typeset -i r=0
 	case "$op" in
 		start)
@@ -1003,18 +1008,21 @@ function ammApp::Main {
 			fi
 			;;
 		*)
-			if ammEnv::IsFunc "appRun$op"; then
-				appRun$op "$@"
+			if ammEnv::IsFunc "appRun::$op"; then
+				appRun::$op "$@"
 			else
 				ammLog::Error "Usage: $0 <start|stop|restart|status|upgrade>"
 
-				typeset extrafuncs="$(grep "function appRun" "$MYSELF"|grep -v '^#'|grep -Po 'appRun[^ ]+')"
+				typeset extrafuncs="$(grep "function appRun::" "$MYSELF"|grep -v '^#'|grep -Po 'appRun::[^ {]+')"
 				if [[ -n "$extrafuncs" ]]; then
 					typeset extrafunc extratxt
 					for extrafunc in $extrafuncs; do
-						extratxt+="${extrafunc#appRun} "
+						[[ "$extrafunc" =~ ^(Start|Stop|Restart|Reload|Status) ]] && continue
+						extratxt+="${extrafunc#appRun::}${extratxt:+ }"
 					done
-					ammLog::Error "Extra opts: $extratxt"
+					ammLog::Error "Extra: $0 <${extratxt// /|}>"
+
+					ammLog::Error "Add --help for more details"
 				fi
 			fi
 			;;

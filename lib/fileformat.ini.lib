@@ -20,6 +20,12 @@ function ammFileformatIni::MetaInit {
 # Manage ini configuration files
 # -----------------------------------------------------------------------------
 
+# @description  Set a value in an ini file. Create it if needed
+# @arg $1  (path)   ini-file to work on
+# @arg $2  (string) ini-section in which to set the given key
+# @arg $3  (string) ini-key to set
+# @arg $4  (string) value to set
+# @arg $5  (string)(optionnal) Should the commented values/sections be uncommented if usable. Default: false
 function ammFileformatIni::SetValue {
 	typeset file="$1"
 	typeset section="${2:-}"

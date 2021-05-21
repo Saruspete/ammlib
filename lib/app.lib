@@ -620,7 +620,7 @@ function ammApp::VersionList {
 		done < <(ammHttp::GithubReleaseList "$UPG_GHPROJECT")
 		return $?
 	# Custom function
-	elif ammEnv::IsFunc "appUpgradeVersionList"; then
+	elif ammEnv::IsFunc "appUpgrade::VersionList"; then
 		ammUpgradeVersionList
 		return $?
 	# No listing available
@@ -634,15 +634,16 @@ function ammApp::VersionList {
 # 
 # Upgrade steps:
 # 0) Get latest version string if none provided and check if update needed
-# 1) Download required content in tmpdir
-# 2) Prepare content (extract, compile)
-# 3) Deploy to target folder
-# 4) Generate / Use new configuration
-# 5) Test the binary in standalone environment
-# 6) Stop current version
-# 7) Call a snapshot on all services within the group
-# 8) test the new version
-# 9) Update current to new version
+# 1) Get URLs of files to download for given version
+# 2) Download required content in tmpdir
+# 3) Prepare content (extract, compile)
+# 4) Deploy to target folder
+# 5) Generate / Use new configuration
+# 6) Test the binary in standalone environment
+# 7) Stop current version
+# 8) Call a snapshot on all services within the group
+# 9) test the new version
+# 10) Update current to new version
 function ammApp::Upgrade {
 	typeset versionNew="${1:-}"
 
@@ -661,9 +662,9 @@ function ammApp::Upgrade {
 
 	# 0) No new version specified. Try to get the latest
 	if [[ -z "$versionNew" ]]; then
-		if ammEnv::IsFunc "appUpgradeGetLatest"; then
-			ammLog::Debug "Calling 'appUpgradeGetLatest' to get latest version"
-			versionNew="$(appUpgradeGetLatest)"
+		if ammEnv::IsFunc "appUpgrade::GetLatest"; then
+			ammLog::Debug "Calling 'appUpgrade::GetLatest' to get latest version"
+			versionNew="$(appUpgrade::GetLatest)"
 
 			if [[ -n "$versionNew" ]]; then
 				ammLog::Info "Found latest version: '$versionNew'"
@@ -688,7 +689,7 @@ function ammApp::Upgrade {
 
 		# No helper, no var...
 		else
-			ammLog::Error "No version specified and no helper 'appUpgradeGetLatest' defined"
+			ammLog::Error "No version specified and no helper 'appUpgrade::GetLatest' defined"
 			return 1
 		fi
 	fi
@@ -714,10 +715,10 @@ function ammApp::Upgrade {
 	#
 	ammLog::StepBegin "Preparing upgrade"
 
-	# 0) Get the URL to fetch
-	if ammEnv::IsFunc "appUpgradeGetUrls"; then
-		urls="$(appUpgradeGetUrls "$versionNew")"
-		ammLog::Debug "function appUpgradeGetUrls returned: '$urls'"
+	# 1) Get URLs of files to download for given version
+	if ammEnv::IsFunc "appUpgrade::GetUrls"; then
+		urls="$(appUpgrade::GetUrls "$versionNew")"
+		ammLog::Debug "function appUpgrade::GetUrls returned: '$urls'"
 	elif [[ -n "${UPG_GHPROJECT}" ]]; then
 		# Try if supplied a release
 		ammLog::Debug "Trying to get release assets from '$UPG_GHPROJECT' version '$versionNew'"
@@ -759,7 +760,7 @@ function ammApp::Upgrade {
 
 
 	#
-	# 1) Download new package or sources
+	# 2) Download required content in tmpdir
 	#
 	if [[ -n "$urls" ]]; then
 
@@ -784,17 +785,16 @@ function ammApp::Upgrade {
 	fi
 
 	#
-	# 2) Prepare content (compile, extract...)
+	# 3) Prepare content (compile, extract...)
 	#
 
-
 	# Custom preparation function
-	if ammEnv::IsFunc "appUpgradePrepare"; then
+	if ammEnv::IsFunc "appUpgrade::Prepare"; then
 		# Call custom function
-		appUpgradePrepare "$versionNew" "$versionOld" "$tmpdir"
+		appUpgrade::Prepare "$versionNew" "$versionOld" "$tmpdir"
 		r+=$?
 
-	# 2) Extract archives into extraction folder
+	# Extract archives into extraction folder
 	else
 		# Look in temp folder for archive to extract
 		typeset f
@@ -822,12 +822,12 @@ function ammApp::Upgrade {
 	ammLog::StepEnd $r
 
 	#
-	# 3) Deploy new version into target
+	# 4) Deploy to target folder
 	#
 	ammLog::StepBegin "Deploying new version to '$appdir'"
 
-	if ammEnv::IsFunc "appUpgradeDeploy"; then
-		appUpgradeDeploy "$versionNew" "$versionOld" "$tmpextract" "$appdir"
+	if ammEnv::IsFunc "appUpgrade::Deploy"; then
+		appUpgrade::Deploy "$versionNew" "$versionOld" "$tmpextract" "$appdir"
 	else
 
 		# Check for bin presency
@@ -848,42 +848,42 @@ function ammApp::Upgrade {
 	ammLog::StepEnd $r
 
 	#
-	# 4) Generate new configuration
+	# 5) Generate / Use new configuration
 	#
 	ammLog::StepBegin "Generating and deploy new configuration"
-	if ammEnv::IsFunc  "appUpgradeConfigure"; then
-		appUpgradeConfigure "$versionNew" "$versionOld" "$appdir"
+	if ammEnv::IsFunc  "appUpgrade::Configure"; then
+		appUpgrade::Configure "$versionNew" "$versionOld" "$appdir"
 		r+=$?
 	elif [[ -n "$RUN_CFG" ]]; then
 		ammLog::Debug "Using '$RUN_CFG' (TODO! )"
 		#cp "$RUN_CFG" "$CFG_ appdir"
 	else
-		ammLog::Info "No function 'appUpgradeConfigure'. Skipping"
+		ammLog::Info "No function 'appUpgrade::Configure'. Skipping"
 	fi
 	ammLog::StepEnd
 
 	#
-	# 5) Testing new version in standalone env
+	# 6) Test the binary in standalone environment
 	#
 	ammLog::StepBegin "Testing new version in namespace"
-	if ammEnv::IsFunc "appUpgradeTest"; then
+	if ammEnv::IsFunc "appUpgrade::Test"; then
 		# Generate a new network & fs namespace
 		ammUpgradeTest "$versionNew" "$versionOld"
 	else
-		ammLog::Info "No function 'appUpgradeTest'. Skipping"
+		ammLog::Info "No function 'appUpgrade::Test'. Skipping"
 	fi
 	ammLog::StepEnd
 
 
 	#
-	# 6) Stop current version
+	# 7) Stop current version
 	#
 	ammLog::StepBegin "Stopping current version"
 	ammApp::Stop
 	ammLog::StepEnd $?
 
 	#
-	# 7) Call a snapshot on required services
+	# 8) Call a snapshot on all services within the group
 	#
 
 	ammLog::StepBegin "Saving current state (snapshot) for easy rollback"
@@ -930,11 +930,11 @@ function ammApp::Upgrade {
 	ammLog::StepEnd $r
 
 	#
-	# 8) Test the new version
+	# 9) test the new version
 	#
 	ammLog::StepBegin "Testing new version with real data"
-	if ammEnv::IsFunc "appUpgradeTest"; then
-		appUpgradeTest "$versionNew"
+	if ammEnv::IsFunc "appUpgrade::Test"; then
+		appUpgrade::Test "$versionNew"
 		r=$?
 	else
 		RUN_VERS="$versionNew" ammApp::Start
@@ -950,7 +950,7 @@ function ammApp::Upgrade {
 	ammLog::StepEnd
 
 	#
-	# 9) Update curret version to new version
+	# 10) Update current version to new version
 	#
 	ammLog::StepBegin "Setting version '$versionNew' as 'current'"
 	ammApp::VersionSetCurrent "$versionNew"

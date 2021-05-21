@@ -51,10 +51,10 @@ function ammApp::Init {
 	typeset -gr APP_SDIR="${__AMMLIB_CALLPATH}"
 	typeset -gr APP_GRPN="${APP_INST%%-*}"
 	typeset -gr APP_NAME="${APP_INST#*-}"
-	typeset -g  APP_BASE="${APP_ROOT}/apps/${APP_GRPN}/${APP_NAME}/"
-	typeset -g  DAT_BASE="${APP_ROOT}/data/${APP_GRPN}/${APP_NAME}/"
-	typeset -g  SRC_BASE="${APP_ROOT}/srcs/${APP_GRPN}/${APP_NAME}/"
-	typeset -g  TMP_BASE="${APP_ROOT}/temp/${APP_GRPN}/${APP_NAME}/"
+	typeset -g  APP_BASE="${APP_ROOT}/apps/${APP_GRPN}/${APP_NAME}"
+	typeset -g  DAT_BASE="${APP_ROOT}/data/${APP_GRPN}/${APP_NAME}"
+	typeset -g  SRC_BASE="${APP_ROOT}/srcs/${APP_GRPN}/${APP_NAME}"
+	typeset -g  TMP_BASE="${APP_ROOT}/temp/${APP_GRPN}/${APP_NAME}"
 
 
 	# Can be overridden

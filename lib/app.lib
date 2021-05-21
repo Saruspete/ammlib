@@ -319,6 +319,7 @@ function ammApp::Start {
 	typeset opts=""
 	typeset pidf=""
 	typeset version="${RUN_VERS:-current}"
+	typeset -i r
 
 	# Add common options
 	if [[ -n "$RUN_OPTCOMMON" ]]; then
@@ -329,11 +330,12 @@ function ammApp::Start {
 	#
 	# User defined startup func, just use it
 	#
-	if ammEnv::IsFunc "appStart"; then
-		ammLog::Info "Starting with custom appStart function"
-		appStart "$opts"
-		ammLog::Info "Result: $?"
-		return $?
+	if ammEnv::IsFunc "appRun::Start"; then
+		ammLog::Info "Starting with custom appRun::Start"
+		appRun::Start "$opts"
+		r=$?
+		ammLog::Info "Result: $r"
+		return $r
 
 	#
 	# Variables defined for standard management
@@ -418,7 +420,7 @@ function ammApp::Start {
 
 	# Nothing...
 	else
-		ammLog::Error "Cannot use generic start: No function 'run_start' and no var 'RUN_BIN' defined"
+		ammLog::Error "Cannot use generic start: No function 'appRun::Start' and no var 'RUN_BIN' defined"
 		return 1
 	fi
 
@@ -430,8 +432,9 @@ function ammApp::Stop {
 	typeset pid="" out=""
 	typeset r=99
 
-	if ammEnv::IsFunc "appStop"; then
-		appStop "$@"
+	if ammEnv::IsFunc "appRun::Stop"; then
+		ammLog::Info "Stopping with custom appRun::Stop"
+		appRun::Stop "$@"
 		r=$?
 	else
 		if pid="$(ammApp::IsRunning true)"; then
@@ -463,16 +466,23 @@ function ammApp::Stop {
 
 function ammApp::Status {
 
-	ammApp::IsRunning "$@"
-	typeset -i r=$?
+	typeset -i r=0
 
-	case $r in
-		0)   echo "Running"; r=0  ;;
-		1)   echo "Stopped"; r=0  ;;
-		2)   echo "Dead";    r=1  ;;
-		99)  echo "Unimplemented" ;;
-		*)   echo "Unhandled return code '$r'"; r=99 ;;
-	esac
+	if ammEnv::IsFunc "appRun::Status"; then
+		appRun::Status "$@"
+		r=$?
+	else
+		ammApp::IsRunning "$@"
+		r=$?
+
+		case $r in
+			0)   echo "Running"; r=0  ;;
+			1)   echo "Stopped"; r=0  ;;
+			2)   echo "Dead";    r=1  ;;
+			99)  echo "Unimplemented" ;;
+			*)   echo "Unhandled return code '$r'"; r=99 ;;
+		esac
+	fi
 
 	return $r
 }
@@ -497,8 +507,8 @@ function ammApp::IsRunning {
 	typeset -i r=99
 
 	# Custom status handled by script
-	if ammEnv::IsFunc "appIsRunning"; then
-		appIsRunning "$@"
+	if ammEnv::IsFunc "appRun::IsRunning"; then
+		appRun::IsRunning "$@"
 		r=$?
 
 	# Standard status handling

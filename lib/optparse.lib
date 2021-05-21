@@ -381,24 +381,25 @@ function ammOptparse::AddOpt {
 }
 
 # @description Add one or more words that will infer on the parsing
-# @arg $1  (string) words to handle, separated by '|'
-# @arg $2  (string) action for the words. Can be 'stop'
+# @arg $1  (string) action for the words. Can be 'skip', 'break', 'continue' or a function name
+# @arg $@  (string) words to handle
 function ammOptparse::AddActionWord {
-	typeset words="$1"
-	typeset action="${2:-stop}"
+	typeset action="$1"; shift
 
 	case "$action" in
-		stop|skip)
+		skip|break|continue)
 			;;
 		*)
-			ammLog::Error "Invalid action '$action' for words '$words'"
-			return 1
+			if ! ammEnv::IsFunc "$action"; then
+				ammLog::Error "Invalid action '$action' for words '$words'"
+				return 1
+			fi
 			;;
 	esac
 
 	# Register words with requested action
 	typeset word
-	for word in ${words//|/ }; do
+	for word in "$@"; do
 		_AMMOPTPARSE_WORDS[$word]="$action"
 	done
 }

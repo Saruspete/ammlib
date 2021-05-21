@@ -803,16 +803,26 @@ function ammOptparse::Help {
 			desc="(disabled) $desc"
 		fi
 
-		# Append current value to the end
+		# Append current value to the end (+ handle color chars)
+		typeset -i printExtraStart=0 printExtraEnd=0
 		if (set +u; [[ -n "${_AMMOPTPARSE_VALUE[$optid]}" ]] ); then
+			printExtraStart="$(( ${#desc} + 17 ))" # size + ". Current value: '"
 			desc+=". Current value: '$currValBold${_AMMOPTPARSE_VALUE[$optid]}$currValRst'"
+			printExtraEnd="$(( ${#desc} - ${#currValRst} ))"
 		fi
 
 		# printf is a shell builtin
+		typeset -i printedDescChars=0
 		while [[ -n "$desc" ]]; do
-			printf "  %-${optSize}.${optSize}s    %.${descSize}s\n" "$opts" "$desc"
-			desc="${desc:$descSize}"
+			# Try to account the colors for the value
+			typeset -i descSizeTmp=$descSize
+			[[ $(( $printedDescChars + $descSize ))    -gt $printExtraStart ]] && descSizeTmp+=${#currValBold}
+			[[ $(( $printedDescChars + $descSizeTmp )) -gt $printExtraEnd ]]   && descSizeTmp+=${#currValRst}
+
+			printf "  %-${optSize}.${optSize}s    %.${descSizeTmp}s\n" "$opts" "$desc"
+			desc="${desc:$descSizeTmp}"
 			opts="${opts:$optSize}"
+			printedDescChars+=$descSizeTmp
 		done
 	done
 }

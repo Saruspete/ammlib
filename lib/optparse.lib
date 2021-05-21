@@ -147,7 +147,7 @@ function _ammOptparse::Expand {
 			options+=("$opt")
 
 			# Special word and special action: stop all parsing
-			if ( set +u; [[ -n "${_AMMOPTPARSE_WORDS[$opt]}" ]] ); then
+			if ( set +u; [[ -n "$opt" ]] && [[ -n "${_AMMOPTPARSE_WORDS[$opt]}" ]] ); then
 				_AMMOPTPARSE_WORDS_ACTIVE[$opt]="true"
 				if [[ "${_AMMOPTPARSE_WORDS[$opt]}" == "stop" ]]; then
 					skipall=true
@@ -313,8 +313,8 @@ function ammOptparse::AddOpt {
 			# Long option
 			else
 				if (set +u; [[ -n "${_AMMOPTPARSE_OPTLONG[$var]}" ]] ); then
-					typeset longid="${_AMMOPTPARSE_OPTLONG[$var]}"
-					ammLog::Warning "Long option '$opt' is already registed as '$longid'"
+					typeset conflictid="${_AMMOPTPARSE_OPTLONG[$var]}"
+					ammLog::Warning "Long option '$opt' (ID '$id') already registed as '$conflictid' at ${_AMMOPTPARSE_REGISTRANTS[$conflictid]}"
 					parseErr+=1
 					continue
 				fi
@@ -349,7 +349,7 @@ function ammOptparse::AddOpt {
 				fi
 			fi
 		else
-			ammLog::Warning "The registered option '$opt' is invalid"
+			ammLog::Warning "The registered option '$opt' has invalid format (called from $(ammLog::Stackdump 1 1))"
 			parseErr+=1
 			continue
 		fi
@@ -735,7 +735,7 @@ function ammOptparse::GetAll {
 # @description Get unparsed options. To be used as 'eval set -- $(ammOptparse::GetUnparsedOpts)'
 # @noarg
 function ammOptparse::GetUnparsedOpts {
-	for i in ${!__AMMLIB_CALLOPTS[@]}; do
+	for i in "${!__AMMLIB_CALLOPTS[@]}"; do
 		[[ -n "${__AMMLIB_CALLOPTS[$i]}" ]] && echo -n "\"${__AMMLIB_CALLOPTS[$i]}\" "
 	done
 }

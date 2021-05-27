@@ -391,7 +391,7 @@ function ammOptparse::AddActionWord {
 			;;
 		*)
 			if ! ammEnv::IsFunc "$action"; then
-				ammLog::Error "Invalid action '$action' for words '$words'"
+				ammLog::Error "Invalid action '$action' for words '$@'"
 				return 1
 			fi
 			;;

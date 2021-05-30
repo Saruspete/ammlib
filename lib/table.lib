@@ -310,9 +310,11 @@ function ammTable::SetRowColor {
 	typeset color="$1"
 	typeset count="${2:-1}"
 
+	typeset colors="$(ammLog::Color $color)"
+
 	typeset -i i=0
 	while [[ $i -lt $count ]]; do
-		__AMMTABLE_ROWSCOLOR[$((${#__AMMTABLE_ROWS[@]}+$i))]="$color"
+		__AMMTABLE_ROWSCOLOR[$((${#__AMMTABLE_ROWS[@]}+$i))]="$colors"
 		i+=1
 	done
 }

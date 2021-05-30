@@ -49,6 +49,7 @@ typeset -ga __AMMTABLE_COLCFG_CALLBACK=()
 
 # Rows content
 typeset -ga __AMMTABLE_ROWS=()
+typeset -ga __AMMTABLE_ROWSCOLOR=()
 typeset -g  __AMMTABLE_ROWSEP=$'\n'
 typeset -ga __AMMTABLE_ROWLAST=()
 
@@ -157,6 +158,7 @@ function ammTable::Reset {
 	__AMMTABLE_COLCFG_OVERFLOW=()
 	__AMMTABLE_COLCFG_CALLBACK=()
 	__AMMTABLE_ROWS=()
+	__AMMTABLE_ROWSCOLOR=()
 	__AMMTABLE_ROWLAST=()
 
 	__AMMTABLE_DISPLAYMODE=""
@@ -301,6 +303,20 @@ function ammTable::AddRow {
 	done
 }
 
+# @description Set the color of the next row to be added
+# @arg $1   (string) The color of the row (as returned by ammLog::Color)
+# @arg $2   (int) optionnal count of next rows to have their color assigned
+function ammTable::SetRowColor {
+	typeset color="$1"
+	typeset count="${2:-1}"
+
+	typeset -i i=0
+	while [[ $i -lt $count ]]; do
+		__AMMTABLE_ROWSCOLOR[$((${#__AMMTABLE_ROWS[@]}+$i))]="$color"
+		i+=1
+	done
+}
+
 # -----------------------------------------------------------------------------
 # Display
 # -----------------------------------------------------------------------------
@@ -366,7 +382,7 @@ function ammTable::DisplayHeader {
 }
 
 # @description  Display only specific row
-
+# @arg $@  (int) The row ID to display
 function ammTable::DisplayRow {
 
 	typeset rowid
@@ -380,6 +396,13 @@ function ammTable::DisplayRow {
 			#set -x
 			#datas=(${__AMMTABLE_ROWS[$rowid]//$__AMMTABLE_ROWSEP/" "})
 			readarray -t datas < <(echo "${__AMMTABLE_ROWS[$rowid]}")
+		fi
+
+		# Table color
+		typeset colorEnd=""
+		if (set +u; [[ -n "${__AMMTABLE_ROWSCOLOR[$rowid]}" ]] ); then
+			echo -ne "${__AMMTABLE_ROWSCOLOR[$rowid]}"
+			colorEnd="$(ammLog::Color "reset")"
 		fi
 
 		# Display each column according to cfg
@@ -400,6 +423,12 @@ function ammTable::DisplayRow {
 
 			printf " %-${len}.${len}s $__AMMTABLE_DISPLAYSEP" "$data"
 		done
-		echo
+
+		# End of line
+		if [[ -n "$colorEnd" ]]; then
+			echo -e "$colorEnd"
+		else
+			echo
+		fi
 	done
 }

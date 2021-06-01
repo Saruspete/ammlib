@@ -61,6 +61,7 @@ typeset -g  __AMMTABLE_DISPLAYSEP="|"
 # Used as cache for column size
 typeset -g  __AMMTABLE_CACHE_TERMSIZE=0
 typeset -ga __AMMTABLE_CACHE_COLSIZE=()
+typeset -ga __AMMTABLE_CACHE_COLMAXSIZE=()
 
 function ammTable::_TermCols {
 	echo "${COLUMNS:-$(tput cols)}"
@@ -124,7 +125,9 @@ function ammTable::_ColGetSize {
 				;;
 
 			fit)
-				ammLog::Error "TODO: Fitting is not yet done"
+				colsize="${__AMMTABLE_CACHE_COLMAXSIZE[$colidloop]}"
+				# Consider the size as fixed now
+				sumfixed+=$colsize
 				;;
 		esac
 
@@ -214,7 +217,7 @@ function ammTable::AddColumn {
 		case "$key" in
 			size)
 				case "$val" in
-					*%|*%total|fill|max|[0-9]|[0-9][0-9]) __AMMTABLE_COLCFG_SIZE[$colid]="$val" ;;
+					*%|*%total|fill|fit|[0-9]|[0-9][0-9]) __AMMTABLE_COLCFG_SIZE[$colid]="$val" ;;
 					*) err="Must be '%' '%total' 'fill' 'max' or fixed int" ;;
 				esac
 				;;
@@ -261,6 +264,9 @@ function ammTable::AddColumn {
 		__AMMTABLE_COLCFG_SIZE[$colid]="${#name}"
 	fi
 
+	# Prepare the cache for fit
+	__AMMTABLE_CACHE_COLMAXSIZE[$colid]=0
+
 	return $r
 }
 
@@ -290,6 +296,11 @@ function ammTable::AddRow {
 		# Process every column
 		typeset colval="" rowstr=""
 		for colval in "${fields+${fields[@]}}"; do
+			# Cache for fitting
+			typeset -i strlen="${#colval}"
+			[[ "$strlen" -gt "${__AMMTABLE_CACHE_COLMAXSIZE[$colid]}" ]] && __AMMTABLE_CACHE_COLMAXSIZE[$colid]=$strlen
+
+			# Construct the final str
 			rowstr+="${colval}${__AMMTABLE_ROWSEP}"
 			__AMMTABLE_ROWLAST[$colid]="$colval"
 			colid+=1

@@ -396,6 +396,7 @@ function ammApp::Start {
 		# Closing unwanted FDs
 		typeset fdToClose="" fd=
 		for fd in /proc/$$/*; do
+			fd="${fd##*/}"
 			if [[ $fd -gt 2 ]]; then
 				fdToClose+="$fd>&- "
 			fi

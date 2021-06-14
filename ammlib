@@ -1438,11 +1438,11 @@ function ammPath::IsSecure {
 function ammPath::IsWritable {
 	typeset path="$1"
 
-	typeset element parent
-	while read e; do
-		if [[ -e "$e" ]]; then
-			if ! [[ -w "$e" ]]; then
-				echo "Not writable: '$e'"
+	typeset element
+	while read element; do
+		if [[ -e "$element" ]]; then
+			if ! [[ -w "$element" ]]; then
+				echo "Not writable: '$element'"
 				return 1
 			fi
 			return 0

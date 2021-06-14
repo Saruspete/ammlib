@@ -42,6 +42,7 @@ typeset -gA  _AMMOPTPARSE_OPTALL
 # Special words
 typeset -gA  _AMMOPTPARSE_WORDS
 typeset -gA  _AMMOPTPARSE_WORDS_ACTIVE
+typeset -gA  _AMMOPTPARSE_OPTREQUIRED
 
 # Options value, description and backtrace
 typeset -gA  _AMMOPTPARSE_VALUE
@@ -405,6 +406,34 @@ function ammOptparse::AddActionWord {
 }
 
 
+
+# @description  Require one or more options to have a value
+# @arg $@  (string) options to require
+function ammOptparse::Require {
+	typeset action="$1"; shift
+
+	typeset opt
+	for opt in "$@"; do
+		typeset id="$(_ammOptparse::OptToId "$opt")"
+		if [[ -z "$id" ]]; then
+			ammLog::Error "Cannot require an undefined option '$opt' at '$(ammLog::StackDump 2 1)'."
+			continue
+		fi
+		_AMMOPTPARSE_OPTREQUIRED[$id]="$action"
+	done
+}
+
+function ammOptparse::RequireOrDie {
+	ammOptparse::Require "die" "$@"
+}
+
+function ammOptparse::RequireOrAsk {
+	ammLib::Require "input"
+	ammOptparse::Require "ask" "$@"
+}
+
+
+
 # @description  Parse the options, optionnally only those matching the prefix $1
 # @arg $@  (string) Prefix
 function ammOptparse::Parse {
@@ -642,7 +671,9 @@ function ammOptparse::Parse {
 
 	# Validation must be done after due to default values
 	for id in ${!_AMMOPTPARSE_VALUE[@]}; do
-		#typeset val="${_AMMOPTPARSE_VALUE[$id]}"
+		# Skip empty values (must be required by ammOptparse::RequireOrXXX)
+		[[ -z "${_AMMOPTPARSE_VALUE[$id]}" ]] && continue
+
 		# If we have a validator, we should test it
 		if (set +u; [[ -n "${_AMMOPTPARSE_VALIDATOR[$id]}" ]] ); then
 			typeset validator="${_AMMOPTPARSE_VALIDATOR[$id]}"
@@ -680,6 +711,32 @@ function ammOptparse::Parse {
 			exit 0
 		fi
 	fi
+
+	# Require options and set action
+	typeset -a requiredMissingOptsDie=() requiredMissingOptsAsk=()
+	for id in ${!_AMMOPTPARSE_OPTREQUIRED[@]}; do
+		if ( set +u; [[ -z "${_AMMOPTPARSE_VALUE[$id]}" ]]; ); then
+			case "${_AMMOPTPARSE_OPTREQUIRED[$id]}" in
+				ask)
+					requiredMissingOptsAsk+=("$id")
+					;;
+				die)
+					requiredMissingOptsDie+=("$id")
+					;;
+			esac
+		fi
+	done
+	# Die early if any missing option is a die
+	if [[ -n "${requiredMissingOptsDie:-}" ]]; then
+		ammLog::Die "Required options are missing: ${requiredMissingOptsDie[@]}"
+	fi
+	# Ask interactively if possible
+	if [[ -n "${requiredMissingOptsAsk:-}" ]]; then
+		for id in "${requiredMissingOptsAsk[@]}"; do
+			_AMMOPTPARSE_VALUE[$id]="$(ammInput::Get "$id" "${_AMMOPTPARSE_DESCRIPTION[$id]}" "" "" "${_AMMOPTPARSE_VALIDATOR[$id]}")"
+		done
+	fi
+
 
 	ammLib::HookTrigger "after:optparse:parse"
 	return $r

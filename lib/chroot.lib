@@ -27,19 +27,22 @@ function ammChroot::_OSInit {
 	(set +u; [[ -n "${__AMMCHROOT_OS:-}" ]] ) && return 0
 
 	for sublib in $(ammLib::LocatePattern "chroot.*"); do
+		typeset sublibname="${sublib#*.}"; sublibname="${sublibname%.lib}"
 		ammLog::Debug "Trying to load sublib $sublib"
-
 		if ammLib::Loadable "$sublib"; then
 			ammLib::Load "$sublib"
+			__AMMCHROOT_OS+=("$sublibname")
 		else
 			ammLog::Warning "Unable to load '$sublib'"
 		fi
 	done
 
-	if ( set +u; [[ -n "${__AMMCHROOT_OS[@]:-}" ]] ); then
+	if [[ -z "${__AMMCHROOT_OS:-}" ]]; then
 		ammLog::Warning "No chroot sublib was loaded. Chroot unavailable"
 		return 1
 	fi
+
+	echo "${__AMMCHROOT_OS[@]}"
 }
 
 function ammChroot::_OSCall {
@@ -74,7 +77,7 @@ function ammChroot::OSNameValidate {
 
 function ammChroot::OSNameList {
 	ammChroot::_OSInit
-	echo $__AMMCHROOT_OS
+	echo "${__AMMCHROOT_OS[@]}"
 }
 
 function ammChroot::DirValidate {

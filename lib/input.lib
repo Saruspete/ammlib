@@ -364,15 +364,10 @@ function ammInput::Populate {
 						continue
 					fi
 
-					# Skip non-option params
-					if [[ "${var:0:2}" != "--" ]]; then
-						continue
-					fi
-
 					# remove leading dash
 					var="${var##--}"
 					# if our option parsing can be done
-					if [[ "$var" == $pfx* ]]; then
+					if [[ -n "$pfx" ]] && [[ "$var" == $pfx* ]]; then
 
 						ammLog::Debug "Processing input related var '$var' having prefix '$pfx'"
 						# remove prefix and add reply
@@ -393,10 +388,9 @@ function ammInput::Populate {
 						__AMMINPUT_REPLIES_FROMCMD[$id]="$val"
 						# Map input with ID for replay
 						 #__AMMINPUT_IDS[$id]="$orig"
-						# Consume optparse
 					else
 						# Push back elemenets as they are read
-						args[${#args[@]}]="$var"
+						args[${#args[@]}]="$orig"
 					fi
 				done
 

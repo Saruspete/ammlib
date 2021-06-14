@@ -1395,7 +1395,15 @@ function ammEnv::PathIsWritable {
 # @arg $1  (path) The path to decompose
 function ammPath::Decompose {
 	typeset path="$1"
-	path="$(realpath "$path")"
+
+	# If path exists, get its absolute value
+	if [[ -e "$path" ]]; then
+		path="$(realpath "$path")"
+	# else, if path is not absolute either
+	elif [[ "${path:0:1}" != "/" ]]; then
+		path="$(realpath "$(pwd -P)")/$path"
+	fi
+
 	while [[ -n "$path" ]]; do
 		echo "$path"
 		path="${path%/*}"
@@ -1470,6 +1478,35 @@ function ammPath::IsEmpty {
 	return 0
 }
 
+# @description  Check if a path is valid
+function ammPath::IsValid {
+	typeset path="$1"
+
+	# Early return for existing files or path
+	[[ -d "$path" ]] && return 0
+	[[ -e "$path" ]] && return 0
+	[[ -z "$path" ]] && return 1
+
+	# Decompose path
+	typeset part= full=
+	typeset -a parts=(${path//\// })
+	typeset -i partId=0 partIdMax=$((${#parts[@]} -1))
+	[[ "${path:0:1}" == "/" ]] && full="/"
+	for partId in ${!parts[@]}; do
+		part="${parts[$partId]}"
+		full+="$part"
+		# More parts to be processed after current one
+		if [[ $partId -lt $partIdMax ]]; then
+			if [[ -e "$full" ]] && ! [[ -d "$full" ]]; then
+				ammLog::Debug "Path '$path' is invalid as '$full' is a file and would stop creation"
+				return 1
+			fi
+		fi
+		full+="/"
+	done
+
+	return 0
+}
 
 # @description  Copy a selection of files with their relative structure
 # @arg $1  (path) Source path where to find the content

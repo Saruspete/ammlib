@@ -364,10 +364,15 @@ function ammInput::Populate {
 						continue
 					fi
 
+					# Skip non-option params
+					if [[ "${var:0:2}" != "--" ]]; then
+						continue
+					fi
+
 					# remove leading dash
 					var="${var##--}"
 					# if our option parsing can be done
-					if [[ "$var" = $pfx* ]]; then
+					if [[ "$var" == $pfx* ]]; then
 
 						ammLog::Debug "Processing input related var '$var' having prefix '$pfx'"
 						# remove prefix and add reply

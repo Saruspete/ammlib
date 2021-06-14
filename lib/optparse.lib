@@ -733,7 +733,7 @@ function ammOptparse::Parse {
 	# Ask interactively if possible
 	if [[ -n "${requiredMissingOptsAsk:-}" ]]; then
 		for id in "${requiredMissingOptsAsk[@]}"; do
-			_AMMOPTPARSE_VALUE[$id]="$(ammInput::Get "$id" "${_AMMOPTPARSE_DESCRIPTION[$id]}" "" "" "${_AMMOPTPARSE_VALIDATOR[$id]}")"
+			_AMMOPTPARSE_VALUE[$id]="$(ammInput::Get "$id" "${_AMMOPTPARSE_DESCRIPTION[$id]} (option --$id)" "" "" "${_AMMOPTPARSE_VALIDATOR[$id]}")"
 		done
 	fi
 

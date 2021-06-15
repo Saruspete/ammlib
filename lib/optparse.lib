@@ -122,8 +122,14 @@ function _ammOptparse::Expand {
 			opt="${opt%%=*}"
 		fi
 
+		# We'll stop processing more after -- to avoid messing with non-standard options
+		if [[ "$opt" == "--" ]]; then
+			ammLog::Debug "Plain -- found, stopping expansion"
+			skipall=true
+			continue
+
 		# long option
-		if [[ ${opt:0:2} == "--" ]]; then
+		elif [[ ${opt:0:2} == "--" ]]; then
 			options+=("$opt")
 			ammLog::Debug "Long option '$opt'"
 
@@ -496,7 +502,9 @@ function ammOptparse::Parse {
 		# Special case: -- to stop processing
 		if [[ "$var" == "--" ]]; then
 			ammLog::Debug "Found '--' at position '$optid'. Stopping processing"
-			return $r
+			# Remove it from options
+			__AMMLIB_CALLOPTS[$optid]=""
+			break
 		fi
 
 		# Check if we accept unparsed options, and our previous one was faulty

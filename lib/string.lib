@@ -754,7 +754,7 @@ function ammString::ExpandStringBash {
 		# Not a bash composite group, just use it raw
 		else
 			if [[ -n "$group" ]]; then
-					ammLog::Debug "Adding '$seq'"
+					ammLog::Debug "Adding '$group'"
 				values+=($group)
 			fi
 		fi

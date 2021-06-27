@@ -751,10 +751,19 @@ function ammString::ExpandStringBash {
 					values+=("$pfx$seq$sfx")
 				fi
 			fi
+
+		# Simple listing with ,
+		elif [[ "${group//,/}" != "$group" ]]; then
+			typeset part
+			for part in ${group//,/ }; do
+				ammLog::Debug "Adding listing '$group'"
+				values+=("$part")
+			done
+
 		# Not a bash composite group, just use it raw
 		else
 			if [[ -n "$group" ]]; then
-					ammLog::Debug "Adding '$group'"
+				ammLog::Debug "Adding raw '$group'"
 				values+=($group)
 			fi
 		fi

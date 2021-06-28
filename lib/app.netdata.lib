@@ -16,6 +16,7 @@ function ammAppNetdata::MetaCheck {
 function ammAppNetdata::MetaInit {
 	ammLib::Load "http" "string"
 
+	typeset -g __AMMAPPNETDATA_OPTS_ADDED=false
 	ammLib::HookRegister "before:optparse:parse" "ammAppNetdata::_HookOptparseAddOpt"
 	ammLib::HookRegister "after:optparse:parse" "ammAppNetdata::_HookOptparsePopulate"
 
@@ -28,11 +29,14 @@ function ammAppNetdata::MetaInit {
 }
 
 function ammAppNetdata::_HookOptparseAddOpt {
-	ammOptparse::AddOptGroup "netdataconnect" "Netdata connection"
-	ammOptparse::AddOpt "--netdata-secure!"  "Use https"          "$AMMAPPNETDATA_SECURE"
-	ammOptparse::AddOpt "--netdata-host="    "Hostname to query"  "$AMMAPPNETDATA_HOST"
-	ammOptparse::AddOpt "--netdata-port="    "Port to query"      "$AMMAPPNETDATA_PORT"
-	ammOptparse::AddOpt "--netdata-api="     "Path to API"        "$AMMAPPNETDATA_API"
+	if ! $__AMMAPPNETDATA_OPTS_ADDED; then
+		__AMMAPPNETDATA_OPTS_ADDED=true
+		ammOptparse::AddOptGroup "netdataconnect" "Netdata connection"
+		ammOptparse::AddOpt "--netdata-secure!"  "Use https"          "$AMMAPPNETDATA_SECURE"
+		ammOptparse::AddOpt "--netdata-host="    "Hostname to query"  "$AMMAPPNETDATA_HOST"
+		ammOptparse::AddOpt "--netdata-port="    "Port to query"      "$AMMAPPNETDATA_PORT"
+		ammOptparse::AddOpt "--netdata-api="     "Path to API"        "$AMMAPPNETDATA_API"
+	fi
 }
 
 function ammAppNetdata::_HookOptparsePopulate {

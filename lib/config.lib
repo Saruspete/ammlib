@@ -30,6 +30,7 @@ function ammConfig::MetaInit {
 	)
 
 
+	typeset -g __AMMCONFIG_INITOPT_DONE=false
 	ammLib::HookRegister "before:optparse:parse" "_ammConfig::HookOptparseAddOpt"
 	ammLib::HookRegister "after:optparse:parse" "_ammConfig::HookOptparse"
 }
@@ -38,12 +39,15 @@ function ammConfig::MetaInit {
 # Caller helpers
 # -----------------------------------------------------------------------------
 function _ammConfig::HookOptparseAddOpt {
-	ammOptparse::AddOptGroup "mod:config" "Configuration Options"
-	ammOptparse::AddOpt "--config-list!"        "List configuration fields"           "false"
-	ammOptparse::AddOpt "--config-generate!"    "Generate configuration and exit"     "false"
-	ammOptparse::AddOpt "--config-filter-name@" "Filter listed/generated vars on their name"
-	ammOptparse::AddOpt "--config-filter-file@" "Filter listed/generated vars on their declared file"
-	ammOptparse::AddOpt "--config-dir-add@"  "Extra search-dir for configuration"
+	if ! $__AMMCONFIG_INITOPT_DONE; then
+		ammOptparse::AddOptGroup "mod:config" "Configuration Options"
+		ammOptparse::AddOpt "--config-list!"        "List configuration fields"           "false"
+		ammOptparse::AddOpt "--config-generate!"    "Generate configuration and exit"     "false"
+		ammOptparse::AddOpt "--config-filter-name@" "Filter listed/generated vars on their name"
+		ammOptparse::AddOpt "--config-filter-file@" "Filter listed/generated vars on their declared file"
+		ammOptparse::AddOpt "--config-dir-add@"  "Extra search-dir for configuration"
+		__AMMCONFIG_INITOPT_DONE=true
+	fi
 
 }
 

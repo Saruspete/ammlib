@@ -15,8 +15,8 @@ function ammChroot::MetaCheck {
 }
 
 function ammChroot::MetaInit {
+	ammLib::Load  fs string config
 	ammChroot::_OSInit
-	ammLib::Load  fs string
 }
 # -----------------------------------------------------------------------------
 # Sub-libraries management
@@ -30,7 +30,7 @@ function ammChroot::_OSInit {
 		typeset sublibname="${sublib#*.}"; sublibname="${sublibname%.lib}"
 		ammLog::Debug "Trying to load sublib $sublib"
 		if ammLib::Loadable "$sublib"; then
-			ammLib::Load "$sublib"
+			ammLib::Require "$sublib"
 			__AMMCHROOT_OS+=("$sublibname")
 		else
 			ammLog::Warning "Unable to load '$sublib'"
@@ -83,7 +83,7 @@ function ammChroot::OSNameList {
 function ammChroot::DirValidate {
 	typeset chrootdir="$1"
 
-	[[ -d "$chrootdir" ]] && [[ "$(readlink -f "$chrootdir")" != "/" ]]
+	[[ -d "$chrootdir" ]] && [[ "$(realpath "$chrootdir")" != "/" ]]
 }
 # -----------------------------------------------------------------------------
 # Chroot runtime helpers
@@ -241,13 +241,15 @@ function ammChroot::Exec {
 # -----------------------------------------------------------------------------
 
 function ammChroot::Create {
-	typeset chrootdir="$(readlink -f $1)"
+	typeset chrootdir="$1"
 	typeset osname="$2"
 	typeset osvers="${3:-}"
 
+	# TODO: Create a safe path creation for that
 	if ! [[ -d "$chrootdir" ]]; then
 		mkdir -p "$chrootdir"
 	fi
+	chrootdir="$(realpath "$chrootdir")"
 
 	# Check if folder is clean
 	if [[ -d "$chrootdir/usr" ]] || [[ -d "$chrootdir/etc" ]]; then
@@ -292,7 +294,7 @@ function ammChroot::Create {
 }
 
 function ammChroot::Destroy {
-	typeset chrootdir="$(readlink -f $1)"
+	typeset chrootdir="$(realpath $1)"
 
 	if ! ammChroot::DirValidate "$chrootdir"; then
 		ammLog::Error "Invalid chroot: '$chrootdir'"

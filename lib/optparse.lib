@@ -692,7 +692,8 @@ function ammOptparse::Parse {
 			if ammEnv::IsFunc $validator; then
 				# TODO: Clean this function call
 				#typeset valcall="${validator//%
-				if ! "${validator%% *}" "$val" "${validator#* }"; then
+				#if ! "${validator%% *}" "$val" "${validator#* }"; then
+				if ! "${validator%% *}" "$val"; then
 					ammLog::Error "Option ID '$id' refused value '$val' by validator '$validator'"
 					r+=1
 				fi
@@ -723,6 +724,8 @@ function ammOptparse::Parse {
 	# Require options and set action
 	typeset -a requiredMissingOptsDie=() requiredMissingOptsAsk=()
 	for id in ${!_AMMOPTPARSE_OPTREQUIRED[@]}; do
+		# Check if option or group is enabled
+		#if ammOptparse::_GroupEnabled "$grpid"
 		if ( set +u; [[ -z "${_AMMOPTPARSE_VALUE[$id]}" ]]; ); then
 			case "${_AMMOPTPARSE_OPTREQUIRED[$id]}" in
 				ask)
@@ -835,6 +838,18 @@ function ammOptparse::Help {
 		currValRst="$(ammLog::Color reset)"
 	fi
 
+
+	echo
+	# If action words have been registered
+	if ( set +u; [[ -n "${!_AMMOPTPARSE_WORDS[@]}" ]] ); then
+		echo "  Usage: ${currValBold}$0 [options...] <action>${currValRst}"
+		echo
+		echo "Available actions: ${currValBold}${!_AMMOPTPARSE_WORDS[@]}${currValRst}"
+	else
+		echo "Usage: ${currValBold}$0${currValRst} [options...]"
+	fi
+
+
 	# Display
 	for optidnum in ${!_AMMOPTPARSE_ORDER[@]}; do
 		typeset optid="${_AMMOPTPARSE_ORDER[$optidnum]}"
@@ -891,4 +906,5 @@ function ammOptparse::Help {
 			printedDescChars+=$descSizeTmp
 		done
 	done
+
 }

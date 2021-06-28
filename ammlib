@@ -592,8 +592,15 @@ function ammLib::Loadable {
 function ammLib::Load {
 	typeset -i r=0
 
-	typeset libfile="" libname= l=
+	typeset libname="" l=
 	for libname in "$@"; do
+		typeset libfile=""
+
+		# Check if we've been given a filename or a filepath
+		if [[ "${libname//\//}" != "$libname" ]]; then
+			libfile="$libname"
+			libname="$(ammLib::NameFromPath "$libname")"
+		fi
 
 		libname="${libname//\"/}"
 		libname="${libname//\'/}"
@@ -621,10 +628,23 @@ function ammLib::Load {
 		# Skip already loaded libraries
 		ammLib::IsLoaded "$libname" && continue
 
-		# Check if we can load requested lib
-		libfile="$(ammLib::Loadable "$libname")"
-		typeset libavailable=$?
+		typeset libavailable=1
 
+		# Check if libfile is already provided from input
+		if [[ -n "$libfile" ]]; then
+			if [[ -e "$libfile" ]]; then
+				if ! [[ "$libfile" -ef "$(ammLib::Locate "$libname")" ]]; then
+					ammLog::Warning "Will load provided file '$libfile' for '$libname' that is not the one found by ammLib::Locate: '$(ammLib::Locate "$libname")'"
+				fi
+
+				libavailable=0
+			fi
+		else
+			libfile="$(ammLib::Loadable "$libname")"
+			libavailable=$?
+		fi
+
+		# Check if we can load requested lib
 		if [[ $libavailable -eq 0 ]]; then
 
 			# Add lib early to avoid within-module reloading
@@ -633,11 +653,18 @@ function ammLib::Load {
 			ammLib::HookTrigger "before:libload:$libname"
 
 			# Init was ok, source and use lib
-			. $libfile
+			. "$libfile"
 
 			# Call init
 			typeset metapref="$(ammLib::MetaGetPrefix "$libname")"
-			ammEnv::IsFunc ${metapref}Init && ${metapref}Init >/dev/null
+			if ammEnv::IsFunc "${metapref}Init"; then
+				ammLog::Debug "Calling init '${metapref}Init'"
+				#${metapref}Init || ammLog::Die "Error during init call of '${metapref}Init'"
+				${metapref}Init >/dev/null
+				[[ $? -ne 0 ]] && ammLog::Warning "Non-zero return from ${metapref}Init"
+			else
+				ammLog::Debug "No init function (${metapref}Init) in '$libfile'"
+			fi
 
 			ammLib::HookTrigger "after:libload:$libname"
 
@@ -982,8 +1009,8 @@ function ammLog::UnavailableFunc {
 	esac
 
 	# Override the function with a message
-	ammLog::Trace "Disabling function '$func' from '$origin': $reason"
-	eval "function $func { ammLog::Err 'Cannot call $func: function is disabled because $reason ($origin)'; }"
+	ammLog::Warning "Disabling function '$func' from '$origin': $reason"
+	eval "function $func { ammLog::Error 'Cannot call $func: function is disabled because $reason ($origin)'; }"
 }
 
 

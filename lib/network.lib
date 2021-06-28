@@ -115,6 +115,73 @@ function ammNetwork::Calc {
 
 
 # -----------------------------------------------------------------------------
+# Local machine helpers
+# -----------------------------------------------------------------------------
+
+# @description  List all active sockets
+# @stdout  processInode remoteInode socketPath pid [pid..]
+function ammNetwork::SocketList {
+
+	# Inspired from https://unix.stackexchange.com/questions/16300/whos-got-the-other-end-of-this-unix-socketpair
+	if ammExec::Exists ss; then
+
+		typeset netid state recvq sendq locAddr locPort remAddr remPort process
+		while read netid state recvq sendq locAddr locPort remAddr remPort desc; do
+			typeset pids="" pidstr="$desc"
+			while [[ "${pidstr#*pid=}" != "$pidstr" ]]; do
+				pidstr="${pidstr#*pid=}"
+				pids+="${pidstr%%,*} "
+			done
+
+			echo "$locPort" "$remPort" "$locAddr" "$pids"
+
+		done < <(ss --unix --process --numeric --no-header --oneline 2>/dev/null)
+
+		return 0
+
+	elif ammExec::Exists lsof; then
+
+		typeset line lsofVersion=
+		while read line; do
+			if [[ "${line#revision:}" != "$line" ]]; then
+				lsofVersion="${line##*: }"
+				break
+			fi
+		done < <(lsof -v 2>&1)
+
+		# Need lsof v4.89 or above
+		typeset lsofMaj=${lsofVersion%%.*} lsofMin="${lsofVersion#*.}"
+		if [[ "$lsofMaj" -gt 4 ]] || [[ "$lsofMaj" -eq 4 ]] && [[ "${lsofMin%.*}" -ge 89 ]]; then
+
+			typeset cmd pid user fd typ dev off node name # name is where random str comes
+			while read  cmd pid user fd typ dev off locNode name; do
+				typeset remNode="${name#*INO=}"; remNode="${remNode%% *}"
+				typeset locAddr="${name%%type=*}"; locAddr="${locAddr% }"
+
+				# Parse line:  type=STREAM ->INO=45204 14772,Web Conte,41u
+				typeset pidstr="${name#*INO=* }" pids=
+				while [[ "${pidstr//,}" != "$pidstr" ]]; do
+					pids+="${pidstr%%,*} "
+					pidstr="${pidstr#*,*,*u}"
+				done
+
+				# Fallback when no 'INO=' field is provided
+				if [[ "${name//INO=/}" == "$name" ]]; then
+					remNode="*"
+					locAddr="${name%% *}"
+					[[ "${locAddr//type=}" != "$locAddr" ]] && locAddr="*"
+					pids=""
+				fi
+
+				echo "$locNode" "$remNode" "${locAddr:-*}" $pids
+			done < <(lsof +E -U 2>/dev/null)
+		fi
+
+	fi
+}
+
+
+# -----------------------------------------------------------------------------
 # Ping helpers
 # -----------------------------------------------------------------------------
 

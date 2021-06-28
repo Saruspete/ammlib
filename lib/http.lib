@@ -206,6 +206,19 @@ function ammHttp::Fetch {
 
 	[[ "$dst" != "-" ]] && opts+=" silent"
 
+	if [[ -n "${AMMHTTP_FETCH_CACHE:-}" ]]; then
+		typeset cachePath="$AMMHTTP_FETCH_CACHE/${src#*://}"
+		if [[ -s "$cachePath" ]]; then
+			if [[ "$dst" == "-" ]]; then
+				cat "$cachePath"
+				return $?
+			else
+				cp "$cachePath" "$dst"
+				return $?
+			fi
+		fi
+	fi
+	
 	ammHttp::Get "$src" "$opts dest=$dst"
 }
 

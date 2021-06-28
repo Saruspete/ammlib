@@ -30,7 +30,7 @@ ammOptparse::AddOpt "--foodisabled" "This option is disabled by default" "no"
 ammOptparse::AddOptGroup "anyothergroup"
 ammOptparse::AddOpt "--fooenabled"  "This option is enabled"
 
-ammOptparse::AddActionWord "woot"
+ammOptparse::AddActionWord "continue" "woot"
 
 
 if ! ammOptparse::Parse --no-unknown; then

@@ -14,7 +14,7 @@ function ammApp::MetaCheck {
 }
 
 function ammApp::MetaInit {
-	ammLib::Load archive input string
+	ammLib::Require archive input string
 }
 
 # -----------------------------------------------------------------------------

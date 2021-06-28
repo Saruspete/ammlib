@@ -15,7 +15,7 @@ function ammSyscfgNetwork::MetaCheck {
 }
 
 function ammSyscfgNetwork::MetaInit {
-	ammLib::Load string
+	ammLib::Require string
 }
 
 # -----------------------------------------------------------------------------

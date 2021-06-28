@@ -13,7 +13,7 @@ fi
 #	ammExec::Require awk
 #}
 function ammFileformatIni::MetaInit {
-	ammLib::Load string
+	ammLib::Require string
 }
 
 # -----------------------------------------------------------------------------

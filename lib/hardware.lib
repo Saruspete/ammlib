@@ -15,7 +15,7 @@ function ammHardware::MetaCheck {
 
 }
 function ammDevice::MetaInit {
-	ammLib::Load string
+	ammLib::Require string
 }
 
 # -----------------------------------------------------------------------------

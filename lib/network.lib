@@ -14,7 +14,7 @@ function ammNetwork::MetaCheck {
 }
 
 function ammNetwork::MetaInit {
-	ammLib::Load process string
+	ammLib::Require process string
 }
 
 # -----------------------------------------------------------------------------

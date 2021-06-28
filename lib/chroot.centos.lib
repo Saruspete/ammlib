@@ -27,7 +27,8 @@ function ammChrootCentos::MetaCheck {
 }
 
 function ammChrootCentos::MetaInit {
-	ammLib::Load "pkg" "config"
+	ammLib::Require "pkg" "config"
+
 	if ! ammLib::Load "pkg.yum"; then
 		ammLog::UnavailableFunc "ammChrootCentos::InitFromPackages" "pkg.yum module cannot be loaded. Is yum binary available?"
 	fi

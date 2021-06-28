@@ -15,7 +15,7 @@ function ammChrootCentos::MetaCheck {
 }
 
 function ammChrootCentos::MetaInit {
-	ammLib::Load pkg
+	ammLib::Require pkg
 }
 
 # -----------------------------------------------------------------------------

@@ -1,0 +1,111 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammX11::MetaCheck {
+	ammExec::RequireOne xdotool xprop
+}
+#function ammX11::MetaInit {
+#}
+
+# -----------------------------------------------------------------------------
+# X11 Helpers and functions
+# -----------------------------------------------------------------------------
+function ammX11::_DoWmctrl {
+
+	ammExec::Exists "wmctrl" || return 99
+	wmctrl "$@"
+}
+
+function ammX11::_DoXdotool {
+	
+	ammExec::Exists "xdotool" || return 99
+	xdotool "$@"
+}
+
+function ammX11::_DoXprop {
+
+	ammExec::Exists "xprop" || return 99
+	xprop "$@"
+}
+
+# -----------------------------------------------------------------------------
+# X11 Public functions
+# -----------------------------------------------------------------------------
+
+function ammX11::WindowGetPid {
+	typeset wid="$1"
+
+	typeset out=""
+	typeset -i r=0
+
+	out="$(ammX11::_DoXprop -id "$wid" _NET_WM_PID 2>/dev/null)"
+	r=$?
+	if [[ $r -ne 99 ]]; then
+		[[ $r -eq 0 ]] && echo "${out##* }"
+		return $r
+	fi
+
+	out="$(ammX11::_DoXdotool getwindowpid "$wid" 2>/dev/null)"
+	r=$?
+	if [[ $r -ne 99 ]]; then
+		[[ $r -eq 0 ]] && echo "$out"
+		return $r
+	fi
+
+	ammLog::Warning "No xprop nor xdotool found. Cannot get Window '$wid' PID"
+	return 99
+}
+
+function ammX11::WindowList {
+
+	typeset out=""
+	typeset -i r=0
+
+	out="$(ammX11::_DoWmctrl -l|awk '{print $1;}')"
+	r=$?
+	if [[ $r -ne 99 ]]; then
+		echo "$out"
+		return $r
+	fi
+
+	out="$(ammX11::_DoXdotool search --onlyvisible . 2>/dev/null)"
+	r=$?
+	if [[ $r -ne 99 ]]; then
+		echo "$out"
+		return $r
+	fi
+
+	ammLog::Warning "Cannot find xdotool nor wmctrl"
+	return 99
+}
+
+function ammX11::WindowActivate {
+	typeset wid="$1"
+
+	typeset out=""
+	typeset -i r=0
+
+	out="$(ammX11::_DoWmctrl -ia "$wid")"
+	r=$?
+	if [[ $r -ne 99 ]]; then
+		return $r
+	fi
+
+	out="$(ammX11::_DoXdotool windowactivate "$wid")"
+	r=$?
+	if [[ $r -ne 99 ]]; then
+		return $r
+	fi
+
+	ammLog::Warning "Cannot find wmctrl nor xdotool"
+	return 99
+}
+

@@ -23,7 +23,7 @@
 * [function ammLog::Time {](#function-ammlogtime-)
 * [function ammLog::Date {](#function-ammlogdate-)
 * [function ammLog::_DbgIsEnabled {](#function-ammlogdbgisenabled-)
-* [function _ammLog::Log {](#function-ammloglog-)
+* [function ammLog::_Log {](#function-ammloglog-)
 * [function ammLog::Die {](#function-ammlogdie-)
 * [function ammLog::Error {](#function-ammlogerror-)
 * [function ammLog::Warning {](#function-ammlogwarning-)
@@ -41,6 +41,8 @@
 * [function ammLog::TracingLog {](#function-ammlogtracinglog-)
 * [function ammLog::TracingEnable {](#function-ammlogtracingenable-)
 * [function ammLog::WriteTerm {](#function-ammlogwriteterm-)
+* [function ammSys::OSIdGet {](#function-ammsysosidget-)
+* [function ammSys::OSVersionGet {](#function-ammsysosversionget-)
 * [function ammEnv::PathAdd {](#function-ammenvpathadd-)
 * [function ammEnv::LibAdd {](#function-ammenvlibadd-)
 * [function ammEnv::ManAdd {](#function-ammenvmanadd-)
@@ -50,9 +52,11 @@
 * [function ammPath::IsSecure {](#function-ammpathissecure-)
 * [function ammPath::IsWritable {](#function-ammpathiswritable-)
 * [function ammPath::IsEmpty {](#function-ammpathisempty-)
+* [function ammPath::IsValid {](#function-ammpathisvalid-)
 * [function _ammPath::RecurseFolders {](#function-ammpathrecursefolders-)
 * [function ammPath::CopyStructure {](#function-ammpathcopystructure-)
 * [function ammExec::AsUser {](#function-ammexecasuser-)
+* [function ammExec::GetPath {](#function-ammexecgetpath-)
 * [function ammExec::Exists {](#function-ammexecexists-)
 * [function ammExec::RequestOne {](#function-ammexecrequestone-)
 * [function ammExec::Require {](#function-ammexecrequire-)
@@ -62,7 +66,7 @@
 
 ## function _ammLib::PathGetForCaller {
 
- Path of the file that loaded ammlib
+ The file that loaded ammlib
 
 ## function ammLib::HookNameToVarname {
 
@@ -261,7 +265,7 @@ _Function has no arguments._
 
  Checks if AMMLIB_DEBUG variable is set and needs to do some job
 
-## function _ammLog::Log {
+## function ammLog::_Log {
 
  (private) Generic log function for logging
 
@@ -399,6 +403,14 @@ _Function has no arguments._
 
 * $1  (string) message to be written
 
+## function ammSys::OSIdGet {
+
+ Get the ID of the current system
+
+## function ammSys::OSVersionGet {
+
+ Get the version of the current system
+
 ## function ammEnv::PathAdd {
 
  Add a path to PATH
@@ -485,6 +497,10 @@ _Function has no arguments._
 
 * $1  (path) Path to the folder to check
 
+## function ammPath::IsValid {
+
+ Check if a path is valid
+
 ## function _ammPath::RecurseFolders {
 
  Copy a selection of files with their relative structure
@@ -511,6 +527,19 @@ _Function has no arguments._
 
 * $1  (string) User to run the command as
 * $@  (string) the command to run, and its arguments. if "-", command is read from stdin
+
+## function ammExec::GetPath {
+
+@description:  Returns the full path of the first usable binary in $PATH
+
+### Arguments
+
+* $1  (string) Binary to search in $PATH
+
+### Exit codes
+
+* **0**:  if binary was found
+* **1**:  if binary wat not found
 
 ## function ammExec::Exists {
 

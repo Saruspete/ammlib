@@ -1,6 +1,7 @@
 
 * [function _ammNetwork::CalcGetIpSegment {](#function-ammnetworkcalcgetipsegment-)
 * [function ammNetwork::Calc {](#function-ammnetworkcalc-)
+* [function ammNetwork::SocketList {](#function-ammnetworksocketlist-)
 
 
 ## function _ammNetwork::CalcGetIpSegment {
@@ -20,4 +21,12 @@
 
 * $1  (string) IP Address to extract data from. "ip/cidr" or "ip netmask"
 * $@  (string[]) Fields to show: ip prefix netmask network brdcast
+
+## function ammNetwork::SocketList {
+
+ List all active sockets
+
+### Output on stdout
+
+*  processInode remoteInode socketPath pid [pid..]
 

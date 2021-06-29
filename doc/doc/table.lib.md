@@ -2,6 +2,7 @@
 * [function ammTable::Create {](#function-ammtablecreate-)
 * [function ammTable::AddColumn {](#function-ammtableaddcolumn-)
 * [function ammTable::AddRow {](#function-ammtableaddrow-)
+* [function ammTable::SetRowColor {](#function-ammtablesetrowcolor-)
 * [function ammTable::Display {](#function-ammtabledisplay-)
 * [function ammTable::DisplayRow {](#function-ammtabledisplayrow-)
 
@@ -32,6 +33,15 @@
 
 * # @args $@  Each column in order
 
+## function ammTable::SetRowColor {
+
+Set the color of the next row to be added
+
+### Arguments
+
+* $1   (string) The color of the row (as returned by ammLog::Color)
+* $2   (int) optionnal count of next rows to have their color assigned
+
 ## function ammTable::Display {
 
  Display the table
@@ -39,4 +49,8 @@
 ## function ammTable::DisplayRow {
 
  Display only specific row
+
+### Arguments
+
+* $@  (int) The row ID to display
 

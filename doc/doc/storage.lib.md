@@ -5,6 +5,7 @@
 * [function ammStorage::GetKernelName {](#function-ammstoragegetkernelname-)
 * [function ammStorage::GetMajorMinor {](#function-ammstoragegetmajorminor-)
 * [function ammStorage::GetNameFromMajorMinor {](#function-ammstoragegetnamefrommajorminor-)
+* [function ammStorage::GetBlockSizeAvail {](#function-ammstoragegetblocksizeavail-)
 
 
 ## function ammStorage::_GetFromUdev {
@@ -52,4 +53,10 @@
 ### Arguments
 
 * $1  (string) Major:Minor like 253:0
+
+## function ammStorage::GetBlockSizeAvail {
+
+#### See also
+
+* [# @seealso:  https://www.seagate.com/fr/fr/tech-insights/advanced-format-4k-sector-hard-drives-master-ti/](## @seealso:  https://www.seagate.com/fr/fr/tech-insights/advanced-format-4k-sector-hard-drives-master-ti/)
 

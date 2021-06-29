@@ -6,6 +6,7 @@
 * [function ammOptparse::AddOptGroupDesc {](#function-ammoptparseaddoptgroupdesc-)
 * [function ammOptparse::AddOpt {](#function-ammoptparseaddopt-)
 * [function ammOptparse::AddActionWord {](#function-ammoptparseaddactionword-)
+* [function ammOptparse::Require {](#function-ammoptparserequire-)
 * [function ammOptparse::Parse {](#function-ammoptparseparse-)
 * [function ammOptparse::Get {](#function-ammoptparseget-)
 * [function ammOptparse::GetUnparsedOpts {](#function-ammoptparsegetunparsedopts-)
@@ -67,8 +68,16 @@ Add one or more words that will infer on the parsing
 
 ### Arguments
 
-* $1  (string) words to handle, separated by '|'
-* $2  (string) action for the words. Can be 'stop'
+* $1  (string) action for the words. Can be 'skip', 'break', 'continue' or a function name
+* $@  (string) words to handle
+
+## function ammOptparse::Require {
+
+ Require one or more options to have a value
+
+### Arguments
+
+* $@  (string) options to require
 
 ## function ammOptparse::Parse {
 

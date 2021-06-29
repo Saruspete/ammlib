@@ -320,7 +320,17 @@ function ammChrootCentos::InitFromTemplate {
 				fi
 
 				# Mount image
-				typeset mntdev="${lodev}p1"
+				# Not all raw images have p1 partition...
+				typeset mntdev="$lodev"
+
+				# Try to use partx
+				if ammExec::Exists "partx"; then
+					ammLog::Info "Using partx to discover/configure partitions"
+					ammExec::AsUser "root" partx -a "$mntdev"
+				fi
+
+				[[ -e "${mntdev}p1" ]] && mntdev+="p1"
+
 				typeset mntpnt="$(ammLib::TmpPathGet "")/mnt.root"
 				[[ -d "$mntpnt" ]] || mkdir -p "$mntpnt"
 				if ! ammExec::AsUser "root" mount -o ro,loop "$mntdev" "$mntpnt"; then

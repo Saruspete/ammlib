@@ -610,7 +610,7 @@ function ammApp::IsRunning {
 function ammApp::VersionList {
 
 	# Github project
-	if [[ -n "$UPG_GHPROJECT" ]]; then
+	if [[ -n "${UPG_GHPROJECT:-}" ]]; then
 		ammLib::Require "http"
 		typeset tag ts name
 		typeset fmt="%-20.20s  %-32.32s  %s\n"
@@ -622,7 +622,7 @@ function ammApp::VersionList {
 		return $?
 	# Custom function
 	elif ammEnv::IsFunc "appUpgrade::VersionList"; then
-		ammUpgradeVersionList
+		appUpgrade::VersionList
 		return $?
 	# No listing available
 	else

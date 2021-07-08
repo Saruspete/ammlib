@@ -142,7 +142,8 @@ export PATH+=":$__AMMLIB_BIN"
 # -----------------------------------------------------------------------------
 # Data management
 # -----------------------------------------------------------------------------
-function _ammLib::PathGetForCaller {
+
+function ammLib::_PathGetForCaller {
 	typeset prefix="$1"
 	typeset suffix="${2:-}"
 
@@ -162,12 +163,12 @@ function _ammLib::PathGetForCaller {
 
 function ammLib::DataPathGet {
 	typeset extra="${1:-}"
-	_ammLib::PathGetForCaller "$__AMMLIB_DATA" "$extra"
+	ammLib::_PathGetForCaller "$__AMMLIB_DATA" "$extra"
 }
 
 function ammLib::TmpPathGet {
 	typeset extra="${1:-}"
-	_ammLib::PathGetForCaller "$__AMMLIB_DATATMP" "$extra"
+	ammLib::_PathGetForCaller "$__AMMLIB_DATATMP" "$extra"
 }
 
 # -----------------------------------------------------------------------------
@@ -257,9 +258,10 @@ typeset -gA __AMMLIB_TRAP_REGISTERED
 typeset -gi __AMMLIB_TRAP_WAITMAX=30
 typeset -g  __AMMLIB_TRAP_WAITSTEP=1
 
+
 # @description  Initialize and registers the signal handling trap
 # @arg $@  Signals to be traped
-function _ammLib::TrapInit {
+function ammLib::_TrapInit {
 
 	# Populate avaialble signals array from "trap -l" output
 	if (set +u; [[ ${#__AMMLIB_SIGNALS[@]} -eq 0 ]]); then
@@ -276,7 +278,7 @@ function _ammLib::TrapInit {
 
 	# Register trap with the signals as argument
 	for s in "$@"; do
-		trap "_ammLib::TrapHandler $s" "$s"
+		trap "ammLib::_TrapHandler $s" "$s"
 		__AMMLIB_TRAP_REGISTERED[$s]="ok"
 	done
 }
@@ -299,7 +301,7 @@ function ammLib::TrapRegister {
 					__AMMLIB_TRAP_CALLBACKS[$signame]+="$callback "
 					if ! ( set +u; [[ -n "${__AMMLIB_TRAP_REGISTERED[$signame]}" ]] ); then
 						ammLog::Debug "Registered callback with uninit signal. Registering signal:$signame for callback:$callback"
-						_ammLib::TrapInit "$signame"
+						ammLib::_TrapInit "$signame"
 					fi
 				else
 					ammLog::Warning "Invalid signal to register callback: signal:$signame callback:$callback"
@@ -328,7 +330,7 @@ function ammLib::TrapClean {
 }
 
 # Can't catch KILL CONT STOP
-_ammLib::TrapInit EXIT HUP INT TERM QUIT ILL ABRT TSTP USR1 USR2
+ammLib::_TrapInit EXIT HUP INT TERM QUIT ILL ABRT TSTP USR1 USR2
 ammLib::TrapRegister "ammLib::TrapClean" EXITALL
 
 # EXIT: Pseudo signal, standard exit of bash
@@ -340,7 +342,7 @@ ammLib::TrapRegister "ammLib::TrapClean" EXITALL
 
 # @description  (private) TRAP handler to clean
 # @arg $1  Name of the signal
-function _ammLib::TrapHandler {
+function ammLib::_TrapHandler {
 	typeset retcode=$?
 	typeset signame="$1"
 	typeset sigtype=""
@@ -1310,7 +1312,8 @@ function ammSys::OSVersionGet {
 # Environment helpers
 # -----------------------------------------------------------------------------
 
-function _ammEnv::Add {
+
+function ammEnv::_Add {
 	typeset var="$1"; shift
 	typeset where="${1:-after}"
 	if [[ "${1:-}" == "before" ]] || [[ "${1:-}" == "after" ]]; then
@@ -1334,21 +1337,21 @@ function _ammEnv::Add {
 # @arg $1  (string)(optionnal). Can be "before" or "after" (default)
 # @arg $@  (path[]) List of paths to be added to the env var
 function ammEnv::PathAdd {
-	_ammEnv::Add "PATH" "$@"
+	ammEnv::_Add "PATH" "$@"
 }
 
 # @description  Add a path to LD_LIBRARY_PATH
 # @arg $1  (string)(optionnal). Can be "before" or "after" (default)
 # @arg $@  (path[]) List of paths to be added to the env var
 function ammEnv::LibAdd {
-	_ammEnv::Add "LD_LIBRARY_PATH" "$@"
+	ammEnv::_Add "LD_LIBRARY_PATH" "$@"
 }
 
 # @description  Add a path to MANPATH
 # @arg $1  (string)(optionnal). Can be "before" or "after" (default)
 # @arg $@  (path[]) List of paths to be added to the env var
 function ammEnv::ManAdd {
-	_ammEnv::Add "MANPATH" "$@"
+	ammEnv::_Add "MANPATH" "$@"
 }
 
 # @description  Check if given name is a function
@@ -1402,18 +1405,6 @@ function ammEnv::VarReturnArray {
 	echo "${varexp#*=}"
 }
 
-function ammEnv::PathDecompose {
-	ammLog::Deprecated "ammPath::Decompose"
-	ammPath::Decompose "$@"
-}
-function ammEnv::PathIsSecure {
-	ammLog::Deprecated "ammPath::IsSecure"
-	ammPath::IsSecure "$@"
-}
-function ammEnv::PathIsWritable {
-	ammLog::Deprecated "ammPath::IsWritable"
-	ammPath::IsWritable "$@"
-}
 # -----------------------------------------------------------------------------
 # Path management helpers
 # -----------------------------------------------------------------------------
@@ -1539,7 +1530,7 @@ function ammPath::IsValid {
 # @arg $1  (path) Source path where to find the content
 # @arg $2  (path) Destination path where to copy content
 # @arg $@  (string) files or patterns to copy from source to destination
-function _ammPath::RecurseFolders {
+function ammPath::_RecurseFolders {
 	typeset srcpath="$1"
 	typeset dstpath="$2"
 	typeset callback="$3"
@@ -1586,7 +1577,7 @@ function _ammPath::RecurseFolders {
 	return $r
 }
 
-function _ammPath::CallbackCopy {
+function ammPath::_CallbackCopy {
 	typeset src="$1" dst="$2" force="${3:-false}"
 
 	# Create parent destination directory
@@ -1596,7 +1587,8 @@ function _ammPath::CallbackCopy {
 	\cp -a "$src" "$dst"
 }
 
-function _ammPath::CallbackHardlink {
+
+function ammPath::_CallbackHardlink {
 	typeset src="$1" dst="$2" force="${3:-false}"
 	# Dest exists, check if same file for early return
 	[[ -e "$dst" ]] && [[ "$src" -ef "$dst" ]] && return 0
@@ -1625,7 +1617,8 @@ function _ammPath::CallbackHardlink {
 	return $r
 }
 
-function _ammPath::CallbackSymlink {
+
+function ammPath::_CallbackSymlink {
 	typeset src="$1" dst="$2" force="${3:-false}"
 	# Dest exists, check if same file for early return
 	[[ -e "$dst" ]] && [[ "$src" -ef "$dst" ]] && return 0
@@ -1657,7 +1650,7 @@ function ammPath::CopyStructure {
 
 	typeset -a patterns=("$@")
 	[[ ${#patterns[@]} -eq 0 ]] && patterns+=(".")
-	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackCopy" "$force" "${patterns[@]}"
+	ammPath::_RecurseFolders "$src" "$dst" "ammPath::_CallbackCopy" "$force" "${patterns[@]}"
 }
 
 function ammPath::CopyStructureHardlinks {
@@ -1668,7 +1661,7 @@ function ammPath::CopyStructureHardlinks {
 
 	typeset -a patterns=("$@")
 	[[ ${#patterns[@]} -eq 0 ]] && patterns+=("*")
-	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackHardlink" "$force" "${patterns[@]}"
+	ammPath::_RecurseFolders "$src" "$dst" "ammPath::_CallbackHardlink" "$force" "${patterns[@]}"
 }
 
 function ammPath::CopyStructureSymlinks {
@@ -1679,7 +1672,7 @@ function ammPath::CopyStructureSymlinks {
 
 	typeset -a patterns=("$@")
 	[[ ${#patterns[@]} -eq 0 ]] && patterns+=("*")
-	_ammPath::RecurseFolders "$src" "$dst" "_ammPath::CallbackSymlink" "$force" "${patterns[@]}"
+	ammPath::_RecurseFolders "$src" "$dst" "ammPath::_CallbackSymlink" "$force" "${patterns[@]}"
 }
 
 ## Rsync for all in one
@@ -1995,4 +1988,17 @@ function ammExec::RequireOne {
 function ammExec::IsExecutable {
 	[[ -f "$1" ]] && [[ -x "$1" ]]
 }
+
+
+# Deprecated functions
+function ammEnv::PathDecompose { ammLog::Deprecated "ammPath::Decompose"; }
+function ammEnv::PathIsSecure { ammLog::Deprecated "ammPath::IsSecure"; }
+function ammEnv::PathIsWritable { ammLog::Deprecated "ammPath::IsWritable"; }
+function _ammLib::TrapInit { ammLog::Deprecated ammLib::_TrapInit "$@"; }
+function _ammLib::TrapHandler { ammLog::Deprecated ammLib::_TrapHandler "$@"; }
+function _ammEnv::Add { ammLog::Deprecated ammEnv::_Add "$@"; }
+function _ammPath::RecurseFolders {  ammLog::Deprecated ammPath::_RecurseFolders "$@"; }
+function _ammPath::CallbackCopy {    ammLog::Deprecated ammPath::_CallbackCopy "$@"; }
+function _ammPath::CallbackHardlink { ammLog::Deprecated ammPath::_CallbackHardlink "$@"; }
+function _ammPath::CallbackSymlink { ammLog::Deprecated ammPath::_CallbackSymlink "$@"; }
 

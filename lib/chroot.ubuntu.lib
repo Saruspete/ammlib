@@ -71,7 +71,7 @@ function ammChrootUbuntu::MetaInit {
 # Some description for your lib
 # -----------------------------------------------------------------------------
 
-function _ammChrootUbuntu::GetDataFolder {
+function ammChrootUbuntu::_GetDataFolder {
 	typeset extra="${1:-}"
 
 	typeset f="$__AMMLIB_DATA/chroot.ubuntu/$extra"

@@ -404,7 +404,7 @@ function ammProcess::RunAs {
 # -----------------------------------------------------------------------------
 typeset __AMMPROCESS_DAEMONSTATEBASE="$__AMMLIB_DATATMP/process.daemon/"
 
-function _ammProcess::DaemonFilestate {
+function ammProcess::_DaemonFilestate {
 	typeset process="$1"
 	echo "$__AMMPROCESS_DAEMONSTATEBASE/$process"
 }

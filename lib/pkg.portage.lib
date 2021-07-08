@@ -33,7 +33,7 @@ function ammPkgPortage::IsAvailable {
 # @description  (private) proxy for rpm executable
 #
 # @arg $1  (string) Action for RPM to exec
-function _ammPkgPortage::Portage {
+function ammPkgPortage::_Portage {
 	typeset opts=""
 
 	# Check if input contains options
@@ -73,12 +73,12 @@ function _ammPkgPortage::Portage {
 }
 
 # @description  Query the portage database
-function _ammPkgPortage::Portageq {
+function ammPkgPortage::_Portageq {
 	:
 }
 
 # @description Wrapper for equery, provided by app-portage/gentoolkit. See portageq
-function _ammPkgPortage::Equery {
+function ammPkgPortage::_Equery {
 
 	ammExec::Exists "equery" >/dev/null || return 1
 
@@ -98,7 +98,7 @@ function _ammPkgPortage::Equery {
 	\equery $opts "$@"
 }
 
-function _ammPkgPortage::Eix {
+function ammPkgPortage::_Eix {
 
 	ammExec::Exists "eix" >/dev/null || return 1
 
@@ -121,29 +121,29 @@ function _ammPkgPortage::Eix {
 
 
 function ammPkgPortage::Install {
-	_ammPkgPortage::Portage "--newuse --deep" "$@"
+	ammPkgPortage::_Portage "--newuse --deep" "$@"
 }
 
 function ammPkgPortage::Remove {
-	_ammPkgPortage::Portage "--depclean" "$@"
+	ammPkgPortage::_Portage "--depclean" "$@"
 }
 
 function ammPkgPortage::Purge {
 	
-	_ammPkgPortage::Portage "--unmerge --rage-clean" "$@"
+	ammPkgPortage::_Portage "--unmerge --rage-clean" "$@"
 }
 
 function ammPkgPortage::Search {
 	if ammExec::Exists "eix"; then
-		_ammPkgPortage::Eix "$@"
+		ammPkgPortage::_Eix "$@"
 	else
 		ammLog::Debug "eix is not installed. Consider installing 'app-portage/eix' to speedup search"
-		_ammPkgPortage::Portage "--search" "$@"
+		ammPkgPortage::_Portage "--search" "$@"
 	fi
 }
 
 function ammPkgPortage::Installed {
-	_ammPkgPortage::Equery "list" "$@"
+	ammPkgPortage::_Equery "list" "$@"
 }
 
 function ammPkgPortage::InfoRequirements {
@@ -189,14 +189,14 @@ function ammPkgPortage::InfoContents {
 	# Check for all input
 	for pkg in "$@"; do
 		# For each pkg, list content
-		_ammPkgPortage::Equery "files" "$@"
+		ammPkgPortage::_Equery "files" "$@"
 	done
 }
 
 # What versions are available for a package
 function ammPkgPortage::InfoVersions {
 	typeset pkg="$1"
-	_ammPkgPortage::Equery "list" $pkg
+	ammPkgPortage::_Equery "list" $pkg
 }
 
 

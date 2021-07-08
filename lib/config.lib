@@ -31,14 +31,14 @@ function ammConfig::MetaInit {
 
 
 	typeset -g __AMMCONFIG_INITOPT_DONE=false
-	ammLib::HookRegister "before:optparse:parse" "_ammConfig::HookOptparseAddOpt"
-	ammLib::HookRegister "after:optparse:parse" "_ammConfig::HookOptparse"
+	ammLib::HookRegister "before:optparse:parse" "ammConfig::_HookOptparseAddOpt"
+	ammLib::HookRegister "after:optparse:parse" "ammConfig::_HookOptparse"
 }
 
 # -----------------------------------------------------------------------------
 # Caller helpers
 # -----------------------------------------------------------------------------
-function _ammConfig::HookOptparseAddOpt {
+function ammConfig::_HookOptparseAddOpt {
 	if ! $__AMMCONFIG_INITOPT_DONE; then
 		ammOptparse::AddOptGroup "mod:config" "Configuration Options"
 		ammOptparse::AddOpt "--config-list!"        "List configuration fields"           "false"
@@ -51,7 +51,7 @@ function _ammConfig::HookOptparseAddOpt {
 
 }
 
-function _ammConfig::HookOptparse {
+function ammConfig::_HookOptparse {
 	__AMMCONFIG_FILTER_NAME=$(ammOptparse::Get "config-filter-name")
 	__AMMCONFIG_FILTER_FILE=$(ammOptparse::Get "config-filter-file")
 
@@ -70,7 +70,7 @@ function _ammConfig::HookOptparse {
 	fi
 }
 
-function _ammConfig::GetCaller {
+function ammConfig::_GetCaller {
 
 	typeset -i nfiles="${#BASH_SOURCE[@]}" i
 	for (( i=$(($nfiles-1)); i>=0; i--)); do
@@ -86,7 +86,7 @@ function _ammConfig::GetCaller {
 # Configuration file
 # -----------------------------------------------------------------------------
 
-function _ammConfig::FileFind {
+function ammConfig::_FileFind {
 	typeset filename="$1"
 	typeset mode="${2:-all}"
 
@@ -113,11 +113,11 @@ function _ammConfig::FileFind {
 
 # @description check if a file is valid
 
-function _ammConfig::FileValidate {
+function ammConfig::_FileValidate {
 	typeset file="$1"
 
 	# Snapshot the vars
-	typeset caller="$(_ammConfig::GetCaller)"
+	typeset caller="$(ammConfig::_GetCaller)"
 	typeset tmpdiff="$(ammLib::TmpPathGet "cfg_$caller")"
 	set >| "$tmpdiff/before"
 	(
@@ -166,7 +166,7 @@ function ammConfig::FileGetName {
 	typeset filepart="${1:-}"
 
 	# If the caller is one of our module, clean it
-	typeset modname="$(_ammConfig::GetCaller)"
+	typeset modname="$(ammConfig::_GetCaller)"
 	if [[ "${modname%.lib}" != "$modname" ]]; then
 		modname="${modname%.lib}"
 		modname="${modname//.//}"
@@ -184,9 +184,9 @@ function ammConfig::FileLoad {
 	filename="$(ammConfig::FileGetName "$filename")"
 
 	typeset file
-	for file in $(_ammConfig::FileFind "$filename"); do
+	for file in $(ammConfig::_FileFind "$filename"); do
 		# Check file validity
-		if ! _ammConfig::FileValidate "$file"; then
+		if ! ammConfig::_FileValidate "$file"; then
 			ammLog::Warning "Config file '$file' is not valid. Skipping"
 			continue
 		fi
@@ -259,7 +259,7 @@ function ammConfig::VarDeclare {
 
 	# Define variable and metadata
 	__AMMCONFIG_VARS_DECL[$name]="$(ammLog::Stackdump 2 1)"
-	__AMMCONFIG_VARS_LIST[$(_ammConfig::GetCaller)]+="$name "
+	__AMMCONFIG_VARS_LIST[$(ammConfig::_GetCaller)]+="$name "
 	__AMMCONFIG_VARS_TYPE[$name]="$format"
 	__AMMCONFIG_VARS_DESC[$name]="$desc"
 

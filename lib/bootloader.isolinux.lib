@@ -65,7 +65,7 @@ function ammBootloaderIsolinux::Init {
 
 	# Create the file listing, according to isolinux version
 	typeset files="isolinux.bin vesamenu.c32 kbdmap.c32 reboot.c32 disk.c32"
-	[[ ${__ammBootloaderIsolinux::Version:0:1} -ge 5 ]] && files+=" libutil.c32 libcom32.c32 ldlinux.c32 linux.c32"
+	[[ ${__ammBootloaderIsolinuxVersion:0:1} -ge 5 ]] && files+=" libutil.c32 libcom32.c32 ldlinux.c32 linux.c32"
 
 	typeset file
 	for file in $files; do
@@ -84,7 +84,7 @@ function ammBootloaderIsolinux::Init {
 	__ammBootloaderIsolinuxEntriesAppend=""
 }
 
-function _ammBootloaderIsolinux::VarnameClean {
+function ammBootloaderIsolinux::_VarnameClean {
 	typeset name="$1"
 	echo ${name} | tr -cd '[a-zA-Z0-9_]'
 }
@@ -106,7 +106,7 @@ function ammBootloaderIsolinux::Find {
 }
 
 typeset -g  __ammBootloaderIsolinuxLocation="$(ammBootloaderIsolinuxFind isolinux.bin)"
-#typeset -g  __ammBootloaderIsolinux::Version="$(awk '/ISOLINUX/{for(i=1;i<=NF; i++){ if($i=="ISOLINUX"){ print $(i+1);} } }' "$__ammBootloaderIsolinuxLocation")"
+#typeset -g  __ammBootloaderIsolinuxVersion="$(awk '/ISOLINUX/{for(i=1;i<=NF; i++){ if($i=="ISOLINUX"){ print $(i+1);} } }' "$__ammBootloaderIsolinuxLocation")"
 typeset -g  __ammBootloaderIsolinuxVersion="$(strings "$__ammBootloaderIsolinuxLocation"| ammString::Filter "-" "ISOLINUX" "ISOLINUX" "+1" )"
 
 # -----------------------------------------------------------------------------
@@ -116,8 +116,8 @@ function ammBootloaderIsolinux::Config {
 	typeset var="$1"
 	typeset val="$2"
 
-	if ! ammString::ContainsWord "$var" "${!__ammBootloaderIsolinux::ConfigAvail[@]}"; then
-		echo "${!__ammBootloaderIsolinux::ConfigAvail[@]}"
+	if ! ammString::ContainsWord "$var" "${!__ammBootloaderIsolinuxConfigAvail[@]}"; then
+		echo "${!__ammBootloaderIsolinuxConfigAvail[@]}"
 		ammLog::Warning "Unavailable configuration '$var'"
 		return 1
 	fi
@@ -142,7 +142,7 @@ function ammBootloaderIsolinux::EntryAddLabel {
 	typeset label="${1:-boot${#__ammBootloaderIsolinuxEntries[@]}}"
 	shift
 
-	typeset id="${#__ammBootloaderIsolinux::Entries[@]}"
+	typeset id="${#__ammBootloaderIsolinuxEntries[@]}"
 	__ammBootloaderIsolinuxEntries[$id]="label $label"
 
 	typeset opt
@@ -164,7 +164,7 @@ function ammBootloaderIsolinux::EntryAddSeparator {
 #
 function ammBootloaderIsolinux::EntryAddSubmenu {
 	typeset name="$1"
-	typeset code="$(_ammBootloaderIsolinux::VarnameClean "${name}")"
+	typeset code="$(ammBootloaderIsolinux::_VarnameClean "${name}")"
 
 	typeset id="${#__ammBootloaderIsolinuxEntries[@]}"
 	__ammBootloaderIsolinuxEntries[$id]="menu begin ^$name"
@@ -272,7 +272,7 @@ function ammBootloaderIsolinux::Generate {
 				echo >> "$isolinuxcfg" "# Submenu $submenuname"
 
 				# Generate the sub menu
-				_ammBootloaderIsolinux::GenerateEntries "$submenuname" >> "$isolinuxcfg"
+				ammBootloaderIsolinux::_GenerateEntries "$submenuname" >> "$isolinuxcfg"
 
 				# Add usual footer menus
 				cat >> "$isolinuxcfg" <<-EOT
@@ -294,10 +294,10 @@ function ammBootloaderIsolinux::Generate {
 
 }
 
-function _ammBootloaderIsolinux::GenerateEntries {
+function ammBootloaderIsolinux::_GenerateEntries {
 	typeset subname="$1"
 	
-	subname="$(_ammBootloaderIsolinux::VarnameClean "${subname}")"
+	subname="$(ammBootloaderIsolinux::_VarnameClean "${subname}")"
 
 	# Would rather have used 'typeset -n' but not available on old bash4
 	# Instead, use eval to create aliases

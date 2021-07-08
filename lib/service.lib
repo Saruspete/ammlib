@@ -29,7 +29,7 @@ function ammService::Type {
  __AMMSERVICE_TYPE="$(ammService::Type)"
 
 
-function _ammService::PathList {
+function ammService::_PathList {
 	if [[ "$__AMMSERVICE_TYPE" == "systemd" ]]; then
 
 		# Listing from https://www.freedesktop.org/software/systemd/man/systemd.unit.html
@@ -60,7 +60,7 @@ function ammService::Exists {
 		suffix=".service"
 	}
 
-	for dir in $(_ammService::PathList); do
+	for dir in $(ammService::_PathList); do
 		[[ -e "$dir/${prefix}${svcname}${suffix}" ]] && return 0
 	done
 	return 1

@@ -248,7 +248,7 @@ function ammString::Type {
 # String modifiers
 # -----------------------------------------------------------------------------
 
-function _ammString::Trim {
+function ammString::_Trim {
 	typeset str="$1"
 	typeset chars="$2"
 
@@ -282,10 +282,10 @@ function ammString::Trim {
 	
 	if [[ "$1" == "-" ]]; then
 		while read line; do
-			_ammString::Trim "$line" "$trimchars"
+			ammString::_Trim "$line" "$trimchars"
 		done
 	else
-		_ammString::Trim "$str" "$trimchars"
+		ammString::_Trim "$str" "$trimchars"
 	fi
 }
 

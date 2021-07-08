@@ -49,7 +49,7 @@ function ammPkgYum::IsDnf {
 # @description  (private) proxy for rpm executable
 #
 # @arg $1  (string) Action for RPM to exec
-function _ammPkgYum::Yum {
+function ammPkgYum::_Yum {
 	typeset act="$1"; shift
 
 	typeset -a opts=("-y")
@@ -76,7 +76,7 @@ function _ammPkgYum::Yum {
 	fi
 }
 
-function _ammPkgYum::Repoquery {
+function ammPkgYum::_Repoquery {
 
 	ammExec::Exists "repoquery" >/dev/null || return 1
 
@@ -98,15 +98,15 @@ function _ammPkgYum::Repoquery {
 
 function ammPkgYum::Install {
 	# TODO: Make more checks for "upgrade" or "downgrade" if version provided
-	_ammPkgYum::Yum "install" "$@"
+	ammPkgYum::_Yum "install" "$@"
 }
 
 function ammPkgYum::Remove {
-	_ammPkgYum::Yum "remove" "$@"
+	ammPkgYum::_Yum "remove" "$@"
 }
 
 function ammPkgYum::Search {
-	_ammPkgYum::Yum "info" "$@"
+	ammPkgYum::_Yum "info" "$@"
 }
 
 function ammPkgYum::Installed {
@@ -114,7 +114,7 @@ function ammPkgYum::Installed {
 }
 
 function ammPkgYum::InfoRequirements {
-	_ammPkgYum::Yum "deplist" "$@" | awk '
+	ammPkgYum::_Yum "deplist" "$@" | awk '
 		$1 == "package:" { printf "\n"$2; delete a; }
 		$1 == "provider:" { if (!a[$2]) { printf " "$2; a[$2]=1; } }
 	'
@@ -133,12 +133,12 @@ function ammPkgYum::InfoWhatProvides {
 		else
 			# If repoquery is available, use it
 			if ammExec::Exists repoquery >/dev/null; then
-				_ammPkgYum::Repoquery --queryformat="%{name}.%{arch}" --whatprovides "$element"
+				ammPkgYum::_Repoquery --queryformat="%{name}.%{arch}" --whatprovides "$element"
 
 			# Else, fallback to yum + parsing
 			else
 				typeset key val _junk pkg=""
-				_ammPkgYum::Yum "provides" "$element" 2>/dev/null | while IFS=: read key val _junk; do
+				ammPkgYum::_Yum "provides" "$element" 2>/dev/null | while IFS=: read key val _junk; do
 					key="$(ammString::Trim "$key")"
 					val="$(ammString::Trim "$val")"
 
@@ -179,14 +179,14 @@ function ammPkgYum::InfoContents {
 	# Check for all input
 	for pkg in "$@"; do
 		# For each pkg, list content
-		_ammPkgYum::Repoquery "--provides" "$pkg"
+		ammPkgYum::_Repoquery "--provides" "$pkg"
 	done
 }
 
 # What versions are available for a package
 function ammPkgYum::InfoVersions {
 	typeset pkg="$1"
-	_ammPkgYum::Yum info $pkg
+	ammPkgYum::_Yum info $pkg
 }
 
 
@@ -270,7 +270,7 @@ function ammPkgYum::Download {
 
 	# Need to do some checks due to yum being lazy
 	else
-		typeset cmdbase="_ammPkgYum::Yum --installroot=\"$root\" --downloadonly --downloaddir=\"$outdir\""
+		typeset cmdbase="ammPkgYum::_Yum --installroot=\"$root\" --downloadonly --downloaddir=\"$outdir\""
 		dlcmd=(eval "(" $cmdbase install "$@" ";" $cmdbase reinstall "$@" ")")
 		ammLog::Debug "Failback to yum with '${dlcmd[@]}'"
 	fi
@@ -466,7 +466,7 @@ function ammPkgYum::ConfigSet {
 # Yum emulation
 # -----------------------------------------------------------------------------
 
-function _ammPkgYum::RepodataCache {
+function ammPkgYum::_RepodataCache {
 	typeset cks="$(echo "$1"|cksum)"; cks="${cks// /_}"
 	typeset t="$__AMMLIB_DATATMP/pkgyum.repodata.$cks"
 
@@ -485,7 +485,7 @@ function ammPkgYum::RepodataGet {
 	fi
 
 	# Download the file listing
-	typeset cache="$(_ammPkgYum::RepodataCache "$url")"
+	typeset cache="$(ammPkgYum::_RepodataCache "$url")"
 	typeset repomd="$cache/repomd.xml"
 	ammHttp::Fetch "$url/repodata/repomd.xml" "$repomd"
 
@@ -507,7 +507,7 @@ function ammPkgYum::RepodataGet {
 	echo "$cache"
 }
 
-function _ammPkgYum::RepodataParseFilelist {
+function ammPkgYum::_RepodataParseFilelist {
 	typeset repodata="$1"; shift
 
 	# Parse all search
@@ -578,5 +578,5 @@ function ammPkgYum::RepodataWhatProvides {
 
 	typeset repodata="$(ammPkgYum::RepodataGet "$url")"
 
-	_ammPkgYum::RepodataParseFilelist "$repodata" "$@" | sort | uniq
+	ammPkgYum::_RepodataParseFilelist "$repodata" "$@" | sort | uniq
 }

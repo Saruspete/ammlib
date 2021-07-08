@@ -320,7 +320,7 @@ function ammSyscfgNetwork::RouteUpdate {
 # Namespace
 # -----------------------------------------------------------------------------
 
-function _ammSyscfgNetwork::NSInit {
+function ammSyscfgNetwork::_NSInit {
 	[[ -d "/var/run/netns" ]] || mkdir -p /var/run/netns
 
 	# TODO: lookup /proc/*/ns/netns as a symink to /var/run/netns/

@@ -90,7 +90,7 @@ function ammChrootCentos::MetaInit {
 # Some description for your lib
 # -----------------------------------------------------------------------------
 
-function _ammChrootCentos::GetDataFolder {
+function ammChrootCentos::_GetDataFolder {
 	typeset extra="${1:-}"
 
 	typeset f="$__AMMLIB_DATA/chroot.centos/$extra"

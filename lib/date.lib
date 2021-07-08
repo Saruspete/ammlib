@@ -12,9 +12,9 @@ function ammDate::MetaCheck {
 function ammDate::MetaInit {
 	__ammDateCurrYear="$(date +%Y)"
 	__ammDateNextYear="$(( $__ammDateCurrYear + 1 ))"
-	__ammDateCurrMonth="$(ammDate::ParseInt $(date +%m) )"
+	_ammDateCurrMonth="$(ammDate::_ParseInt $(date +%m) )"
 	__ammDateNextMonth="$(( ($__ammDateCurrMonth % 12) + 1 ))"
-	__ammDateCurrDayOfMonth="$(ammDate::ParseInt $( date +%d) )"
+	_ammDateCurrDayOfMonth="$(ammDate::_ParseInt $( date +%d) )"
 	__ammDateCurrDayOfWeek="$(date +%u)"
 
 	# TODO: Set a timer to update values in case of long-running script

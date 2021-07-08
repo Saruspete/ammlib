@@ -102,7 +102,7 @@ function ammPkg::ManagerDetect {
 # @arg $1  (string) function name to call
 # @arg $2  (path)(optionnal)
 # @arg $@  (any) argument to pass to the selected function
-function _ammPkg::Proxy {
+function ammPkg::_Proxy {
 	typeset func="$1"; shift
 
 	typeset path="/"
@@ -140,18 +140,18 @@ function _ammPkg::Proxy {
 # -----------------------------------------------------------------------------
 
 function ammPkg::Install {
-	_ammPkg::Proxy "Install" "$@"
+	ammPkg::_Proxy "Install" "$@"
 }
 
 function ammPkg::Remove {
-	_ammPkg::Proxy "Remove" "$@"
+	ammPkg::_Proxy "Remove" "$@"
 }
 
 # @description Check if a given package is installed
 # @arg $@  (string) Package or string to be checked against
 # @stdout  List of given string and the matching packages
 function ammPkg::Installed {
-	_ammPkg::Proxy "Installed" "$@"
+	ammPkg::_Proxy "Installed" "$@"
 }
 
 
@@ -168,13 +168,13 @@ function ammPkg::Installed {
 
 # What files or requirements does a pkg need
 function ammPkg::InfoRequirements {
-	_ammPkg::Proxy "InfoRequirements" "$@"
+	ammPkg::_Proxy "InfoRequirements" "$@"
 }
 
 # @description  List packages that provides a specified
 # @arg $@  (string) Path or glob of a searched file
 function ammPkg::InfoWhatProvides {
-	_ammPkg::Proxy "InfoWhatProvides" "$@"
+	ammPkg::_Proxy "InfoWhatProvides" "$@"
 }
 
 
@@ -254,11 +254,11 @@ function ammPkg::InstallWhatProvides {
 # -----------------------------------------------------------------------------
 
 function ammPkg::Fix {
-	_ammPkg::Proxy "Fix" "$@"
+	ammPkg::_Proxy "Fix" "$@"
 }
 
 function ammPkg::Extract {
-	_ammPkg::Proxy "Extract" "$@"
+	ammPkg::_Proxy "Extract" "$@"
 }
 
 # -----------------------------------------------------------------------------
@@ -271,7 +271,7 @@ function ammPkg::Extract {
 #
 # @stdout List of libraries path with matching file (their full path)
 # @stderr List of libraries without matching file (only printin name)
-function _ammPkg::DepsFindBin {
+function ammPkg::_DepsFindBin {
 
 	! ammExec::Exists ldd && return 1
 
@@ -296,13 +296,13 @@ function _ammPkg::DepsFindBin {
 			#[[ "$lib" == "libc.so.6" ]] || continue
 
 			if [[ -e "$file" ]]; then
-					echo "$file"
+				echo "$file"
 			else
 				echo >&2 "$lib"
 			fi
 
 			# Recursion
-			[[ -e "$file" ]] && _ammPkg::DepsFindBin "$file"
+			[[ -e "$file" ]] && $FUNCNAME "$file"
 
 		done < <(ldd "$file" 2>/dev/null)
 	done
@@ -379,7 +379,7 @@ function ammPkg::FindDeps {
 				ammLog::Debug "Extracting dependencies from ELF binary '$element'"
 
 				typeset file
-				for file in $(_ammPkg::DepsFindBin $element 2>/dev/null | sort -u); do
+				for file in $(ammPkg::_DepsFindBin $element 2>/dev/null | sort -u); do
 					ammLog::Debug "Searching package for file '$file'"
 
 					# if file is not absolute, we are missing it. Add a refrence to /lib in the path

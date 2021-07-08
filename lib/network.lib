@@ -24,7 +24,7 @@ function ammNetwork::MetaInit {
 # @description  Returns the requested segment of the IP address
 # @arg $1  (string) IP Address (4 or 6)
 # @arg $2  (int)    Segment number of the IP address to return (starts at 0)
-function _ammNetwork::CalcGetIpSegment {
+function ammNetwork::_CalcGetIpSegment {
 	typeset ip="$1"
 	typeset part="$2"
 
@@ -68,7 +68,7 @@ function ammNetwork::Calc {
 	typeset -i prefix=0 prefixrem=$cidr
 	# TODO: handle ipv6
 	for segnum in {0..3}; do
-		typeset segment="$(_ammNetwork::CalcGetIpSegment "$ip" "$segnum")"
+		typeset segment="$(ammNetwork::_CalcGetIpSegment "$ip" "$segnum")"
 
 		# Full network segment
 		if [[ $prefixrem -ge 8 ]]; then

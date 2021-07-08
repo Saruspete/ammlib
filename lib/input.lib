@@ -79,13 +79,13 @@ function ammInput::MetaInit {
 	__AMMINPUT_OPTS_ADDED=false
 
 	# Register for option parsing
-	ammLib::HookRegister "before:optparse:parse" "_ammInput::HookOptparseAddOpt"
-	ammLib::HookRegister "after:optparse:parse" "_ammInput::HookOptparsePopulate"
+	ammLib::HookRegister "before:optparse:parse" "ammInput::_HookOptparseAddOpt"
+	ammLib::HookRegister "after:optparse:parse" "ammInput::_HookOptparsePopulate"
 }
 
 
 # @description  Callback for Optparse before parsing
-function _ammInput::HookOptparseAddOpt {
+function ammInput::_HookOptparseAddOpt {
 	if ! $__AMMINPUT_OPTS_ADDED; then
 		ammOptparse::AddOptGroup "mod:input" "Dynamic Input"
 		ammOptparse::AddOpt "--input-errorisfatal!" "Die on invalid entry"                   "$__AMMINPUT_BATCH_DIE_ON_ERR"
@@ -102,7 +102,7 @@ function _ammInput::HookOptparseAddOpt {
 }
 
 # @description  Callback for Optparse after parsing
-function _ammInput::HookOptparsePopulate {
+function ammInput::_HookOptparsePopulate {
 
 	__AMMINPUT_BATCH_DIE_ON_ERR="$(ammOptparse::Get "input-errorisfatal")"
 	__AMMINPUT_BATCH_AUTOTRY="$(ammOptparse::Get "input-autotry")"

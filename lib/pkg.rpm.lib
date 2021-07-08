@@ -38,7 +38,7 @@ function ammPkgRpm::Extract {
 # Queries
 # -----------------------------------------------------------------------------
 
-function _ammPkgRpm::Rpm {
+function ammPkgRpm::_Rpm {
 
 	typeset opts=""
 	while [[ -n "${1:-}" ]]; do
@@ -84,11 +84,11 @@ function ammPkgRpm::Install {
 
 	typeset pkgfile
 	for pkgfile in "$@"; do
-		typeset pkgname="$(_ammPkgRpm::Rpm "-qp --qf %{NAME}" "$pkgfile")"
-		typeset pkgvers="$(_ammPkgRpm::Rpm "-qp --qf %{VERSION}-%{RELEASE}" "$pkgfile")"
+		typeset pkgname="$(ammPkgRpm::_Rpm "-qp --qf %{NAME}" "$pkgfile")"
+		typeset pkgvers="$(ammPkgRpm::_Rpm "-qp --qf %{VERSION}-%{RELEASE}" "$pkgfile")"
 
 		#if ammPkgRpm::Installed
-		typeset curvers="$(_ammPkgRpm::Rpm "${commonopts[@]} -qp --qf %{VERSION}-%{RELEASE}" "$pkgname")"
+		typeset curvers="$(ammPkgRpm::_Rpm "${commonopts[@]} -qp --qf %{VERSION}-%{RELEASE}" "$pkgname")"
 
 		# If we have a package version mismatch...
 		if [[ -n "$curvers" ]] && [[ "$curvers" != "$pkgvers" ]]; then
@@ -96,7 +96,7 @@ function ammPkgRpm::Install {
 		fi
 	done
 
-	_ammPkgRpm::Rpm "${commonopts[@]}" "${installopts[@]}" --upgrade --oldpackage "$@"
+	ammPkgRpm::_Rpm "${commonopts[@]}" "${installopts[@]}" --upgrade --oldpackage "$@"
 }
 
 
@@ -109,7 +109,7 @@ function ammPkgRpm::Installed {
 	# If we have special chars, query all then grep
 	if ! [[ "${pkgs// /}" =~ ^([$stdchrs]+)$ ]]; then
 		typeset specialchrs="${pkgs//[\ $stdchrs]/}"
-		typeset allpkgs="$(_ammPkgRpm::Rpm --query --all 2>/dev/null)"
+		typeset allpkgs="$(ammPkgRpm::_Rpm --query --all 2>/dev/null)"
 
 		for pkg in "$@"; do
 			typeset pkgtogrep="$pkg"
@@ -126,7 +126,7 @@ function ammPkgRpm::Installed {
 	else
 		typeset f1 f2 f3
 		typeset -A out=()
-		_ammPkgRpm::Rpm --query --queryformat "%{NAME}: %{NEVRA}\n" "$@"  2>/dev/null| while read f1 f2 f3; do
+		ammPkgRpm::_Rpm --query --queryformat "%{NAME}: %{NEVRA}\n" "$@"  2>/dev/null| while read f1 f2 f3; do
 			# From output
 			if [[ "$f1" == "package" ]] && [[ "$f3" == "is not installed" ]]; then
 				echo "$f2:"
@@ -150,15 +150,15 @@ function ammPkgRpm::InfoRequirements {
 
 	for file in "$@"; do
 		echo -n "$file"
-		#_ammPkgRpm::Rpm --query  --queryformat="%{name}.%{arch}\n" --requires "$file"
-		_ammPkgRpm::Rpm --query  --queryformat="[%{REQUIRES} ]" --requires "$file"
+		#ammPkgRpm::_Rpm --query  --queryformat="%{name}.%{arch}\n" --requires "$file"
+		ammPkgRpm::_Rpm --query  --queryformat="[%{REQUIRES} ]" --requires "$file"
 		echo
 	done
 }
 
 # What does a package provides
 function ammPkgRpm::InfoProvides {
-	_ammPkgRpm::Rpm --query --queryformat="%{name}.%{arch}\n" --fileprovide "$@"
+	ammPkgRpm::_Rpm --query --queryformat="%{name}.%{arch}\n" --fileprovide "$@"
 }
 
 # What package provides a given element
@@ -166,7 +166,7 @@ function ammPkgRpm::InfoWhatProvides {
 
 	typeset element
 	for element in "$@"; do
-		_ammPkgRpm::Rpm --query  --queryformat="%{name}.%{arch}\n" --file "$element"
+		ammPkgRpm::_Rpm --query  --queryformat="%{name}.%{arch}\n" --file "$element"
 	done
 }
 
@@ -200,15 +200,15 @@ function ammPkgRpm::DbInit {
 		[[ -d "$prefix" ]] || mkdir -p "$prefix"
 		rpmopts+="--root=$prefix"
 	fi
-	_ammPkgRpm::Rpm $rpmopts --initdb
+	ammPkgRpm::_Rpm $rpmopts --initdb
 }
 
 function ammPkgRpm::GpgKeyImport {
-	_ammPkgRpm::Rpm --import "$@"
+	ammPkgRpm::_Rpm --import "$@"
 }
 
 function ammPkgRpm::GpgKeyExport {
-	_ammPkgRpm::Rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
+	ammPkgRpm::_Rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
 }
 
 function ammPkgRpm::GpgKeyRemove {
@@ -220,7 +220,7 @@ function ammPkgRpm::GpgKeyRemove {
 		[[ "${key#gpg-pubkey}" == "$key" ]] && key="gpg-pubkey-$key"
 		keys+=("$key")
 	done
-	_ammPkgRpm::Rpm -e "${keys[@]}"
+	ammPkgRpm::_Rpm -e "${keys[@]}"
 }
 
 function ammPkgRpm::DbExport {

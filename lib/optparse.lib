@@ -55,7 +55,7 @@ typeset -gA  _AMMOPTPARSE_VALTYPE
 
 typeset -g   _AMMOPTPARSE_ARRSEP='§§'
 
-function _ammOptparse::OptClean {
+function ammOptparse::_OptClean {
 	typeset opt="$1"
 
 	# Remove leading -
@@ -68,12 +68,12 @@ function _ammOptparse::OptClean {
 	echo "$opt"
 }
 
-function _ammOptparse::OptToId {
+function ammOptparse::_OptToId {
 	typeset opt="$1"
 
 	typeset id=""
 
-	opt="$(_ammOptparse::OptClean "$opt")"
+	opt="$(ammOptparse::_OptClean "$opt")"
 
 	# Long option
 	if [[ "${opt:0:2}" == "--" ]] || [[ "${#opt}" -gt 1 ]]; then
@@ -99,7 +99,7 @@ function _ammOptparse::OptToId {
 
 
 # @description Expand short options and var=val to independant elements
-function _ammOptparse::Expand {
+function ammOptparse::_Expand {
 
 	# Early return: empty array to avoid unbound var checks
 	[[ "${#__AMMLIB_CALLOPTS[@]}" == "1" ]] && [[ -z "${__AMMLIB_CALLOPTS[@]}" ]] && return
@@ -275,7 +275,7 @@ function ammOptparse::AddOpt {
 	# Get the first long-name
 	for opt in ${options//|/ }; do
 		if [[ "${opt#--}" != "$opt" ]]; then
-			id="$(_ammOptparse::OptClean "$opt")"
+			id="$(ammOptparse::_OptClean "$opt")"
 			ammLog::Debug "Using '$id' (from $opt) as ID for '$options'"
 			break
 		fi
@@ -420,7 +420,7 @@ function ammOptparse::Require {
 
 	typeset opt
 	for opt in "$@"; do
-		typeset id="$(_ammOptparse::OptToId "$opt")"
+		typeset id="$(ammOptparse::_OptToId "$opt")"
 		if [[ -z "$id" ]]; then
 			ammLog::Error "Cannot require an undefined option '$opt' at '$(ammLog::StackDump 2 1)'."
 			continue
@@ -453,7 +453,7 @@ function ammOptparse::Parse {
 	ammLib::HookTrigger "before:optparse:parse"
 
 	# Call data expansion
-	_ammOptparse::Expand
+	ammOptparse::_Expand
 
 	# Special options parsing
 	typeset opt
@@ -529,7 +529,7 @@ function ammOptparse::Parse {
 		ammLog::Debug "Processing option '$var' (pos: $optid)"
 
 		# Check the word is a valid registered option (we'll take it as ref)
-		id="$(_ammOptparse::OptToId "$var")"
+		id="$(ammOptparse::_OptToId "$var")"
 		if [[ -z "$id" ]]; then
 
 			# If it's not a registerd option, maybe it's a registered word
@@ -707,15 +707,15 @@ function ammOptparse::Parse {
 
 	# Only parse help if enabled (to avoid stopping on pre-checks)
 	if [[ "$dohelp" == "true" ]]; then
-		if [[ -n "$(_ammOptparse::OptToId "help-full")" ]] && [[ "$(ammOptparse::Get "help-full")" == "true" ]]; then
+		if [[ -n "$(ammOptparse::_OptToId "help-full")" ]] && [[ "$(ammOptparse::Get "help-full")" == "true" ]]; then
 			ammOptparse::Help "full"
 			exit 0
 		fi
-		if [[ -n "$(_ammOptparse::OptToId "help-all")" ]] && [[ "$(ammOptparse::Get "help-all")" == "true" ]]; then
+		if [[ -n "$(ammOptparse::_OptToId "help-all")" ]] && [[ "$(ammOptparse::Get "help-all")" == "true" ]]; then
 			ammOptparse::Help "all"
 			exit 0
 		fi
-		if [[ -n "$(_ammOptparse::OptToId "help")" ]] && [[ "$(ammOptparse::Get "help")" == "true" ]]; then
+		if [[ -n "$(ammOptparse::_OptToId "help")" ]] && [[ "$(ammOptparse::Get "help")" == "true" ]]; then
 			ammOptparse::Help
 			exit 0
 		fi
@@ -757,7 +757,7 @@ function ammOptparse::Parse {
 # @arg $1  (string) A short, long or id option value
 function ammOptparse::Get {
 	typeset elem="$1"
-	typeset id="$(_ammOptparse::OptToId "$elem")"
+	typeset id="$(ammOptparse::_OptToId "$elem")"
 
 	if [[ -z "$id" ]]; then
 		ammLog::Warning "Requesting non-registered option '$elem'"

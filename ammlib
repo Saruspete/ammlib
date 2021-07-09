@@ -438,6 +438,7 @@ function ammLib::Locate {
 				return
 			fi
 	done
+	return 1
 }
 
 # @description  Locate all libraries that starts with the given pattern

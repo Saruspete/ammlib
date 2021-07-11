@@ -1,16 +1,20 @@
 # Bash Modular Library
 
+The primary goal is simple: **Having high-level functions and still having the choice of using what you want.**
+
+Instead of forcing you to use specific libraries or tools, ammlib will do its job with what you already have. It won't force you into a model or choices that aren't yours.
+
 ## Use Case
 
 A huge number of scripts are used to do day2day production.
 This is an attempt to provide a quality common library, that can be :
-- usable in scripts **and** interactive shells
-- modular: easy to extend, do not load every unneeded function
-- fast: use native shell features instead of creating process
-- secure: reduce the risk of typos and undefined behaviour, check return code
-- fault-tolerant: protects itself against various env failures, sanitize inputs
-- debuggable: helps keeping track of processing, especially during failures
-- packable: generates a single packed script with the required modules for embbedding
+- **modular**: easy to extend, do not load every unneeded function
+- **fast**: use native shell features instead of creating process
+- **secure**: reduce the risk of typos and undefined behaviour, check return code
+- **fault-tolerant**: protects itself against various env failures, sanitize inputs
+- **legacy-friendly**: the only requirement is a very available bash-4.2+
+- **debuggable**: helps keeping track of processing, especially during failures
+- **packable**: (TODO) generates a single packed script with the required modules for embbedding
 
 
 ## Why such a huge library in shell ?
@@ -65,7 +69,7 @@ The main library enforce some best practices:
 
 
 - Although using bash, we should avoid "bash-only" keywords (like `declare`, `local` or `readonly`). declarations must be done using `typeset` to help portability
-to other shells (dash, ksh, zsh).  
+to other shells (dash, ksh, zsh).
 - Avoid using `typeset -n`: while it's very nice to avoid `eval`, it's not available in early releases of bash4.
 
 

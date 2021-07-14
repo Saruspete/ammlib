@@ -85,6 +85,15 @@ function ammChroot::DirValidate {
 
 	[[ -d "$chrootdir" ]] && [[ "$(realpath "$chrootdir")" != "/" ]]
 }
+
+function ammChroot::ChrootValidate {
+	typeset chrootdir="$1"
+
+	ammChroot::DirValidate "$chrootdir" || return 1
+	[[ -d "$chrootdir/proc" ]]
+}
+
+
 # -----------------------------------------------------------------------------
 # Chroot runtime helpers
 # -----------------------------------------------------------------------------
@@ -92,6 +101,11 @@ function ammChroot::DirValidate {
 function ammChroot::Mounted {
 	typeset mntpnt="$1"
 	typeset mntopts="${2:-}"
+
+	# If the folder doesn't exists, it cannot be mounted
+	! [[ -d "$mntpnt" ]] && return 1
+
+	mntpnt="$(realpath "$mntpnt")"
 
 	typeset mnt="$(awk '$2 == "'$mntpnt'"{ print $4}' /proc/self/mounts)"
 
@@ -149,7 +163,7 @@ function ammChroot::Mount {
 	fi
 
 	if ammChroot::Mounted "$mntdst"; then
-		ammLog::Info "Mountpoint '$mntdst' already mounted"
+		ammLog::Debug "Mountpoint '$mntdst' already mounted"
 		return 0
 	fi
 

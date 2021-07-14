@@ -278,6 +278,7 @@ function ammChroot::Create {
 
 	ammLog::StepBegin "Creating new chroot in '$chrootdir'"
 
+	ammLog::StepBegin "Populate common files and folders"
 	# Bind mount
 	ammLog::Info "Mounting system mounts"
 	typeset dir
@@ -288,11 +289,19 @@ function ammChroot::Create {
 	# Copy resolv.conf (might be needed for package manager installation)
 	mkdir -p "$chrootdir/etc"
 	ammLog::Info "Copying host resolv.conf"
-	cp -f /etc/resolv.conf $chrootdir/etc/resolv.conf
+	cp -f "/etc/resolv.conf" "$chrootdir/etc/resolv.conf"
 
-	ammLog::Info "Initializing OS"
+	ammLog::StepEnd
+
+
+	ammLog::StepBegin "Initializing OS '$osname'"
 	ammChroot::_OSCall "$osname" "Init" "$chrootdir" "$osvers" || return $?
 
+	if ! [[ "/etc/resolv.conf" -ef "$chrootdir/etc/resolv.conf" ]]; then
+		ammLog::Info "resolv.conf has been overwritten. Copying again"
+		mv "$chrootdir/etc/resolv.conf"{,.chrootbak.$$}
+		cp -f "/etc/resolv.conf" "$chrootdir/etc/resolv.conf"
+	fi
 
 	# Touch some files, cause dumb stuff happens...
 	touch "$chrootdir/etc/fstab"
@@ -303,6 +312,10 @@ function ammChroot::Create {
 		ammLog::Error "Error during populating chroot '$chrootdir'"
 		return 1
 	fi
+
+	ammLog::StepEnd
+
+	# TODO: Fixing some init-related stubs
 
 	ammLog::StepEnd
 }

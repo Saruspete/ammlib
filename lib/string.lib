@@ -545,6 +545,36 @@ function ammString::HexToIPv4 {
 	echo $ip4str
 }
 
+function ammString::IPv4QuadToInt {
+	if [[ $# -eq 4 ]]; then
+		echo $(($1 << 24 | $2 << 16 | $3 << 8 | $4))
+		return 0
+	fi
+
+	echo "0"
+	return 1
+}
+
+function ammString::IPv4ToInt {
+	IFS='.' ammString::IPv4QuadToInt $1
+}
+
+function ammString::IntToIPv4 {
+	echo "$(( ($1 >> 24) & 0xff )).$(( ($1 >> 16) & 0xff )).$(( ($1 >> 8) & 0xff )).$(( $1 & 0xff ))"
+}
+
+
+function ammString::IPv4MaskToPrefix {
+	typeset mask="$1"
+
+	typeset -i pfx=0 x=0$( printf '%o' ${mask//./ } )
+	while [ $x -gt 0 ]; do
+		pfx+=$(( $x % 2 ))
+		x=$(( $x >> 1 ))
+	done
+	echo $pfx
+}
+
 
 function ammString::IntegerMin {
 

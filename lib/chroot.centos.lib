@@ -340,10 +340,25 @@ function ammChrootCentos::InitFromTemplate {
 
 				# Copy archive to chroot
 				ammLog::Info "Copying data from '$mntpnt' to '$chrootdir'"
-				ammExec::AsUser "root" cp -a "$mntpnt/." "$chrootdir"
+				if ! ammExec::AsUser "root" cp -a "$mntpnt/." "$chrootdir"; then
+					if ! [[ -d "$chrootdir/etc/centos-release" ]]; then
+						ammLog::Error "Unable to copy files from '$mntpnt' to '$chrootdir' is incomplete. Check manually"
+						return 1
+					else
+						ammLog::Warning "Copy seems ok, but returned with error. Trying to continue..."
+						r+=1
+					fi
+				fi
 
+				# Cleanup loopback mountpoints
 				if ! ammExec::AsUser "root" umount "$mntpnt"; then
-					ammLog::Error "Unable to umount dir '$mntpnt'. Cleanup manually"
+					ammLog::Error "Unable to umount dir '$mntpnt'. Please cleanup manually"
+					r+=1
+				fi
+
+				if ! ammExec::AsUser losetup -d "$lodev" ; then
+					ammLog::Error "Unable to stop loop '$lodev'. Please cleanup manually"
+					r+=1
 				fi
 
 				;;
@@ -482,6 +497,7 @@ function ammChrootCentos::Populate {
 	typeset chrootdir="$1"
 	typeset version="$2"
 
+	typeset -i r=0
 
 	# Base system
 	typeset pkgs="basesystem bash filesystem"
@@ -504,8 +520,15 @@ function ammChrootCentos::Populate {
 	# Build
 	#pkgs+="elfutils findutils gcc make strace"
 
+	# Install base packages
 	ammChroot::Exec "$chrootdir" yum -y install $pkgs
+	r+=$?
 
+	# Update all packages
+	ammChroot::Exec "$chrootdir" yum -y update
+	r+=$?
+
+	return $r
 }
 
 # @description: remove all non-necessary files

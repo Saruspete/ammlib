@@ -22,12 +22,13 @@ function ammPkgRpm::Extract {
 	typeset    dst="$1"; shift
 	typeset -i ret=0
 
-	for file in "$@"; do
-		ammLog::Debug "Extracting package '$file' into '$dst'"
+	typeset rpmfile
+	for rpmfile in "$@"; do
+		ammLog::Debug "Extracting package '$rpmfile' into '$dst'"
 		# Exec in subshell to avoid changing script cwd
 		(
 			cd "$dst"
-			rpm2cpio "$file" | cpio -idm 2>/dev/null
+			rpm2cpio "$rpmfile" | cpio -idm 2>/dev/null
 		)
 		ret+=$?
 	done

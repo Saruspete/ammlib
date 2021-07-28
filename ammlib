@@ -870,6 +870,7 @@ function ammLog::_Log {
 
 	# Read stdin
 	if [[ "$@" = "-" ]]; then
+		typeset line
 		while read line; do
 			# Silent mode doesn't write any log
 			if [[ "$__AMMLOG_SILENT" == "0" ]]; then

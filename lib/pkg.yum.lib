@@ -72,7 +72,12 @@ function ammPkgYum::_Yum {
 		ammLog::Info "Trying to execute 'yum $act $opts $@' as root"
 		ammExec::AsUser "root" yum --quiet $act $opts "$@"
 	else
-		yum --quiet $act $opts "$@"
+		# Wrapper to avoid slots being added in package name (eg, openssl-devel-1, make-1)
+		if [[ "$act" == "provides" ]] && ammPkgYum::IsDnf; then
+			dnf --quiet repoquery --queryformat "%{name}-%{version}.%{release}.%{arch}:\nFilename:" "$@"
+		else
+			yum --quiet $act $opts "$@"
+		fi
 	fi
 }
 
@@ -160,8 +165,11 @@ function ammPkgYum::InfoWhatProvides {
 						if [[ -z "$pkg" ]]; then
 							pkg="$key"
 							typeset arch="${pkg##*.}"
-							# name-version.dist.arch
-							typeset name="${pkg%-*-*.*.*}"
+							# name-version.dist.arch (don't be greedy: name can contain '-' too)
+							typeset name="${pkg%-*.*.*}"
+							# In some dist, we have a -release in the version...
+							name="${name/%-[0-9]*}"
+
 							if [[ -n "$name" ]]; then
 								ammLog::Debug "Renamed '$pkg' to '$name.$arch'"
 								pkg="$name.$arch"

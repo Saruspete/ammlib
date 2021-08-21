@@ -530,7 +530,7 @@ function ammLib::Loadable {
 
 	typeset -i r=0
 
-	ammLog::Dbg "Checking if libs are loadable: $@"
+	ammLog::Debug "Checking if libs are loadable: $@"
 
 	typeset arg=""
 	for arg in "$@"; do
@@ -821,7 +821,7 @@ function ammLog::Date {
 # @description  Checks if AMMLIB_DEBUG variable is set and needs to do some job
 function ammLog::_DbgIsEnabled {
 	# Early tests
-	[[ $__AMMLOG_VERBOSITY -ge 2 ]] && return 0
+	[[ $__AMMLOG_VERBOSITY -ge 4 ]] && return 0
 	[[ -z "${AMMLIB_DEBUG:-}" ]] && return 1
 	[[ "$AMMLIB_DEBUG" == "all" ]] && return 0
 
@@ -845,13 +845,16 @@ typeset -g __AMMLOG_LOGFILE=""
 typeset -g __AMMLOG_LOGTERM=""
 typeset -g __AMMLOG_SILENT="0"
 
+# If stdout is piped, forward logs to stderr to avoid messing
+$__AMMLIB_STDOUTPIPED && __AMMLOG_FDSTD=$__AMMLOG_FDERR
+
 typeset -gi __AMMLOG_STEPDEPTH=0
 typeset -ga __AMMLOG_STEPTIME
 typeset -ga __AMMLOG_STEPNAME
-
 # @description  (private) Generic log function for logging
 # @arg $1  (string) tag
 # @arg $2  (string) format, passed to ammLog::Color, thus keys of $__AMMLOG_TERMCODES
+# @arg $3  (string) prefix, added to the message
 # @arg $@  (string[]) Text to be logged. If only "-", read as stdin.
 # @stdout  (string) Resulting log
 function ammLog::_Log {
@@ -859,29 +862,32 @@ function ammLog::_Log {
 	typeset redbg=""
 	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
 
-	typeset tag="$1"; shift
-	typeset fmt="$1"; shift
+	typeset tag="$1"
+	typeset fmt="$2"
+	typeset pfx="$3"
+	shift 3
 
 	typeset color="$(ammLog::Color $fmt)"
 	typeset colorrst="$(ammLog::Color reset)"
 	typeset date="$(ammLog::Time)"
 	typeset pad="$(ammLog::_StepPad)"
 
-
 	# Read stdin
 	if [[ "$@" = "-" ]]; then
 		typeset line
+		# Add the reverse color for stdin logging
+		color+="$(ammLog::Color "reverse")"
 		while read line; do
 			# Silent mode doesn't write any log
 			if [[ "$__AMMLOG_SILENT" == "0" ]]; then
-				echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $line${colorrst}"
-			# Special case: only error on stdout
+				echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $pfx$line${colorrst}"
+			# Special case: only error
 			elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
-				echo "[$date][$tag][$$]$pad $line"
+				echo >&$__AMMLOG_FDERR "[$date][$tag][$$]$pad $line"
 			fi
 
 			if [[ -n "${__AMMLOG_LOGFILE:-}" ]] && [[ -w "$__AMMLOG_LOGFILE" ]]; then
-				echo >>"$__AMMLOG_LOGFILE"  "[$date][$tag][$$]$pad $line"
+				echo >>"$__AMMLOG_LOGFILE"  "[$date][$tag][$$]$pad $pfx$line"
 			fi
 		done
 
@@ -889,13 +895,14 @@ function ammLog::_Log {
 	else
 		# Silent mode doesn't display any log
 		if [[ "$__AMMLOG_SILENT" == "0" ]]; then
-			echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $@${colorrst}"
+			echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $pfx$@${colorrst}"
+		# Special case: only error
 		elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
-			echo "[$date][$tag][$$]$pad $@"
+			echo >&$__AMMLOG_FDERR "[$date][$tag][$$]$pad $pfx$@"
 		fi
 
 		if [[ -n "${__AMMLOG_LOGFILE:-}" ]] && [[ -w "$__AMMLOG_LOGFILE" ]]; then
-			echo >>"$__AMMLOG_LOGFILE"  "[$date][$tag][$$]$pad $@"
+			echo >>"$__AMMLOG_LOGFILE"  "[$date][$tag][$$]$pad $pfx$@"
 		fi
 	fi
 
@@ -905,15 +912,18 @@ function ammLog::_Log {
 
 
 function ammLog::_Write {
-	typeset tar="$1"; shift
-	typeset fmt="$2"; shift
+	typeset tag="$1"
+	typeset fmt="$2"
+	typeset pfx="$3"
+	shift 3
+
 	typeset color=""
 }
 
 # @description  Log a fatal error and terminate script
 # @arg $@  Log text for fatal error. If "-", text is read from stdin
 function ammLog::Die {
-	ammLog::_Log "DIE" "bold red reverse" "$@"
+	ammLog::_Log "DIE" "bold red reverse" "" "$@"
 	exit 255
 }
 
@@ -921,25 +931,24 @@ function ammLog::Die {
 # @arg $@  Error text to log. If "-", text is read from stdin
 function ammLog::Error {
 	# TODO: add calling path
-	ammLog::_Log "ERR" "bold red" "$@"
+	[[ $__AMMLOG_VERBOSITY -ge 0  ]] && ammLog::_Log "ERR" "bold red" "" "$@"
 }
 
 # @description  Log a warning
 # @arg $@  warning text to log. If "-", text is read from stdin
 function ammLog::Warning {
-	ammLog::_Log "WRN" "bold yellow" "$@"
+	[[ $__AMMLOG_VERBOSITY -ge 1 ]] && ammLog::_Log "WRN" "bold yellow" "" "$@"
 }
 
 # @description  Log an information
 # @arg $@  Info text to log. If "-", text is read from stdin
 function ammLog::Info {
-	ammLog::_Log "INF" "bold green" "$@"
+	[[ $__AMMLOG_VERBOSITY -ge 2  ]] && ammLog::_Log "INF" "bold green" "" "$@"
 }
 
 function ammLog::Notice {
-	ammLog::_Log "INF" "bold green" "$@"
+	[[ $__AMMLOG_VERBOSITY -ge 3 ]] && ammLog::_Log "INF" "bold green" "" "$@"
 }
-
 
 # @description  Log a debug info
 # @arg $@  Debug text to log. If "-", text is read from stdin
@@ -954,9 +963,9 @@ function ammLog::Debug {
 	#if [[ -n "${AMMLIB_DEBUG:-}" ]] || [[ $__AMMLOG_VERBOSITY -ge 2 ]]; then
 	if ammLog::_DbgIsEnabled "${FUNCNAME[1]}"; then
 		# Get the caller
-		typeset callerdbg="${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]} ${FUNCNAME[1]}"
+		typeset callerdbg="${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]} ${FUNCNAME[1]:-main}"
 
-		ammLog::_Log "DBG" "bold blue reverse" "[$callerdbg] $@"
+		ammLog::_Log "DBG" "bold blue" "[$callerdbg] " "$@"
 
 	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
 	else

@@ -786,7 +786,7 @@ typeset -gA __AMMLOG_TERMCODES=(
 	[bglightblack]=100 [bglightred]=101 [bglightgreen]=102 [bglightyellow]=103 [bglightblue]=104 [bglightmagenta]=105 [bglightcyan]=106 [bglightwhite]=107 [bglightdefault]=109
 )
 
-typeset -gi __AMMLOG_VERBOSITY=1
+typeset -gi __AMMLOG_VERBOSITY=2
 typeset -gi __AMMLOG_DEPTH=0
 
 # @description  Colorize the text with values in __AMMLOG_TERMCODES

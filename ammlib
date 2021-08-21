@@ -447,12 +447,12 @@ function ammLib::Locate {
 function ammLib::LocatePattern {
 	typeset libpattern="$1"
 
-	typeset libpath lib
+	typeset libpath= lib=
 	typeset searchextra="${AMMLIB_SEARCHPATH_EXTRA:-}"
 	typeset searchoverride="${AMMLIB_SEARCHPATH_OVERRIDE:-}"
 	for libpath in ${searchoverride//:/ } $__AMMLIB_SEARCHPATH ${searchextra//:/ }; do
 		for lib in $libpath/$libpattern*.lib; do
-			echo "$lib"
+			[[ -f "$lib" ]] && echo "$lib"
 		done
 	done
 }

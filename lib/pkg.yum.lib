@@ -183,6 +183,23 @@ function ammPkgYum::InfoWhatProvides {
 	done
 }
 
+function ammPkgYum::InfoWhatProvidesFile {
+	typeset file
+	typeset -a filesQuery=()
+	for file in "$@"; do
+		# Absolute path or already wildcarded, good to go
+		if [[ "${file:0:1}" == "/" ]] || [[ "${file:0:2}" == "*/" ]]; then
+			filesQuery+=("$file")
+
+		# Prefix it with */
+		else
+			filesQuery+=("*/$file")
+		fi
+	done
+
+	ammPkgYum::InfoWhatProvides "${filesQuery[@]}"
+}
+
 function ammPkgYum::InfoContents {
 	# Check for all input
 	for pkg in "$@"; do

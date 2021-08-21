@@ -72,16 +72,21 @@ function ammPkg::ManagerDetect {
 			if ammLib::Loadable "$sublib" >/dev/null; then
 				ammLib::Load "$sublib"
 
-				typeset libtype="${sublib#pkg.}"
+				typeset libtype="${sublib#*/pkg.}"
+				libtype="${libtype%.lib}"
 
 				# If the package manager is ok, good
-				if ammPkg::${libtype^}IsAvailable "$rootpath"; then
+				typeset funcName="ammPkg${libtype^}::IsAvailable"
+				if ammEnv::IsFunc "$funcName" && $funcName "$rootpath"; then
 					mgr+=("$libtype")
 				fi
 			fi
 		done
 
-		if [[ ${#mgr[@]} -eq 1 ]]; then
+		if [[ -z "${mgr:-}" ]]; then
+			ammLog::Error "Unhandled or inexistant package manager on '$rootpath'"
+			return 1
+		elif [[ ${#mgr[@]} -eq 1 ]]; then
 			echo $mgr
 			return 0
 		elif [[ ${#mgr[@]} -gt 1 ]]; then
@@ -89,7 +94,7 @@ function ammPkg::ManagerDetect {
 			ammLog::Warning "Multiple package managers available: '${mgr[@]}'"
 			return 1
 		else
-			ammLog::Error "Unhandled or inexistant package manager on '$rootpath'"
+			ammLog::Error "Unhandled case: mgr='${mgr[@]}'"
 			return 1
 		fi
 	fi
@@ -108,7 +113,7 @@ function ammPkg::_Proxy {
 	typeset path="/"
 	# Some functions like "Extract" need a path.
 	# TODO: make it smarter, like test if the path is a valid chroot or smth like this
-	if [[ -n "${1:-}" ]] && [[ -d "$1" ]] && [[ "$func" != "Extract" ]]; then
+	if [[ -n "${1:-}" ]] && [[ -d "$1/var" ]] && [[ "$func" != "Extract" ]]; then
 		path="$1"
 		shift
 	fi
@@ -123,6 +128,12 @@ function ammPkg::_Proxy {
 		if [[ -n "$lib" ]]; then
 			__AMMPKG_PATHTOTYPE[$path]="$lib"
 		fi
+	fi
+
+	# Check we found a managed
+	if [[ -z "$lib" ]]; then
+		ammLog::Error "Unable to find the manager library to use for path '$path'"
+		return 1
 	fi
 
 	# Load the target library
@@ -171,10 +182,15 @@ function ammPkg::InfoRequirements {
 	ammPkg::_Proxy "InfoRequirements" "$@"
 }
 
-# @description  List packages that provides a specified
+# @description  List packages that provides a specified file or feature
 # @arg $@  (string) Path or glob of a searched file
 function ammPkg::InfoWhatProvides {
 	ammPkg::_Proxy "InfoWhatProvides" "$@"
+}
+
+# @description  List packages that provides a specified file
+function ammPkg::InfoWhatProvidesFile {
+	ammPkg::_Proxy "InfoWhatProvidesFile" "$@"
 }
 
 

@@ -1028,6 +1028,36 @@ function ammString::HashSHA1 {
 	return 0
 }
 
+function ammString::HashSHA256 {
+	typeset str="${1--}"
+	typeset salt="${2:-}"
+
+	if [[ "$str" == "-" ]] && [[ -n "$salt" ]]; then
+		ammLog::Warning "$FUNCNAME: Cannot set a salt when reading from stdin"
+	fi
+
+	if ammExec::Exists "sha256sum"; then
+		if [[ -r "$str" ]] || [[ "$str" == "-" ]]; then
+			(echo -n "$salt"; cat "$str") | sha256sum "-" | cut -f 1 -d " "
+		else
+			echo -n "${salt}${str}" | sha256sum | cut -f 1 -d " "
+		fi
+	elif ammExec::Exists "openssl"; then
+		if [[ -r "$str" ]]; then
+			(echo -n "$salt"; cat "$str") | openssl sha256 | cut -f 2 -d " "
+		elif [[ "$str" == "-" ]]; then
+			openssl sha256 | cut -f 2 -d " "
+		else
+			echo -n "${salt}${str}" | openssl sha256 | cut -f 2 -d " "
+		fi
+	else
+		ammLog::Error "No SHA256 generator available (openssl or sha256sum)"
+		return 1
+	fi
+
+	return 0
+}
+
 
 # -----------------------------------------------------------------------------
 # Pretty print and display helpers

@@ -21,7 +21,7 @@ typeset func="$1"; shift
 typeset libname=""
 
 # Allow to test private functions
-libname="${func##*_}"
+libname="${func#_}"
 # Remove the prefix
 libname="${libname#amm}"
 libname="${libname,}"

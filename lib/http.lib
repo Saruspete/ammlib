@@ -132,14 +132,15 @@ function ammHttp::_DoWget {
 	shift 1
 
 	# Options parsing
-	typeset wgetopts=""
-	for o in ${opts:-}; do
+	typeset wgetopts="" opt=
+	for opt in ${opts:-}; do
 		typeset val="${opt#*=}"
 		case $o in
 			follow) ;;
 			nofollow)    wgetopts+=" --max-redirect=0 " ;;
 			silent)      wgetopts+=" --quiet " ;;
 			agent=*)     wgetopts+=" --user-agent='$val' " ;;
+			dest=*)      wgetopts+=" --output-document='$val' " ;;
 			destdir=*)   wgetopts+=" --directory-prefix='$val' "  ;;
 			cookiejar=*) wgetopts+=" --load-cookies='$val' --save-cookies='$val' --keep-session-cookies " ;;
 			# wget specific options
@@ -193,7 +194,7 @@ function ammHttp::Post {
 }
 
 # @description  Fetch an url
-# @arg $1 
+# @arg $1 (url)  URL to retrieve file from
 # @arg $2 (path)  Directory
 # @arg $3 (string) Options to change function behavir. Default: "follow silent"
 #   follow: Follow redirections

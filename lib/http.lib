@@ -204,10 +204,23 @@ function ammHttp::Fetch {
 	typeset dst="$2"
 	typeset opts="${3:-follow}"
 
+	typeset -i r=0
 	[[ "$dst" != "-" ]] && opts+=" silent"
 
+	# Remove protocol
+	typeset cacheName="${src#*://}"
+
+	# Transform param in sha256 in case of secret credentials
+	typeset cacheParam="${cacheName#*\?}"
+	if [[ "$cacheParam" != "$cacheName" ]]; then
+		cacheParam="$(ammString::HashSHA256 "$cacheParam")"
+		cacheName="${cacheName##\?*}?$cacheParam"
+	fi
+
+	# Check if cache is available
 	if [[ -n "${AMMHTTP_FETCH_CACHE:-}" ]]; then
-		typeset cachePath="$AMMHTTP_FETCH_CACHE/${src#*://}"
+		typeset cachePath="$AMMHTTP_FETCH_CACHE/$cacheName"
+		ammLog::Debug "Checking if cache is present under '$cachePath'"
 		if [[ -s "$cachePath" ]]; then
 			if [[ "$dst" == "-" ]]; then
 				cat "$cachePath"
@@ -218,8 +231,19 @@ function ammHttp::Fetch {
 			fi
 		fi
 	fi
-	
+
 	ammHttp::Get "$src" "$opts dest=$dst"
+	r=$?
+
+	# Do the caching if requested and fetch success
+	if [[ $r == 0 ]] && [[ -n "${AMMHTTP_FETCH_CACHE:-}" ]]; then
+		typeset cachePath="$AMMHTTP_FETCH_CACHE/$cacheName"
+		ammLog::Debug "Storing '$src' as cache '$cachePath'"
+		mkdir -p "${cachePath%/*}"
+		cp "$dst" "$cachePath"
+	fi
+
+	return $?
 }
 
 function ammHttp::FetchSmart {

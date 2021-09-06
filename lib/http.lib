@@ -243,7 +243,7 @@ function ammHttp::Fetch {
 
 	# if dest is a directory or ends with /, change option accordingly
 	typeset dstOpt="dest"
-	if [[ -d "$dst" ]] || [[ "${dest: -1:1}" == "/" ]]; then
+	if [[ -d "$dst" ]] || [[ "${dst: -1:1}" == "/" ]]; then
 		dstOpt="destdir"
 	fi
 	ammHttp::Get "$src" "$opts ${dstOpt}=$dst"

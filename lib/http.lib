@@ -82,7 +82,7 @@ function ammHttp::_DoCurl {
 	typeset request="GET"
 
 	# Options parsing
-	typeset curlopts="" opt=
+	typeset curlopts="" opt= cwd=
 	for opt in $(ammHttp::_OptParse ${opts:-}); do
 		typeset val="${opt#*=}"
 		case $opt in
@@ -111,8 +111,12 @@ function ammHttp::_DoCurl {
 			# Local modifiers
 			silent)      curlopts+=" --silent --show-error " ;;
 			dest=*)      curlopts+=" --output $val --create-dirs " ;;
-			destdir=*)   curlopts+=" --output-dir $val --create-dirs " ;;
+			# Have to implement it with shell, as --output-dir is not always available
+			destdir=*)   ! [[ -d "$val" ]] && mkdir -p "$val"
+			             cwd="$val"
+			             curlopts+=" --remote-name " ;;
 			cookiejar=*) curlopts+=" --cookie-jar $val " ;;
+
 			# curl specific options
 			parallel)    curlopts+=" -Z" ;;
 			*) ammLog::Error "Unknown option: $opt" ;;
@@ -121,7 +125,11 @@ function ammHttp::_DoCurl {
 
 	# Do the query for every url provided
 	typeset -i ret=0
-	\curl --request "$request" $curlopts -f --connect-timeout 10 "$@" 2>/dev/null
+	(
+		# cwd is required for destdir
+		[[ -n "$cwd" ]] && cd "$cwd"
+		\curl --request "$request" $curlopts -f --connect-timeout 10 "$@" 2>/dev/null
+	)
 	ret+=$?
 
 	return $ret
@@ -233,7 +241,12 @@ function ammHttp::Fetch {
 		fi
 	fi
 
-	ammHttp::Get "$src" "$opts dest=$dst"
+	# if dest is a directory or ends with /, change option accordingly
+	typeset dstOpt="dest"
+	if [[ -d "$dst" ]] || [[ "${dest: -1:1}" == "/" ]]; then
+		dstOpt="destdir"
+	fi
+	ammHttp::Get "$src" "$opts ${dstOpt}=$dst"
 	r=$?
 
 	# Do the caching if requested and fetch success

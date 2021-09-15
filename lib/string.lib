@@ -867,6 +867,59 @@ function ammString::ExpandIntegerList {
 	echo -n ${values[@]}" "
 }
 
+# @description  Encode a binary stream to its 
+function ammString::UrlEncode {
+
+	# https://unix.stackexchange.com/questions/159253/decoding-url-encoding-percent-encoding
+	if ammExec::Exists perl; then
+		ammLog::Debug "UrlEncoding using perl"
+		perl -p -e 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg'
+		# perl -MURI::Escape -e 'print uri_unescape($ARGV[0])' "$encoded_url"
+
+	elif ammExec::Exists php; then
+		ammLog::Debug "UrlEncoding using php"
+		php -r 'while($l=fgets(STDIN)) echo rawurlencode($l);'
+
+	elif ammExec::Exists jq; then
+		# Beware: might add \x0a at the end?
+		ammLog::Debug "UrlEncoding using jq"
+		jq --raw-output --raw-input --slurp "@uri"
+
+	elif ammExec::Exists xxd && ammExec::Exists sed; then
+		xxd -p|tr -d \\n|sed 's/../%&/g'
+
+	#elif ammExec::Exists awk; then
+	#	awk -niord '{printf RT?$0chr("0x"substr(RT,2)):$0}' RS=%..
+
+	# Plain bash fallback (might fail with \0 and \n)
+	else
+		# urlencode <string>
+		typeset line
+		ammLog::Warning "UrlEncoding using bash + printf: data may be corrupted"
+		while read line; do
+			typeset -i length="${#line}" i=0
+			for (( i = 0; i < length; i++ )); do
+				local c="${line:i:1}"
+				case $c in
+					[a-zA-Z0-9.~_-]) echo -n "$c" ;;
+					*) printf '%%%02X' "'$c" ;;
+				esac
+			done
+		done
+	fi
+
+}
+
+function ammString::UrlDecode {
+	:
+	#sed 's@+@ @g;s@%@\\x@g' | xargs -0 printf "%b"
+	# perl -pe 's/\%(\w\w)/chr hex $1/ge'
+
+	# local url_encoded="${1//+/ }"
+	#printf '%b' "${url_encoded//%/\\x}"
+}
+
+
 # -----------------------------------------------------------------------------
 # UUID
 # -----------------------------------------------------------------------------

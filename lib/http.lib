@@ -28,9 +28,12 @@ function ammHttp::MetaInit {
 		ammLog::Debug "Found wget version '$_AMMHTTP_WGET_VERSION'"
 	fi
 
+	# Reset agent override
 	typeset -g _AMMHTTP_AGENT_FORCE=
-
 }
+
+
+
 
 # -----------------------------------------------------------------------------
 # Internal wrappers for tools
@@ -43,7 +46,8 @@ function ammHttp::_DoQuery {
 	if [[ -n "${_AMMHTTP_AGENT_FORCE:-}" ]]; then
 		# TODO: warning: executing a user-provided variable. Might be security risk
 		if ammEnv::IsFunc "$_AMMHTTP_AGENT_FORCE" || ammExec::Exists "$_AMMHTTP_AGENT_FORCE"; then
-			$AMMHTTP_AGENT_FORCE "$@"
+			$_AMMHTTP_AGENT_FORCE "$@"
+			return $?
 		else
 			ammLog::Warning "Invalid value in AMMHTTP_AGENT_FORCE: '$AMMHTTP_AGENT_FORCE'"
 		fi
@@ -80,57 +84,97 @@ function ammHttp::_DoCurl {
 	typeset path="${1%%\?*}"
 	typeset data="${1#*\?}"
 	typeset request="GET"
+	
+	# Modifiers:
+	# @  read from file given after @  (act like file upload)  avatar@file.jpg
+	# <  read from file given after <  (act like text field)   mytext<longstory.txt
+	# ;  set custom parameters of file: avatar@file.jpg;filename=rick.jpg
+	#    Can be: filename, type, headers. Eg:  myupload
+	# -  read from stdin
+	# .  Same as - but unbuffered for streaming
+
+	# --data(all)   application/x-www-form-urlencoded   (for form post)
+	# --form(all)   multipart/form-data                 (for file upload)
+
+	# --data
+	# --data-ascii   like --data
+	# --data-raw     like --data but without interpretation of @
+	# --data-binary  no special char processing
+	# --data-urlencode urlencode data
+	# --form         
+	# --form-string  no special char processing
+
 
 	# Options parsing
-	typeset curlopts="" opt= cwd=
+	typeset -i ret=0
+	typeset -a curlopts=()
+	typeset opt= cwd=
 	for opt in $(ammHttp::_OptParse ${opts:-}); do
 		typeset val="${opt#*=}"
 		case $opt in
 			# HEAD
 			head)        request="HEAD"
-			             curlopts+=" --head " ;;
+			             curlopts+=("--head") ;;
 			# PUT
 			put)         request="PUT"  ;;
 			put-file=*)  request="PUT"
-			             curlopts+=" --upload-file '$val' " ;;
+			             curlopts+=("--upload-file '$val'");;
 			put-form=*)  request="PUT"
-			             curlopts+=" --form '$val' " ;;
+			             curlopts+=("--form '$val'") ;;
 			# POST
 			post)        request="POST" ;;
 			post-file=*) request="POST"
-			             curlotps+=" --data-binary '@$val' " ;;
+			             typeset formName="${val%%=*}" formFile="${val#*=}"
+			             [[ "$formName" == "$val" ]] && formName="${val##*/}"
+			             curlopts+=("--form" "$formName=@$formFile") ;;
 			post-form=*) request="POST"
-			             curlopts+=" --form $val " ;;
+			             curlopts+=("--data" "$val") ;;
+			# Security
+			cert-cafile=*)curlopts+=("--cacert" "$val") ;;
+			cert-cadir=*) curlopts+=("--capath" "$val") ;;
+			cert-client=*)curlopts+=("--cert"   "$val") ;;
+			cert-crl=*)   curlopts+=("--crlfile" "$val") ;;
+
 			# Query modifiers
-			json)        curlopts+=" --header 'Content-Type: application/x-www-form-urlencoded' ";;
-			follow)      curlopts+=" --location " ;;
-			nofollow)    curlopts="${curlopts// --location / /}"
-			             curlopts="${curlopts// -L / /}" ;;
-			agent=*)     curlopts+=" --user-agent '$val' " ;;
+			json)        curlopts+=("--header" "Content-Type: application/x-www-form-urlencoded") ;;
+			follow)      curlopts+=("--location") ;;
+			nofollow)    curlopts=("${curlopts[@]/--location/}")
+			             curlopts=("${curlopts[@]/-L/}") ;;
+			header=*)    curlopts+=("--header" "$val") ;;
+			agent=*)     curlopts+=("--user-agent" "$val") ;;
 
 			# Local modifiers
-			silent)      curlopts+=" --silent --show-error " ;;
-			dest=*)      curlopts+=" --output $val --create-dirs " ;;
+			silent)      curlopts+=("--silent" "--show-error") ;;
+			dest=*)      curlopts+=("--output" "$val" "--create-dirs") ;;
 			# Have to implement it with shell, as --output-dir is not always available
 			destdir=*)   ! [[ -d "$val" ]] && mkdir -p "$val"
 			             cwd="$val"
-			             curlopts+=" --remote-name " ;;
-			cookiejar=*) curlopts+=" --cookie-jar $val " ;;
+			             curlopts+=("--remote-name") ;;
+			cookiejar=*) curlopts+=("--cookie-jar" "$val") ;;
 
 			# curl specific options
 			parallel)    curlopts+=" -Z" ;;
-			*) ammLog::Error "Unknown option: $opt" ;;
+			*)
+				ammLog::Error "Unknown option: '$opt'"
+				ret+=1
+				;;
 		esac
 	done
 
+	if [[ $ret -gt 0 ]]; then
+		ammLog::Error "Cannot execute curl with unhandled parameters"
+		return $ret
+	fi
+
 	# Do the query for every url provided
-	typeset -i ret=0
+	ammLog::Debug "Calling curl as: curl --request '$request' ${curlopts[@]} -f --connect-timeout 10 '$@'"
 	(
 		# cwd is required for destdir
 		[[ -n "$cwd" ]] && cd "$cwd"
-		\curl --request "$request" $curlopts -f --connect-timeout 10 "$@" 2>/dev/null
+		\curl --request "$request" "${curlopts[@]}" -f --connect-timeout 10 "$@" 2>/dev/null
 	)
 	ret+=$?
+	ammLog::Debug "Return curl: $ret"
 
 	return $ret
 }
@@ -140,27 +184,60 @@ function ammHttp::_DoWget {
 	shift 1
 
 	# Options parsing
-	typeset wgetopts="" opt=
+	typeset -i ret=0 formCnt=0
+	typeset -a wgetopts=("--quiet" "--output-document" "-")
+	typeset opt=
 	for opt in ${opts:-}; do
 		typeset val="${opt#*=}"
-		case $o in
+		case $opt in
+			# POST
+			post-form=*) wgetopts+=("--post-data" "$val") ;;
+			# wget can't post binary data (multipart), we must convert it beforehand
+			post-file=*)
+				ammLog::Warning "uploading binary data using wget. This is inefficient and triple traffic size"
+				typeset formName="${val%%=*}" formFile="${val#*=}"
+				[[ "$formName" == "$val" ]] && formName="${val##*/}"
+
+				# translate to url encoding
+				typeset tmpUpload="$(ammLib::TmpPathGet)/wget.post.$$.$formCnt"
+				echo -n "$formName=" >| "$tmpUpload"
+				cat "$formFile" | ammString::UrlEncode >> "$tmpUpload"
+				wgetopts+=("--post-file" "$tmpUpload")
+				formCnt+=1
+				;;
+			# Security
+
+			# Query modifiers
 			follow) ;;
-			nofollow)    wgetopts+=" --max-redirect=0 " ;;
-			silent)      wgetopts+=" --quiet " ;;
-			agent=*)     wgetopts+=" --user-agent='$val' " ;;
-			dest=*)      wgetopts+=" --output-document='$val' " ;;
-			destdir=*)   wgetopts+=" --directory-prefix='$val' "  ;;
-			cookiejar=*) wgetopts+=" --load-cookies='$val' --save-cookies='$val' --keep-session-cookies " ;;
+			nofollow)    wgetopts+=("--max-redirect=0") ;;
+			header=*)    wgetopts+=("--header" "$val") ;;
+			agent=*)     wgetopts+=("--user-agent" "$val") ;;
+
+			# Local modifiers
+			#to-stdout)   wgetopts=
+			silent)      wgetopts+=("--quiet") ;;
+			dest=*)      wgetopts+=("--output-document" "$val") ;;
+			destdir=*)   wgetopts+=("--directory-prefix" "$val")  ;;
+			cookiejar=*) wgetopts+=("--load-cookies" "$val" "--save-cookies" "$val" "--keep-session-cookies") ;;
+
+
 			# wget specific options
-			recursive)   wgetopts+=" -r -np -e robots=off --wait 0.1 " ;;
-			*) log_err "Unknown fetch_http option: $o" ;;
+			recursive)   wgetopts+=("--recursive" "--no-parent" "--execute" "robots=off" "--wait" "0.1") ;;
+			*)
+				ammLog::Error "Unhandled fetch_http option for wget: $opt"
+				ret+=1
+				;;
 		esac
-		shift
 	done
 
+	if [[ $ret -gt 0 ]]; then
+		ammLog::Error "Cannot execute wget with unhandled parameters"
+		return $ret
+	fi
+
 	# Do the query for every url provided
-	typeset -i ret=0
-	\wget $wgetopts --no-clobber "$@" 2>/dev/null
+	ammLog::Debug "Calling wget as: wget ${wgetopts[@]} --no-clobber '$@'"
+	\wget "${wgetopts[@]}" --no-clobber "$@" 2>/dev/null
 	ret=$?
 
 
@@ -185,17 +262,20 @@ function ammHttp::Post {
 	typeset data="$2"
 	typeset opts="${3:-follow}"
 
+	# Maybe should be ammString::UrlEncode
+	data="${data// /%20}"
+
 	# File upload ?
 	if [[ -s "$data" ]]; then
 		opts+=" post-file=$data"
 
 	# JSON ?
 	elif [[ "${data:0:1}" == "{" ]]; then
-		opts+=" post-data='$data' json"
+		opts+=" post-form=$data json"
 	
 	# Simple form
 	else
-		opts+=" post-data='$data'"
+		opts+=" post-form=$data"
 	fi
 
 	ammHttp::_DoQuery "$opts" "$url"
@@ -277,7 +357,7 @@ function ammHttp::FetchSmart {
 			)
 			ret=$?
 		else
-			log_err "Cannot find git"
+			ammLog::Error "Cannot find git"
 			ret=99
 		fi
 
@@ -316,33 +396,13 @@ function ammHttp::FetchSmart {
 	return $ret
 }
 
-
+# @description  Push a given file to a specified url
 function ammHttp::Push {
 	typeset url="$1"
 	typeset file="$2"
 	typeset opts="${3:-}"
 
-	# Allowed options
-
-
-	if ammExec::Exists "curl"; then
-		typeset opt val curlopts=
-		for opt in ${opts:-}; do
-			val="${opt#*=}"
-			case "$opt" in
-				certcafile=*)  curlopts+=" --cacert $val" ;;
-				certcadir=*)   curlopts+=" --capath $val" ;;
-				certclient=*)  curlopts+=" --cert   $val" ;;
-				certcrl=*)     curlopts+=" --crlfile $val" ;;
-			esac
-		done
-
-		\curl $curlopts --data-binary "@$file"  "$url" 2>/dev/null
-		return $?
-
-	elif ammExec::Exists "wget"; then
-		:
-	fi
+	ammHttp::_DoQuery "post-file=$file $opts" "$url"
 }
 
 

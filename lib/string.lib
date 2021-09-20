@@ -177,7 +177,7 @@ function ammString::IsIPv6 {
 
 function ammString::IsIP {
 	typeset ip="$1"
-	ammString::IsIPv4 "$ip" || ammStringIsIPv6 "$ip"
+	ammString::IsIPv4 "$ip" || ammString::IsIPv6 "$ip"
 }
 
 # Check if the input looks like an option (starts with - or --)

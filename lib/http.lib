@@ -187,7 +187,7 @@ function ammHttp::_DoWget {
 	typeset -i ret=0 formCnt=0
 	typeset -a wgetopts=("--quiet" "--output-document" "-")
 	typeset opt=
-	for opt in ${opts:-}; do
+	for opt in $(ammHttp::_OptParse ${opts:-}); do
 		typeset val="${opt#*=}"
 		case $opt in
 			# POST

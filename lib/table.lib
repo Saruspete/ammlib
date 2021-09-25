@@ -64,7 +64,19 @@ typeset -ga __AMMTABLE_CACHE_COLSIZE=()
 typeset -ga __AMMTABLE_CACHE_COLMAXSIZE=()
 
 function ammTable::_TermCols {
-	echo "${COLUMNS:-$(tput cols)}"
+	if [[ -n "$COLUMNS" ]] then
+		echo "$COLUMNS"
+	# Tput from ncurses
+	elif type -P tput >/dev/null 2>&1; then
+		tput cols
+	# stty from coreutils
+	elif type -P stty >/dev/null 2>&1; then
+		typeset lines cols
+		read line cols < <(stty size)
+		echo $cols
+	else
+		echo 80
+	fi
 }
 
 function ammTable::_DataMaxSize {

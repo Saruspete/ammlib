@@ -1086,7 +1086,7 @@ function ammLog::Step {
 function ammLog::StepBegin {
 	typeset name="$1"
 
-	typeset txt=">> Begin: $name"
+	typeset txt=">> $name"
 
 	__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]="$name"
 	__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]="$(date +%s)"
@@ -1113,7 +1113,7 @@ function ammLog::StepEnd {
 
 	#typeset txt="$(ammLog::_StepPrefix $__AMMLOG_STEPDEPTH"
 	typeset -i time="$(($(date +%s) - ${__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]} ))"
-	typeset txt="<< End: ${__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]}. Took:${time}s"
+	typeset txt="<< ${__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]}. Took:${time}s"
 	[[ -n "$ret" ]] && txt+=" Ret:'$ret'"
 	[[ -n "$msg" ]] && txt+=" Msg:'$msg'"
 

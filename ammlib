@@ -1326,7 +1326,8 @@ function ammSys::OSVersionGet {
 
 function ammEnv::_Add {
 	typeset var="$1"; shift
-	typeset where="${1:-after}"
+
+	typeset where="after"
 	if [[ "${1:-}" == "before" ]] || [[ "${1:-}" == "after" ]]; then
 		where="$1"
 		shift

@@ -516,7 +516,7 @@ function ammChrootCentos::Populate {
 	pkgs+=" chkconfig procps-ng iputils"
 	# Utils and tools
 	pkgs+=" bzip2 gawk grep gzip info less"
-	#pkgs+="ncurses perl pcre sed tar tee which"
+	pkgs+=" ncurses sed tar which wget"
 	# Build
 	#pkgs+="elfutils findutils gcc make strace"
 

@@ -139,6 +139,15 @@ typeset -g __AMMLIB_BIN="$HOME/.${__AMMLIB_APPNAME}/bin"
 [[ -d "$__AMMLIB_BIN" ]] || mkdir -p "$__AMMLIB_BIN"
 export PATH+=":$__AMMLIB_BIN"
 
+#typeset -ga __AMMLIB_ERRCODES=(
+#	# Inspired from asm-generic/errno-base.h
+#	[1]="PERM"   [2]="NOENT"  [3]="SRCH" [5]="IO" [8]="NOEXEC" [9]="BADF"
+#	[10]="CHILD"  [11]="AGAIN" [12]="NOMEM" [13]="ACCES"
+#	[20]="NOTDIR" [21]="ISDIR" [22]="INVAL" [28]="NOSPC"
+#	# Other errors codes
+#)
+
+
 # -----------------------------------------------------------------------------
 # Data management
 # -----------------------------------------------------------------------------

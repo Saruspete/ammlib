@@ -855,7 +855,9 @@ typeset -g __AMMLOG_LOGTERM=""
 typeset -g __AMMLOG_SILENT="0"
 
 # If stdout is piped, forward logs to stderr to avoid messing
-$__AMMLIB_STDOUTPIPED && __AMMLOG_FDSTD=$__AMMLOG_FDERR
+if $__AMMLIB_STDOUTPIPED || [[ -n "${AMMLIB_LOGTOSTDERR:-}" ]]; then
+	__AMMLOG_FDSTD=$__AMMLOG_FDERR
+fi
 
 typeset -gi __AMMLOG_STEPDEPTH=0
 typeset -ga __AMMLOG_STEPTIME

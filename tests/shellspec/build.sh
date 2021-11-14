@@ -35,7 +35,7 @@ SS_VERSION="$(ammOptparse::Get "ss-version")"
 SS_DESTDIR="$(ammOptparse::Get "ss-destdir")"
 
 # Try to get the latest version if needed
-[[ "$SS_VERSION" == "latest" ]] && SS_VERSION="$(ammHttp::GithubReleaseGetLastVersion "shellspec/shellspec")"
+[[ "$SS_VERSION" == "latest" ]] && SS_VERSION="$(ammHttp::GithubReleaseGetLatest "shellspec/shellspec")"
 
 # Check version
 [[ -z "$SS_VERSION" ]] && ammLog::Die "Invalid ShellSpec version '$SS_VERSION'"
@@ -47,16 +47,24 @@ if [[ -s "$ss_extract/shellspec" ]]; then
 	ammLog::Info "Version '$SS_VERSION' is already extracted"
 else
 
-	typeset ss_assets="$(ammHttp::GithubReleaseGetAssets "shellspec/shellspec" "$SS_VERSION")"
-	if [[ -z "$ss_assets" ]]; then
-		ammLog::Die "Unable to fetch assets for version '$SS_VERSION'"
-	fi
+	if [[ "$SS_VERSION" == "devel" ]]; then
+		(
+			mkdir -p "$ss_extract"
+			cd "$ss_extract"
+			git clone "https://github.com/saruspete/shellspec.git" "."
+		)
+	else
+		typeset ss_assets="$(ammHttp::GithubReleaseGetAssets "shellspec/shellspec" "$SS_VERSION")"
+		if [[ -z "$ss_assets" ]]; then
+			ammLog::Die "Unable to fetch assets for version '$SS_VERSION'"
+		fi
 
-	typeset ss_archive="$(ammHttp::FetchSmart "$ss_assets")"
-	[[ -d "$ss_extract" ]] || mkdir -p "$ss_extract"
+		typeset ss_archive="$(ammHttp::FetchSmart "$ss_assets")"
+		[[ -d "$ss_extract" ]] || mkdir -p "$ss_extract"
 
-	if ! tar -xf "$ss_archive" -C "$ss_extract" --strip-components=1; then
-		ammLog::Warning "tar extraction failed. You may expect some failure down the line"
+		if ! tar -xf "$ss_archive" -C "$ss_extract" --strip-components=1; then
+			ammLog::Warning "tar extraction failed. You may expect some failure down the line"
+		fi
 	fi
 
 	ammLog::Info "Extracted to '$ss_extract'. Creating symlink 'current' to it"

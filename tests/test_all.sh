@@ -3,6 +3,9 @@
 typeset MYSELF="$(readlink -e $0 || realpath $0)"
 typeset MYPATH="${MYSELF%/*}"
 
+# To ensure standard behavior between piped logs and standard runs
+export AMMLIB_LOGTOSTDERR=1
+
 # Change dir for shellspec
 cd "$MYPATH"
 
@@ -33,7 +36,8 @@ rglobal+=$rlocal
 ammLog::StepEnd $rlocal
 
 ammLog::StepBegin "Fetching latest ShellSpec version"
-$AMMTEST_SS_ROOT/build.sh
+# Use the devel version until a newer release than 0.28.1 is done, to have UseFD + my patch
+$AMMTEST_SS_ROOT/build.sh --ss-version=devel
 rlocal=$?
 rglobal+=$rlocal
 ammLog::StepEnd $rlocal

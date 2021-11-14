@@ -1,0 +1,218 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammCryptHash::MetaCheck {
+	:
+}
+#function ammHash::MetaInit {
+#}
+
+# @description  Try to identify the type of a provided hash
+# @arg  $1  (string) the hash string to identify
+function ammCryptHash::TypeOf {
+	typeset str="$1"
+
+	typeset strType=""
+
+	# Hash password
+	if [[ "${str:0:1}" == '$' ]]; then
+		typeset fmt="${str#$}"; fmt="${fmt%%\$*}"
+		case "$fmt" in
+			'')  strType="crypt_des" ;;
+			_)   strType="crypt_bsdi" ;;
+			1)   strType="crypt_md5" ;;
+			2|2[axyb]) strType="crypt_bcrypt" ;;
+			3)   strType="crypt_nthash" ;;
+			5)   strType="crypt_sha256" ;;
+			6)   strType="crypt_sha512" ;;
+			sha1) strType="crypt_sha1" ;;
+			y)   strType="crypt_yescrypt" ;;
+			md5|md5,*) strType="crypt_sunmd5" ;;
+			apr1) strType="crypt_apr1" ;;
+			*)   ammLog::Warning "Unmanaged Crypt type '$fmt'" ;;
+		esac
+	# Hex hash
+	elif [[ "$str" =~ ^[a-fA-f0-9]+$ ]]; then
+		# Find based on size
+		case "${#str}" in
+			32)  strType="hex_md5" ;;
+			40)  strType="hex_sha1" ;;
+			64)  strType="hex_sha256" ;;
+			128) strType="hex_sha512" ;;
+			*)   ammLog::Warning "Unmanaged hex size type '${#str}' for '$str'" ;;
+		esac
+	# Base64
+	elif [[ "$str" =~ ^[a-zA-Z+/=]+$ ]]; then
+		strType="base64"
+	# Apache sha1 (http://i-ac.eu/manual/en/misc/password_encryptions.html)
+	elif [[ "${str:0:5}" == "{SHA}" ]]; then
+		strType="apache_sha1"
+	fi
+
+	if [[ -z "$strType" ]]; then
+		ammLog::Warning "Unknown type for string '$str'"
+		return 1
+	fi
+
+	ammLog::Debug "Found str '$str' is type '$strType'"
+	echo "$strType"
+}
+
+
+# @description  Check a clear text matches the provided hash. Format is discovered automatically
+# @arg $1  (string) The clear-text string
+# @arg $2  (string) The hashed string
+function ammCryptHash::Check {
+	typeset passHash="$1"
+	typeset passText="$2"
+
+	typeset passType="$(ammCryptHash::TypeOf "$passHash")"
+	case "$passType" in
+		crypt_*)
+			typeset passSalt="${passHash#\$*\$}" ; passSalt="${passSalt%%\$*}"
+			[[ "$passHash" == "$(ammCryptHash::CryptGenerate "$passText" "$passType" "$passSalt")" ]]
+			return $?
+			;;
+
+#		hex_*)
+#			;;
+		apache_sha1)
+			[[ $(ammCryptHash::ApacheGenerate "$passText" "$passType") == "$passHash" ]]
+			return $?
+			;;
+		*)
+			ammLog::Error "Unamanged hash format '$passType' for '$passHash'"
+			return 1
+			;;
+	esac
+
+	return 0
+}
+
+
+function ammCryptHash::Generate {
+	typeset text="$1"
+	typeset format="${2:-crypt_sha256}"
+	typeset salt="${3:-}"
+
+	typeset -i r=0
+	case "$format" in
+		crypt_*)
+			ammCryptHash::CryptGenerate "$text" "$format" "$salt"
+			r=$?
+			;;
+		apache_*)
+			ammCryptHash::ApacheGenerate "$text" "$format" "$salt"
+			r=$?
+			;;
+		*)
+			ammLog::Error "Unamanged hash format '$format'"
+			return 1
+			;;
+	esac
+
+	return $r
+}
+
+
+
+function ammCryptHash::ApacheGenerate {
+	typeset text="$1"
+	typeset format="${2:-apr1}"
+	typeset salt="${3:-}"
+
+	typeset -i r=0
+	case "$format" in
+		apr1|apache_apr1)
+			ammCryptHash::CryptGenerate "$text" "apr1" "$salt"
+			r=$?
+			;;
+		sha1|apache_sha1)
+			ammLib::Load "string"
+			typeset str="$(ammString::HashSHA1 "$text")"
+			if [[ -z "$str" ]]; then
+				ammLog::Error "Empty sha1 hash for '$text'"
+				return 1
+			fi
+			echo "{SHA}$str"
+			;;
+		*)
+			ammLog::Error "Unmanaged format '$format'"
+			return 1
+			;;
+	esac
+	return 0
+}
+
+
+function ammCryptHash::CryptGenerate {
+	typeset text="$1"
+	typeset format="${2:-sha256}"
+	typeset salt="${3:-}"
+
+	typeset saltSize="${#salt}"
+
+	# Note: pure-shell fallbacks from md5/sha256/sha512 Would need to implement
+	# The 1000(md5) or 5000(sha) iterations. Difficult to implement 
+	# Base: echo -n "$pass$salt$pass" |sha256sum|awk '{print $1}'|xxd -r -p - | base64
+	# https://github.com/openssl/openssl/blob/OpenSSL_1_1_1l/apps/passwd.c#L412-L433
+	# https://github.com/openssl/openssl/blob/OpenSSL_1_1_1l/apps/passwd.c#L672-L693
+
+	typeset errMsg="Cannot find any valid binary for generating crypt password $format. Need one of:"
+	case "$format" in
+		1|md5|crypt_md5)
+			if ammExec::Exists openssl; then
+				echo -n "$text" | openssl passwd -1 ${salt:+-salt "$salt"} -in -
+			#elif ammExec::Exists mkpasswd; then
+			#	# TODO: Warning, it expects fixed-length salt
+			#	echo -n "$text" | mkpasswd --stdin -5 --salt "$salt"
+			else
+				ammLog::Error "$errMsg openssl mkpasswd"
+				return 1
+			fi
+			;;
+		#2|2[axyb]|bcrypt)  pwdOpt="
+
+		5|sha256|crypt_sha256)
+			if ammExec::Exists openssl; then
+				echo -n "$text" | openssl passwd -5 ${salt:+-salt "$salt"} -in -
+			else
+				ammLog::Error "$errMsg openssl"
+				return 1
+			fi
+			;;
+
+		6|sha512|crypt_sha512)
+			if ammExec::Exists openssl; then
+				echo -n "$text" | openssl passwd -6 ${salt:+-salt "$salt"} -in -
+			else
+				ammLog::Error "$errMsg openssl"
+				return 1
+			fi
+			;;
+
+		apr1|crypt_apr1)
+			if ammExec::Exists openssl; then
+				echo -n "$text" | openssl passwd -apr1 ${salt:+-salt "$salt"} -in -
+			else
+				ammLog::Error "$errMsg openssl"
+				return 1
+			fi
+			;;
+		*)
+			ammLog::Error "Unamanged format '$format'"
+			return 1
+			;;
+	esac
+
+	return 0
+}
+

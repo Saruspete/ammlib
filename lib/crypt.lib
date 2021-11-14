@@ -1,0 +1,29 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+#function ammCrypt::MetaCheck {
+#	ammExec::Require awk
+#}
+#function ammCrypt::MetaInit {
+#}
+
+# -----------------------------------------------------------------------------
+# Some description for your lib
+# -----------------------------------------------------------------------------
+
+#
+function ammCrypt::Passwd {
+	:
+}
+
+function ammCrypt::PasswdFromHash {
+	:
+}

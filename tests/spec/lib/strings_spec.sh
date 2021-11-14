@@ -1,8 +1,14 @@
 # shellcheck shell=bash
 
+# OUT/ERR/DBG
+#UseFD 97
+#UseFD 99
+
 Describe "string.lib:"
 	Include "../ammlib"
 	Before "ammLib::Require string"
+
+	UseFD 98
 
 	typeset -a _demoArrayWords=(hello world pouet coin lol rofl mao)
 
@@ -301,7 +307,7 @@ Describe "string.lib:"
 		End
 		It "Emits a warning if an element is invalid"
 			When call ammString::ExpandIntegerList "7-10,11,12,a-f,14-16"
-			#The stderr should include "is not an integer"
+			The fd 98 should include "is not an integer"
 			The output should eq "7 8 9 10 11 12 14 15 16 "
 		End
 	End

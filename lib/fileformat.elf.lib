@@ -1,0 +1,80 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+function ammFileformatElf::MetaCheck {
+#	ammExec::Require awk
+	# Could be replaced by "/lib64/ld-linux.so --list" but arch 32,64... should be done too
+	ammExec::Require ldd
+}
+function ammFileformatElf::MetaInit {
+	ammLib::Require string
+}
+
+# -----------------------------------------------------------------------------
+# Manage ELF binary files
+# -----------------------------------------------------------------------------
+
+# @description  lists all libraries needed by a file and all these libraries dependencies too
+# @arg $1  file path to scan for librariries
+# @arg $@  (optionnal) List of libraries already added, to avoid circular dependencies
+# @stdout List of libraries path with matching file (their full path)
+# @stderr List of libraries without matching file (only printin name)
+function ammFileformatElf::DependenciesGet {
+
+	typeset elfbin="$1"; shift
+
+	typeset -A deps
+
+	typeset lib arrow file address _junk
+	while read lib arrow file address _junk; do
+
+		# When there is no arrow, either lib is abs, either it's name matches
+		if [[ "$arrow" != "=>" ]]; then
+			# Absolute or relative to PWD
+			if [[ "${lib:0:1}" == "/" ]]; then
+				deps["$lib"]="$lib"
+			else
+				# Only print if file exists (not vdso)
+				if [[ -e "$lib" ]]; then
+					deps["$(pwd -P)/$lib"]="$(pwd -P)/$lib"
+				fi
+			fi
+		fi
+
+		# Empty file: maybe vdso or ld-linux or error msg "not a dynamic executable"
+		[[ -n "$file" ]] || continue
+		#[[ "$lib" == "libc.so.6" ]] || continue
+
+		# If file exists, add it to list and recurse on it
+		if [[ -e "$file" ]]; then
+			deps["$file"]="$file"
+
+			# Recurse only if file has not been already processed
+			if ! ammString::ContainsWord "$file" "$@"; then
+				# Recursion
+				typeset depfile
+				for depfile in $($FUNCNAME "$file" "${deps[@]}"); do
+					deps[$depfile]="$depfile"
+				done
+			fi
+		else
+			echo >&2 "$lib"
+		fi
+
+	done < <(ldd "$elfbin" 2>/dev/null)
+
+	typeset dep
+	for dep in "${deps[@]}"; do
+		echo "$dep"
+	done
+}
+
+

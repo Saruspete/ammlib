@@ -22,6 +22,17 @@ if [[ -n "$PS4" ]] && [[ "$PS4" == "+ " ]]; then
 	PS4=' (${BASH_SOURCE##*/}:$LINENO ${FUNCNAME[0]:-main})  '
 fi
 
+#
+# Survivor env check (for run with  "env -i")
+#
+if [[ -z "${PATH:-}" ]]; then
+	export PATH="/bin:/usr/bin:/sbin:/usr/sbin"
+fi
+if [[ -z "${HOME:-}" ]]; then
+	HOME="$(getent passwd $(id -u))"
+	HOME="${HOME%%:*}"
+	export HOME="${HOME##*:}"
+fi
 
 #
 # Compatibility check

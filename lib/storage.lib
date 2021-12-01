@@ -26,6 +26,8 @@ function ammStorage::MetaCheck {
 
 function ammStorage::MetaInit {
 
+	ammLib::Require "string"
+
 	# Some values are fixed in include/uapi/linux/major.h, some are dynamics
 	AMMSTORAGE_MAJOR_DM="$(ammStorage::_GetModuleMajor "device-mapper")"
 	AMMSTORAGE_MAJOR_MD=9
@@ -430,7 +432,7 @@ function ammStorage::GetType {
 	if ammStorage::IsPartition "$dev"; then
 		typ="part"
 	# DeviceMapper (LVM CRYPT-LUKS2 )
-	elif tmp=$(ammStorage::_GetFromSysBlock "$dev" "dm/uuid"); then
+	elif tmp=$(ammStorage::_GetFromSysBlock "$dev" "dm/uuid") && [[ -n "$tmp" ]]; then
 		typ="${tmp%%-*}"
 	# NVMe
 	elif [[ "${dev#nvme}" != "$dev" ]]; then
@@ -738,7 +740,7 @@ function ammStorage::SecureErase {
 	# Work on all sub-devices
 	typeset dev
 	typeset -i r=0
-	for dev in $(ammStorage::ListParents "$blockdev"); do
+	for dev in $(ammStorage::ListParents "$targetdev") $targetdev; do
 		typeset typ="$(ammStorage::GetType "$dev")"
 		case $typ in
 			# Persistent Memory
@@ -761,9 +763,9 @@ function ammStorage::SecureErase {
 
 				if ammString::IsYes "$doit"; then
 					# https://github.com/linux-nvme/nvme-cli/blob/master/Documentation/nvme-format.txt
-					\nvme format -s1 "$dev"
+					\nvme format -s1 "$dev" --force
 				else
-					echo "Will erase '$dev' with 'nvme format -s1 $dev'"
+					echo "Will erase '$dev' with 'nvme format -s1 $dev --force'"
 				fi
 
 				;;
@@ -780,6 +782,6 @@ function ammStorage::SecureErase {
 		esac
 	done
 
-	return r
+	return $r
 }
 

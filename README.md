@@ -56,6 +56,19 @@ If you need to work on hostile environment, with non-root users, interacting wit
 
 While most libraries provides generic features only tied to the shell (or coreutils), some libraries are very tied to the Distribution: packages management, chroot generation, system configuration...
 
+### Tests
+
+Unit tests are run against:
+  - OS distributions:
+    - CentOS: 7, 8
+    - Debian: 9, 10, 11
+    - Fedora: 32, 33, 34
+    - Oracle: 7, 8
+    - OpenSuSE: Leap15, Tumbleweed
+    - ubuntu: 16.04, 18.04, 20.04, 20.10, 21.04, 21.10
+  - bash versions: 4.2, 4.3, 4.4, 5.0, 5.1
+  - Overall status: ![Unit-tests](https://github.com/saruspete/ammlib/actions/workflows/tests.yml/badge.svg)
+
 ### Base structure
 
 A template is available in [lib/_template](blob/master/lib/_template) file. You should always use it, and try to keep-up with upgrades.

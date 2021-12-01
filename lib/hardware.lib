@@ -14,45 +14,92 @@ function ammHardware::MetaCheck {
 	ammExec::Require lspci
 
 }
-function ammDevice::MetaInit {
+function ammHardware::MetaInit {
 	ammLib::Require string
+
+	typeset -g __AMMHARDWARE_DB_PCI=
+}
+
+function ammHardware::DbInit {
+
+	# already init
+	[[ -n "$__AMMHARDWARE_DB_PCI" ]] && return
+
+	typeset dbpath
+	# First plain-ids
+	for dbpath in "/usr/share/hwdata/pci.ids" "/usr/share/misc/pci.ids"; do
+		[[ -e "$dbpath" ]] && __AMMHARDWARE_DB_PCI="$dbpath"
+	done
+	# TODO: Next, try .gz if we have gunzip
+
 }
 
 # -----------------------------------------------------------------------------
-# List and manage local devices
+# Vendor ID related (pci-id, usb-id, oui.txt)
 # -----------------------------------------------------------------------------
 
+# @description  Get the vendor detail from th PCI-IDS DB
+function ammHardware::VendorGetFromPciid {
+	typeset pciid="$1"
 
-function ammHardware::GetVendorFromId {
-	typeset vendor="$vendorid"
-	typeset pcidb="/usr/share/hwdata/pci.ids"
+	ammHardware::DbInit
+
+	# Default to the given ID
+	typeset vendor="$pciid"
+	typeset pcidb="$__AMMHARDWARE_DB_PCI"
 	if [[ -n "$vendorid" ]] && [[ -e "$pcidb" ]]; then
 		vendor="$(grep "^${vendorid#0x}" "$pcidb")"
 		vendor="${vendor#* }"
 	fi
-	echo "vendor=\"${vendor# }\""
+	echo "${vendor# }"
 
 }
 
-function ammHardware::DeviceSummary {
+# @description  Get the vendor detail from a given OUI (MacAddr, etc..)
+# @args $1  OuiID (string) VendorID
+function ammHardware::VendorGetFromOui {
+	typeset ouiid="$1"
+
+	
+}
+
+
+# -----------------------------------------------------------------------------
+# Expansion devices (pcie, usb)
+# -----------------------------------------------------------------------------
+
+# @description  Get summary (pciid, devtype, vendor, device id
+function ammHardware::PciDeviceSummary {
 
 	typeset line
-#	for dev in /sys/bus/pci*/devices/*/uevent; do
-	while read line; do
+	while read -r line; do
+		# Remove the -r & -p
+		line="${line/ -[pr]* / }"
 		eval "typeset -a data=($line)"
 		echo "pciid=\"${data[0]}\" devtype=\"${data[1]}\" vendor=\"${data[2]}\" device=\"${data[3]}\" version=\"${data[4]}\""
 	done < <(lspci -mm)
-	
 
+	# Possible fallback: parse /sys/.../device/config  (Beware, values are in BigEndian
+	# Config values are defined in drivers/pci/pci-sysfs.c :: pci_read_config()
+	# 0x00:
+	# - 0-1 bytes,   Vendor-ID
+	# - 2-3 bytes,   Device-ID
+	# -   8 bytes,   Revision-num
+	# - 9-11 bytes,  Device-Class
+	# 0x20:
+	# - 12-13 bytes, Subsystem-Vendor-iD
+	# - 14-15 bytes, subsystem-model-id
 }
 
-function ammHardware::DeviceDetail {
-	typeset device="$1"
+function ammHardware::PciDeviceDetail {
+	typeset deviceId="$1"
 
-	typeset pcipath="/sys/bus/pci/devices/0000:$device/"
+	# Fix domain as 0000 (should you have bullion or superdome-x, please implement it)
+	typeset pcipath="/sys/bus/pci/devices/0000:$deviceId/"
 
 	if [[ -e "$pcipath" ]]; then
 		for param in {current,max}_link_{speed,width} irq numa_node enable; do
+			# Using cat to avoid stderr
 			echo -n "$param=\"$(cat "$pcipath/$param" 2>/dev/null)\" "
 		done
 
@@ -62,6 +109,12 @@ function ammHardware::DeviceDetail {
 		fi
 	fi
 }
+
+
+
+# -----------------------------------------------------------------------------
+# NUMA
+# -----------------------------------------------------------------------------
 
 
 function ammHardware::NumaSummary {

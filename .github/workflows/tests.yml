@@ -1,5 +1,5 @@
 ---
-name: UnitTest
+name: All-Dist All-Bash
 on:
   push:
     branches:
@@ -19,6 +19,7 @@ jobs:
           - 'clearlinux'
           - 'debian:9'
           - 'debian:10'
+          - 'debian:11'
           - 'fedora:32'
           - 'fedora:33'
           - 'fedora:34'
@@ -31,6 +32,7 @@ jobs:
           - 'ubuntu:20.04'
           - 'ubuntu:20.10'
           - 'ubuntu:21.04'
+          - 'ubuntu:21.10'
     steps:
       - name: "Git clone repo"
         uses: actions/checkout@v2

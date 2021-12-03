@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-typeset MYSELF="$(readlink -e $0 || realpath $0)"
+typeset MYSELF="$(realpath $0)"
 typeset MYPATH="${MYSELF%/*}"
 
 # To ensure standard behavior between piped logs and standard runs

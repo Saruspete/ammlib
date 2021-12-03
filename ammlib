@@ -80,23 +80,52 @@ fi
 # Path management
 #
 
-# @description  Path where ammlib is
-typeset -g  __AMMLIB_REALPATH="$(realpath ${BASH_SOURCE[0]} 2>/dev/null)"
+# @description  Generate an absolute path from the given parts
+function ammPath::Canonicalize {
+	typeset path="$1"
 
-# Check the readlink usability
-if type -t realpath >/dev/null; then
-	if ! [[ "$(realpath "$__AMMLIB_REALPATH")" -ef "$__AMMLIB_REALPATH" ]]; then
-		echo "realpath exists ($(type "realpath")) but does not behave properly."
-		echo "Please check your existing environment before retrying. Stopping here."
-		if $__AMMLIB_INTERACTIVE; then
-			echo "(press any key to exit)"
-			read -s -n 1 key
+echo "$path" >> /tmp/rofl
+
+	# Path exists, just call the most efficient binary then fallback
+	if [[ -e "$path" ]]; then
+		if type -t "realpath" >/dev/null; then
+			realpath "$path"
+		elif type -t "readlink" >/dev/null; then
+			readlink -f "$path"
 		else
-			echo "Exiting"
+			# Folder: symlink symlink/ ./symlink ./symlink/
+			if [[ -d "$path" ]]; then
+				( cd "$path" && pwd -P )
+			# Anything else than folder
+			else
+				# Append at least one folder separator
+				[[ "${path:0:1}" != "/" ]] && path="./$path"
+				( cd "${path%/*}" && echo "$(pwd -P)/${path##*/}"; )
+			fi
 		fi
-		exit 1
+	# Path does not exists: get existing part, canonicalize it then add back
+	else
+		# Seek an existing path
+		typeset add= existing="$path"
+		while ! [[ -e "$existing" ]] && [[ -n "$existing" ]] && [[ "${existing//\//}" != "$existing" ]]; do
+			add="/${existing##*/}$add"
+			existing="${existing%/*}"
+		done
+
+		# If we found one, replace it with its absolute path
+		if [[ -n "$existing" ]] && [[ -e "$existing" ]]; then
+			existing="$($FUNCNAME "$existing")"
+		fi
+		echo "$existing$add"
 	fi
-fi
+}
+
+
+
+
+# @description  Path where ammlib is
+typeset -g  __AMMLIB_REALPATH="$(ammPath::Canonicalize ${BASH_SOURCE[0]} 2>/dev/null)"
+
 
 # @description  Options passed to the script ($@)
 typeset -ga __AMMLIB_CALLOPTS=("$@")
@@ -117,7 +146,7 @@ else
 	# @description  Name of the file that was called
 	typeset -gr  __AMMLIB_CALLFILE="${0##*/}"
 	# Set in 2-times to avoid bug "h" fixed in 4.4-rc1 (make_cmd.c:801)
-	typeset -g  __AMMLIB_CALLPATH="$(realpath "${BASH_SOURCE[-1]%/*}")"
+	typeset -g  __AMMLIB_CALLPATH="$(ammPath::Canonicalize "${BASH_SOURCE[-1]%/*}")"
 fi
 
 
@@ -1306,7 +1335,7 @@ function ammSys::OSVersionGet {
 		typeset releaseStr="$(< "/etc/${osid}-release")"
 		case $osid in
 			gentoo) # Special case: use the profile version
-				typeset profile="$(realpath "/etc/portage/make.profile")"
+				typeset profile="$(ammPath::Canonicalize "/etc/portage/make.profile")"
 				profile="${profile##*/linux/}"
 				profile="${profile#*/}"
 				releaseStr="${profile%%/*}"
@@ -1450,10 +1479,10 @@ function ammPath::Decompose {
 
 	# If path exists, get its absolute value
 	if [[ -e "$path" ]]; then
-		path="$(realpath "$path")"
+		path="$(ammPath::Canonicalize "$path")"
 	# else, if path is not absolute either
 	elif [[ "${path:0:1}" != "/" ]]; then
-		path="$(realpath "$(pwd -P)")/$path"
+		path="$(ammPath::Canonicalize "$(pwd -P)")/$path"
 	fi
 
 	while [[ -n "$path" ]]; do

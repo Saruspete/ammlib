@@ -239,22 +239,45 @@ function ammHardware::MemoryDetail {
 	typeset showEmpty="${1:-false}"
 
 	# Append DMI data if available
+	typeset doProcess=0
+	typeset -A data=()
 	while IFS=: read key val; do
 		key="$(ammString::Trim "$key")"
 		val="$(ammString::Trim "$val")"
 
+		# Empty row + valid current: print line
+		if [[ -z "$key" ]] && [[ "$doProcess" == "1" ]]; then
+			if [[ -n "${data[size]:-}" ]] || [[ "$showEmpty" != "false" ]]; then
+				echo "slot=\"${data[locator]}\" size=\"${data[size]:-}\" form=\"${data[form]:-}\" rank=\"${data[rank]:-}\"  vendor=\"${data[vendor]:-}\" model=\"${data[model]:-}\" serial=\"${data[serial]:-}\"  "
+			fi
+			doProcess=0
+			data=()
+		fi
+
+		# Skip non-memory rows
+		[[ "$key" == "Memory Device" ]] && doProcess=1
+		[[ "$doProcess" != "1" ]] && continue
+
+		# Don't set dummy values
+		if [[ "$val" == "Unknown" ]] || [[ "$val" == "No Module Installed" ]] || [[ "$val" == "Not Specified" ]]; then
+			continue
+		fi
+
 		case "$key" in
-			Size) ;;
-			Form\ Factor) ;;
-			Manufacturer) ;;
-			Rank) ;;
-			Type) ;;
-			Type\ Detail) ;;
-			Speed);;
-			Configured\ Memory\ Speed) ;;
-			Serial\ Number) ;;
-			Locator) ;;
+			Size)          data[size]="$val" ;;
+			Form\ Factor)  data[form]="$val" ;;
+			Locator)       data[locator]="$val" ;;
 			Bank\ Locator) ;;
+			Type)          data[type]="$val" ;;
+			Type\ Detail)  data[typedetail]="$val" ;;
+			Speed)         data[speedmax]="$val" ;;
+			Configured\ Memory\ Speed) data[speed]="$val" ;;
+			Manufacturer)  data[vendor]="$val" ;;
+			Serial\ Number)data[serial]="$val" ;;
+			Asset\ Tag) ;;
+			Part\ Number)  data[model]="$val" ;;
+			Rank)          data[rank]="$val" ;;
+
 		esac
 	done < <(ammExec::AsUser root dmidecode -t memory 2>/dev/null)
 

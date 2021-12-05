@@ -74,7 +74,7 @@ function ammHardware::PciDeviceSummary {
 	typeset line
 	while read -r line; do
 		# Remove the -r & -p
-		line="${line/ -[pr]* / }"
+		line="${line/ -[pr][a-f0-9][a-f0-9] / }"
 		eval "typeset -a data=($line)"
 		echo "pciid=\"${data[0]}\" devtype=\"${data[1]}\" vendor=\"${data[2]}\" device=\"${data[3]}\" version=\"${data[4]}\""
 	done < <(lspci -mm)

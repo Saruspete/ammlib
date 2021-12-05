@@ -345,6 +345,20 @@ function ammString::Glue {
 	)
 }
 
+function ammString::Replace {
+	typeset search="$1"
+	typeset replace="$2"
+
+	typeset line
+	if ammExec::Exists "sed"; then
+		sed "s/$search/$replace/g"
+	else
+		while read -r line; do
+			echo "${line//$search/$replace}"
+		done
+	fi
+}
+
 function ammString::ToCSV {
 	typeset -a fields=("$@")
 

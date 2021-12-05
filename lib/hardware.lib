@@ -110,6 +110,54 @@ function ammHardware::PciDeviceDetail {
 	fi
 }
 
+# -----------------------------------------------------------------------------
+# System / Core
+# -----------------------------------------------------------------------------
+
+function ammHardware::SystemSummary {
+
+	# Get DMI data if available
+	typeset sysdmi="/sys/devices/virtual/dmi/id"
+	typeset -a elems="$@"
+
+	if [[ -z "${elems:-}" ]]; then
+		elems=(
+			bios-{vendor,version,release-date,revision}
+			system-{manufacturer,product-name,version,serial-number,family}
+			baseboard-{manufacturer,product-name,version,serial-number,asset-tag}
+			chassis-{manufacturer,type,version,serial-number,asset-tag}
+		)
+	fi
+
+	typeset name
+	for name in "${elems[@]}"; do
+
+		typeset namedmi="$name"
+		# Try to map from dmidecode to sysfs:
+		namedmi="${namedmi/system-manufacturer/sys_vendor}"
+		# system => product, baseboard => board
+		namedmi="${namedmi/#system/product}"
+		namedmi="${namedmi/#baseboard/board}"
+		# Other renamings
+		namedmi="${namedmi/%serial-number/serial}"
+		namedmi="${namedmi/%product-name/name}"
+		namedmi="${namedmi/%sku-number/sku}"
+		namedmi="${namedmi/%manufacturer/vendor}"
+		# map - to _ for sysfs
+		namedmi="${namedmi//-/_}"
+
+		typeset sysdmifile="$sysdmi/$namedmi"
+		typeset dmival=""
+		if [[ -r "$sysdmifile" ]]; then
+			dmival="$(< $sysdmifile)"
+		else
+			# No mapping found, try with dmidecode
+			dmival="$(ammExec::AsUser "root" dmidecode -s "$name")"
+		fi
+
+		echo "${name//-/_}=\"${dmival//"/\\"}\" "
+	done
+}
 
 
 # -----------------------------------------------------------------------------
@@ -174,9 +222,6 @@ function ammHardware::NumaSummary {
 		# 
 		memsize[$numaid]="$(echo "$meminfo" | awk '$3 == "MemTotal:" { print $4; }')"
 	done
-
-	# Get DMI data if available
-
 
 	#
 	# Display content

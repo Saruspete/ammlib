@@ -18,12 +18,14 @@ function ammHardware::MetaInit {
 	ammLib::Require string
 
 	typeset -g __AMMHARDWARE_DB_PCI=
+	typeset -g __AMMHARDWARE_DB_USB=
+	typeset -g __AMMHARDWARE_DB_OUI="$(ammLib::DataPathGet "db")/oui.txt"
 }
 
-function ammHardware::DbInit {
+function ammHardware::DbIdInit {
 
 	# already init
-	[[ -n "$__AMMHARDWARE_DB_PCI" ]] && return
+	[[ -n "$__AMMHARDWARE_DB_PCI" ]] && [[ -n "$__AMMHARDWARE_DB_USB" ]] && return
 
 	typeset dbpath
 	# First plain-ids
@@ -32,6 +34,39 @@ function ammHardware::DbInit {
 	done
 	# TODO: Next, try .gz if we have gunzip
 
+	for dbpath in "/usr/share/hwdata/usb.ids" "/usr/share/misc/usb.ids"; do
+		[[ -e "$dbpath" ]] && __AMMHARDWARE_DB_USB="$dbpath"
+	done
+	# TODO: Next, try .gz if we have gunzip
+
+	if [[ -z "$__AMMHARDWARE_DB_PCI" ]] && [[ -z "$__AMMHARDWARE_DB_USB" ]]; then
+		ammLog::Warning "Cannot init HW-ID DBs"
+		return 1
+	fi
+
+	return 0
+}
+
+function ammHardware::DbOuiInit {
+
+
+	# Fetch db if not existing
+	if ! [[ -e "$__AMMHARDWARE_DB_OUI" ]]; then
+
+		typeset url="http://standards-oui.ieee.org/oui/oui.txt"
+		if ! ammLib::Load "http"; then
+			ammLog::Error "Cannot load http module, so cannot fetch oui.txt from '$url' to '$__AMMHARDWARE_DB_OUI'"
+			return 1
+		fi
+
+		ammLog::Debug "Fetching '$url' into '$__AMMHARDWARE_DB_OUI'"
+		if ! ammHttp::Fetch "$url" "$__AMMHARDWARE_DB_OUI"; then
+			ammLog::Error "Cannot fetch oui.txt from '$url' to '$__AMMHARDWARE_DB_OUI'. Do it manually to fix it"
+			return 1
+		fi
+	fi
+
+	[[ -e "$__AMMHARDWARE_DB_OUI" ]]
 }
 
 # -----------------------------------------------------------------------------
@@ -39,28 +74,121 @@ function ammHardware::DbInit {
 # -----------------------------------------------------------------------------
 
 # @description  Get the vendor detail from th PCI-IDS DB
-function ammHardware::VendorGetFromPciid {
-	typeset pciid="$1"
+function ammHardware::PciVendorNameFromId {
+	typeset vendorid="$1"
 
-	ammHardware::DbInit
+	ammHardware::DbIdInit
 
 	# Default to the given ID
-	typeset vendor="$pciid"
+	typeset vendor="$vendorid"
 	typeset pcidb="$__AMMHARDWARE_DB_PCI"
 	if [[ -n "$vendorid" ]] && [[ -e "$pcidb" ]]; then
-		vendor="$(grep "^${vendorid#0x}" "$pcidb")"
+		vendor="$(grep "^${vendorid#0x}" "$pcidb" 2>/dev/null)"
 		vendor="${vendor#* }"
 	fi
 	echo "${vendor# }"
-
 }
+
+# @description  Get the vendor detail from th PCI-IDS DB
+function ammHardware::PciDeviceNameFromId {
+	typeset -l vendorid="$1"
+	typeset -l deviceid="$2"
+
+	ammHardware::DbIdInit
+
+	# Default to the given ID
+	typeset vendor="$vendorid" device="$deviceid"
+	typeset pcidb="$__AMMHARDWARE_DB_PCI"
+
+	if [[ -n "$vendorid" ]] && [[ -n "$deviceid" ]] && [[ -e "$pcidb" ]]; then
+		awk -v vendorId="${vendorid#0x}" -v deviceId="${deviceid#0x}" '
+			# Quick selection to our vendorid
+			match($0,/^([0-9a-f]+)/,a) {
+				if (a[1] == ""vendorId)
+					doProcess=1
+				else
+					doProcess=0
+				next
+			}
+			# In our current vendor, search device
+			doProcess && match($0,/^\t([0-9a-f]+)/,a) {
+				if (a[1] == ""deviceId) {
+					for (i=2; i<=NF; i++)
+						printf $i" "
+				}
+			}
+			' "$pcidb"
+	fi
+}
+
+
+# @description  Get the vendor detail from th PCI-IDS DB
+function ammHardware::PciVendorIdFromName {
+	typeset vendorid="$1"
+
+	ammHardware::DbIdInit
+
+	# Default to the given ID
+	typeset vendor="$vendorid"
+	typeset pcidb="$__AMMHARDWARE_DB_PCI"
+	if [[ -n "$vendorid" ]] && [[ -e "$pcidb" ]]; then
+		vendor="$(grep "^${vendorid#0x}" "$pcidb" 2>/dev/null)"
+		vendor="${vendor#* }"
+	fi
+	echo "${vendor# }"
+}
+
+
+function ammHardware::UsbVendorNameFromId {
+	typeset vendorid="$1"
+
+	ammHardware::DbIdInit
+
+	# Default to the given ID
+	typeset vendor="$vendorid"
+	typeset usbdb="$__AMMHARDWARE_DB_USB"
+	if [[ -n "$vendorid" ]] && [[ -e "$usbdb" ]]; then
+		vendor="$(grep "^${vendorid#0x}" "$usbdb")"
+		vendor="${vendor#* }"
+	fi
+	echo "${vendor# }"
+}
+
+# function ammHardware::UsbVendorIdFromName
+# function ammHardware::UsbDeviceNameFromId
+
 
 # @description  Get the vendor detail from a given OUI (MacAddr, etc..)
 # @args $1  OuiID (string) VendorID
-function ammHardware::VendorGetFromOui {
-	typeset ouiid="$1"
+function ammHardware::OuiVendorNameFromId {
+	typeset -u vendorid="$1"
 
-	
+	ammHardware::DbOuiInit || return
+
+	# Only keep the 6 first hex chars
+	vendorid="${vendorid//[^0-9A-F]/}"
+	vendorid="${vendorid:0:6}"
+
+	[[ -z "$vendorid" ]] && return
+
+	typeset id b1 b2 vendor
+	while read id b1 b2 vendor; do
+		[[ "$b1$b2" != "(base16)" ]] && continue
+		echo "$id $vendor"
+	done < <(grep "^${vendorid:0:6}" "$__AMMHARDWARE_DB_OUI")
+}
+
+# @description  Get the allocated OUI for a given name
+# @stdout  OUI VendorName
+function ammHardware::OuiVendorOuiFromName {
+	typeset name="$1"
+
+	ammHardware::DbOuiInit || return
+
+	typeset id b1 b2 vendor
+	while read id b1 b2 vendor; do
+		echo "$id $vendor"
+	done < <(grep " (base 16)" "$__AMMHARDWARE_DB_OUI" | grep -i "$name")
 }
 
 

@@ -605,7 +605,7 @@ function ammHardware::CpuFrequencyGetAvailable {
 			;;
 		acpi-cpufreq)
 			# Should have been provided by available_frequencies. cpupower should provide more
-			typeset cpout="$(ammExec::AsUser "root" "cpupower frequency-info")"
+			typeset cpout="$(ammExec::AsUser "root" cpupower frequency-info)"
 			if [[ -n "$cpout" ]]; then
 				#echo "$cpout" | grep
 				:
@@ -658,7 +658,7 @@ function ammHardware::CpuFrequencySet {
 	typeset fmin="$1"
 	typeset fmax="${2:-$fmin}"
 
-	if ! ammExec::AsUser "root" "cpupower frequency-set --min $fmin --max $fmax"; then
+	if ! ammExec::AsUser "root" cpupower frequency-set --min $fmin --max $fmax; then
 		ammLog::Error "Unable to set frequency to min/max: $fmin/$fmax"
 		return 1
 	fi

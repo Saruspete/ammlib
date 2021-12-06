@@ -196,8 +196,59 @@ function ammHardware::OuiVendorOuiFromName {
 # Expansion devices (pcie, usb)
 # -----------------------------------------------------------------------------
 
+function ammHardware::_PciDeviceSysfs {
+	typeset deviceId="$1"
+	typeset method="${2:-}"
+	typeset value="${3:-}"
+
+	# Fix domain as 0000 (should you have bullion or superdome-x, please implement it)
+	typeset pcipath="/sys/bus/pci/devices/0000:$deviceId"
+	if ! [[ -d "$pcipath" ]]; then
+		ammLog::Error "Invalid deviceId '$deviceId'"
+		return 1
+	fi
+
+	# No method, display the pcipath
+	if [[ -z "$method" ]]; then
+		echo "$pcipath"
+		return 0
+
+	# Method requested, check what to do
+	else
+		typeset pciPathMethod="$pcipath/$method"
+		if [[ -e "$pciPathMethod" ]]; then
+			# Provided value to write
+			if [[ -n "$value" ]]; then
+				# Try to write directly
+				if [[ -w "$pciPathMethod" ]]; then
+					echo -n "$value" > "$pciPathMethod"
+					return $?
+				# Try with a helper
+				else
+					echo -n "$value" | ammExec::AsUser "root" tee "$pciPathMethod" 2>/dev/null
+					return $?
+				fi
+			# Just read / check file is here
+			else
+				# Don't drop error on write-only files
+				if [[ -r "$pciPathMethod" ]]; then
+					cat "$pciPathMethod"
+				fi
+				return 0
+			fi
+		fi
+	fi
+
+	return 1
+}
+
 # @description  Get summary (pciid, devtype, vendor, device id
 function ammHardware::PciDeviceSummary {
+
+	if ! ammExec::Exists lspci; then
+		ammLog::Error "Cannot find 'lspci' binary to enumerate devices"
+		return 1
+	fi
 
 	typeset line
 	while read -r line; do
@@ -222,8 +273,8 @@ function ammHardware::PciDeviceSummary {
 function ammHardware::PciDeviceDetail {
 	typeset deviceId="$1"
 
-	# Fix domain as 0000 (should you have bullion or superdome-x, please implement it)
-	typeset pcipath="/sys/bus/pci/devices/0000:$deviceId/"
+	typeset pcipath="$(ammHardware::_PciDeviceSysfs "$deviceId")"
+	[[ -z "$pcipath" ]] && return 1
 
 	if [[ -e "$pcipath" ]]; then
 		for param in {current,max}_link_{speed,width} irq numa_node enable; do
@@ -237,6 +288,57 @@ function ammHardware::PciDeviceDetail {
 		fi
 	fi
 }
+
+function ammHardware::PciDeviceRescan {
+
+	typeset sysRescan="/sys/bus/pci/rescan"
+
+	if [[ -w "$sysRescan" ]]; then
+		echo 1 > "$sysRescan"
+		return $?
+	else
+		echo 1 | ammExec::AsUser "root" tee "$sysRescan" 2>/dev/null
+		return $?
+	fi
+}
+
+function ammHardware::PciDeviceReset {
+	typeset deviceId="$1"
+
+	typeset pcipath="$(ammHardware::_PciDeviceSysfs "$deviceId")"
+	[[ -z "$pcipath" ]] && return 1
+
+	# If the device can be reset
+	if ammHardware::_PciDeviceSysfs "$deviceId" "reset"; then
+		ammHardware::_PciDeviceSysfs "$deviceId" "reset" "1"
+		if [[ $? -eq 0 ]]; then
+			return 0
+		fi
+
+		# Still there?
+		ammLog::Error "Cannot reset device '$deviceId' gracefully. Trying forcefully"
+	fi
+
+	# Cannot reset gracefully. Try to remove + rescan
+	if ! ammHardware::PciDeviceRemove "$deviceId"; then
+		ammLog::Error "Cannot remove pci device '$deviceId'. Stopping"
+		return 1
+	fi
+
+	if ! ammHardware::PciDeviceRescan; then
+		ammLog::Error "Cannot trigger pci-rescan."
+		return 1
+	fi
+
+	return 0
+}
+
+function ammHardware::PciDeviceRemove {
+	typeset deviceId="$1"
+
+	ammHardware::_PciDeviceSysfs "$deviceId" "remove" "1"
+}
+
 
 # -----------------------------------------------------------------------------
 # System / Core

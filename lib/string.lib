@@ -327,6 +327,38 @@ function ammString::ToUpper {
 	fi
 }
 
+# @description Remove non-printable control chars
+# 
+function ammString::CleanShell {
+	typeset str="$1"
+
+	# Read from stdin
+	if [[ "$str" == "-" ]]; then
+		if ammExec::Exists sed; then
+			sed 's,\x1B\[[0-9;]*[a-zA-Z],,g'
+		elif ammExec::Exists perl; then
+			perl -pe 's/\e\[[0-9;]*[a-zA-Z]//g'
+		else
+			# echo "${s//$'\x1B'\[[0-9][0-9]m/}"
+			ammLog::Warning "Cannot find sed nor perl. Cannot clean string"
+			return 1
+		fi
+	# [\x01-\x1F\x7F]
+	else
+		if ammExec::Exists sed; then
+			echo "$str" | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g"
+		elif ammExec::Exists perl; then
+			perl -pe 's/\e\[[0-9;]*[a-zA-Z]//g'
+		else
+			# echo "${s//$'\x1B'\[[0-9][0-9]m/}"
+			ammLog::Warning "Cannot find sed nor perl. Cannot clean string"
+			return 1
+		fi
+	fi
+
+	return 0
+}
+
 function ammString::Split {
 	typeset str="$1"
 	typeset sep="${2:-,}"

@@ -150,7 +150,7 @@ function ammPkgPortage::InfoRequirements {
 	:
 }
 
-function ammPkgPortage::InfoWhatProvides {
+function ammPkgPortage::InfoWhatProvidesFile {
 
 	ammLib::Require "http" || return 1
 

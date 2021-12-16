@@ -281,48 +281,6 @@ function ammPkg::Extract {
 # Generic fetcher
 # -----------------------------------------------------------------------------
 
-# @description Private: lists all libraries needed by a file and all these libraries dependencies too
-#
-# @arg $@  file path to scan for librariries
-#
-# @stdout List of libraries path with matching file (their full path)
-# @stderr List of libraries without matching file (only printin name)
-function ammPkg::_DepsFindBin {
-
-	! ammExec::Exists ldd && return 1
-
-	typeset file
-	for file in "$@"; do
-
-		typeset lib arrow file address _junk
-		while read lib arrow file address _junk; do
-
-			# When there is no arrow, either lib is abs, either it's name matches
-			if [[ "$arrow" != "=>" ]]; then
-				# Absolute or relative to PWD
-				if [[ "${lib:0:1}" == "/" ]]; then
-					echo "$lib"
-				else
-					echo "$(pwd -P)/$lib"
-				fi
-			fi
-
-			# Empty file: maybe vdso or ld-linux or error msg "not a dynamic executable"
-			[[ -n "$file" ]] || continue
-			#[[ "$lib" == "libc.so.6" ]] || continue
-
-			if [[ -e "$file" ]]; then
-				echo "$file"
-			else
-				echo >&2 "$lib"
-			fi
-
-			# Recursion
-			[[ -e "$file" ]] && $FUNCNAME "$file"
-
-		done < <(ldd "$file" 2>/dev/null)
-	done
-}
 
 
 # @description Smart extractor for a package, binary or feature and its dependencies
@@ -335,6 +293,7 @@ function ammPkg::FindDeps {
 	typeset -A pkgFiles
 	typeset tmpdir="$__AMMLIB_DATATMP/ammPkg::/extract"
 	mkdir -p "$tmpdir"
+
 
 	# For each provided element, we'll guess its type, action and extract it
 	typeset element
@@ -392,10 +351,16 @@ function ammPkg::FindDeps {
 			# For now, assume a binary. Else, just skip (may comment following test)
 			if head -n 1 "$element" | grep ELF >/dev/null 2>&1; then
 
+				# Require the fileformat Elf module
+				if ! ammLib::Load "fileformat.elf"; then
+					ammLog::Error "Cannot load library 'fileformat.elf' cannot process ELF file '$element'"
+					continue
+				fi
+
 				ammLog::Debug "Extracting dependencies from ELF binary '$element'"
 
 				typeset file
-				for file in $(ammPkg::_DepsFindBin $element 2>/dev/null | sort -u); do
+				for file in $(ammFileformatElf::DependenciesGet $element 2>/dev/null | sort -u); do
 					ammLog::Debug "Searching package for file '$file'"
 
 					# if file is not absolute, we are missing it. Add a refrence to /lib in the path

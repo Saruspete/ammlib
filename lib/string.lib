@@ -1052,7 +1052,7 @@ function ammString::UUIDGenerate {
 	# Init first time for v1 & v2
 	if [[ -z "${__AMMSTRING_UUID_MACADDR:-}" ]]; then
 		# QnD, but less than most implementation on the net..
-		typeset iface="$(ip -o route get 1.0.0.0 2>/dev/null| awk 'NR==1{for(i=1; i<NF; i++) { if($i=="dev"){print $(i+1); }}}')"
+		typeset iface="$(ip -o route get 1.0.0.0 2>/dev/null| ammString::Filter "-" "1.0.0.0" "^dev$" "+1")"
 		typeset macaddr="$(cat /sys/class/net/$iface/address 2>/dev/null)"
 		if [[ -z "$macaddr" ]]; then
 			macaddr="FE:E1:DE:AD:00:00"

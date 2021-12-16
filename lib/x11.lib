@@ -5,15 +5,24 @@ if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
 	exit 1
 fi
 
+# Interesting resources
+# https://github.com/kevinlekiller/linux_intel_display_overclocking
+# 
+
+
 # -----------------------------------------------------------------------------
 # AMM Lib meta stubs
 # -----------------------------------------------------------------------------
 
 function ammX11::MetaCheck {
 	ammExec::RequireOne xdotool xprop
+	ammExec::RequireOne xrandr
+
+	ammLib::Require "string"
 }
-#function ammX11::MetaInit {
-#}
+function ammX11::MetaInit {
+	ammLib::Require "string"
+}
 
 # -----------------------------------------------------------------------------
 # X11 Helpers and functions
@@ -105,7 +114,91 @@ function ammX11::WindowActivate {
 		return $r
 	fi
 
-	ammLog::Warning "Cannot find wmctrl nor xdotool"
+	ammLog::Warning "Cannot find wmctrl nor xdotool. How could you load this lib?"
 	return 99
+}
+
+# -----------------------------------------------------------------------------
+# X11 Resolution management
+# -----------------------------------------------------------------------------
+
+#function ammX11::ResolutionExists {
+#	typeset display="${1:-:0}"
+#	typeset output="$1"
+
+	
+#}
+
+# @description  Create a new modeline
+function ammX11::ResolutionCreate {
+	typeset width="$1"
+	typeset height="$2"
+	typeset freq="${3:-60.00}"
+	typeset name="${4:-${width}x${height}_${freq}}"
+
+
+	# https://askubuntu.com/questions/377937/how-do-i-set-a-custom-resolution
+	typeset modeline=""
+	if ammExec::Exists cvt; then
+		modeline="$(cvt "$width" "$height" "$freq"|ammString::Filter "-" "Modeline")"
+		modeline="${modeline#Modeline \"*\"}"
+	else
+		# Reimplement https://gitlab.freedesktop.org/xorg/lib/libxcvt/-/blob/master/cvt/cvt.c
+		# or https://github.com/kevinlekiller/cvt_modeline_calculator_12/blob/master/cvt12.c
+		ammLog::Warning "cvt is not available on the system"
+	fi
+
+	if [[ -z "$modeline" ]]; then
+		ammLog::Error "Cannot generate CVT Modeline"
+		return
+	fi
+
+	xrandr --newmode "$name" $modeline
+
+	echo "$name"
+}
+
+
+# -----------------------------------------------------------------------------
+# Screen management
+# -----------------------------------------------------------------------------
+
+function ammX11::OutputList {
+	xrandr | ammString::Filter "-" " connected" "" "1"
+}
+
+function ammX11::OutputBrightnessSet {
+	typeset brightness="$1"
+	shift
+
+	typeset -a screens=($@)
+	[[ $# -eq 0 ]] && screens=( $(ammX11::OutputList) )
+
+	typeset screen
+	for screen in "${screens[@]}"; do
+		xrandr --output "$screen" --brightness "$brightness"
+	done
+}
+
+
+function ammX11::OutputResolutionSet {
+	typeset width="$1"
+	typeset height="$2"
+	typeset freq="${3:-60.00}"
+	shift 3
+
+	typeset mode="${width}x${height}_${freq}"
+	# TODO: Check if mode exists
+
+
+	typeset -a screens=($@)
+	[[ $# -eq 0 ]] && screens=( $(ammX11::OutputList) )
+
+	typeset screen
+	for screen in "${screens[@]}"; do
+		# Check if mode is attached
+		xrandr --output "$screen" --addmode "$mode"
+		xrandr --output "$screen" --mode "$size"
+	done
 }
 

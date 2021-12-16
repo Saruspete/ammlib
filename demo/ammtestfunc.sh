@@ -34,13 +34,6 @@ libname="${libname%%::*}"
 if [[ "$libname" != "${libname,,}" ]]; then
 	# Translates uppercase "C" chars by ".c"
 	libname="$(echo "$libname"|sed -Ee 's/([A-Z])/.\L\1/g')"
-
-	typeset libpref=""
-	for parent in ${libname//./ }; do
-		libpref+="$parent"
-		ammLib::Require $libpref
-		libpref+="."
-	done
 fi
 
 # If the function is not declared, try to require it

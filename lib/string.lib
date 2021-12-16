@@ -677,8 +677,8 @@ function ammString::IntegerSum {
 # @description  Filter a file to filter lines and columns
 # @arg $1  (file)  File to filter, or - for stdin
 # @arg $2  (regex) Keep lines matching this regex
-# @arg $3  (regex) Keep columns 
-# @arg $4  (int)   Column number, or offset to the matched column if starting by + or -
+# @arg $3  (regex) Keep columns matching this regex
+# @arg $4  (int)   Column number (starts at 1), or offset to the matched column if starting by + or -
 function ammString::Filter {
 	typeset file="${1:-}"
 	typeset filterline="${2:-.+}"
@@ -686,23 +686,84 @@ function ammString::Filter {
 	typeset displaycolumn="${4:-0}"
 
 	ammLog::Debug "fl=$filterline fc=$filtercolumn dc=$displaycolumn file=$file"
-	awk -v fl="$filterline" -v fc="$filtercolumn" -v dc="$displaycolumn" '
+
+	if ammExec::Exists "awk2"; then
+		\awk -v fl="$filterline" -v fc="$filtercolumn" -v dc="$displaycolumn" '
 		# Line matching
 		match($0, fl) {
-			# Seek the column matching
-			for (i=1; i<=NF; i++) {
-				if (length(fc) && ! match($i, fc))
-					continue
+			# If we have a column pattern
+			if (length(fc)) {
+				matched = ""
+				# Seek the column matching
+				for (i=1; i<=NF; i++) {
+					if (! match($i, fc))
+						continue
 
-				# Display column relative to the finding
-				if (substr(dc,0,1) ~ /[+-]/)
-					print $( i + dc )
-				# Absolute column. Default to the whole line ($0)
-				else
-					print $dc
-				break
+					# Display column relative to the finding
+					if (substr(dc,0,1) ~ /[+-]/)
+						matched = matched" "$( i + dc )
+					# specified absolute column
+					else if (dc != 0)
+						matched = matched" "$dc
+					# default: current column
+					else
+						matched = matched" "$i
+					fi
+				}
+				# Display match if something matched
+				if (length(matched))
+					print substr(matched, 2)
+			}
+			# No column filter, just print the requested column
+			else {
+				print $dc
 			}
 		}' "$file" | tr -cd '\t\n [:print:]'
+	else
+		# Try to emulate it in bash
+		typeset line=
+		while read -r line; do
+			# Filter lines matching specified reqex
+			if [[ "$line" =~ $filterline ]]; then
+				# If we have a column filter, keep only matching columns
+				if [[ -n "$filtercolumn" ]]; then
+					typeset colId="" match=""
+					typeset -a cols=($line)
+					for colId in ${!cols[@]}; do
+						typeset col="${cols[$colId]}"
+						[[ $col =~ $filtercolumn ]] || continue
+
+						typeset pfx="${displaycolumn:0:1}"
+						# Display colun relative to the current one (offset)
+						if [[ "$pfx" == "+" ]] || [[ "$pfx" == "-" ]]; then
+							typeset colOffset="${displaycolumn:1}"
+							match+="${cols[$(( $colId + $colOffset ))]} "
+						# specified absolute column
+						elif [[ "$displaycolumn" != 0 ]]; then
+							match+="${cols[$(( $displaycolumn -1 ))]}"
+						# default: current column
+						else
+							match+="${cols[$colId]}"
+						fi
+					done
+
+					# If we have matched something, remove trailing space
+					[[ -n "$match" ]] && echo "${match% }"
+
+				# No column filter, just print whole line or fixed column
+				else
+					if [[ "$displaycolumn" != 0 ]]; then
+						typeset -a cols=($line)
+						echo "${cols[$(( $displaycolumn -1 ))]}"
+					# default: current column
+					else
+						echo "$line"
+					fi
+				fi
+			fi
+		done < <(cat "$file")
+
+	fi
 }
 
 function ammString::FilterTuples {

@@ -661,7 +661,7 @@ function ammLib::Load {
 		# For submodule, you need to load parent module first
 		if ammLib::IsSublib "$libname"; then
 
-			# If the name is indeed a submodule, stop here
+			# If the name is indeed a submodule
 			typeset parentlib="${libname%.*}"
 			typeset parentlibpath="$(ammLib::Locate "$parentlib")"
 			if [[ -n "$parentlibpath" ]]; then
@@ -669,10 +669,14 @@ function ammLib::Load {
 				typeset parentloaded=
 				ammLib::IsLoaded "$parentlib" && parentloaded="$parentlib"
 
+				# If parent is not loaded
 				if [[ -z "$parentloaded" ]]; then
-					ammLog::Error "Cannot load '$libname' with ammLib::Load: look like a sub-lib of '$parentlib' and its parent '$parentlib' is not loaded"
-					r=r+1
-					continue
+					# Try to load the parent before
+					if ! ammLib::Load "$parentlib"; then
+						ammLog::Error "Cannot load '$libname' with ammLib::Load: look like a sub-lib of '$parentlib' and its parent '$parentlib' is not loadable"
+						r=r+1
+						continue
+					fi
 				fi
 			fi
 		fi

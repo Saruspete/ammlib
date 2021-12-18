@@ -167,7 +167,7 @@ function ammX11::OutputList {
 	xrandr | ammString::Filter "-" " connected" "" "1"
 }
 
-function ammX11::OutputBrightnessSet {
+function ammX11::BrightnessSet {
 	typeset brightness="$1"
 	shift
 
@@ -181,7 +181,7 @@ function ammX11::OutputBrightnessSet {
 }
 
 
-function ammX11::OutputResolutionSet {
+function ammX11::ResolutionSet {
 	typeset width="$1"
 	typeset height="$2"
 	typeset freq="${3:-60.00}"

@@ -568,13 +568,16 @@ function ammString::DecToHex {
 
 function ammString::IPv4ToHex {
 	typeset ipv4str="$1"
+	typeset separator="${2:-}"
 
 	typeset ipset strhex
 	for ipset in ${ipv4str//./ }; do
-		strhex+="$(ammString::DecToHex $ipset)"
+		typeset byte="$(ammString::DecToHex $ipset)"
+		[[ "${#byte}" == 1 ]] && byte="0$byte"
+		strhex+="${byte}${separator}"
 	done
 
-	echo $strhex
+	echo ${strhex%$separator}
 }
 function ammString::HexToIPv4 {
 	typeset strhex="$1"

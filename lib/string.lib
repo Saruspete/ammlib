@@ -18,7 +18,11 @@ function ammString::MetaInit {
 
 	# Days diff in Julian Calendar between 15 oct 1582 (uuid) and 1jan 1970 (epoch)
 	#typeset -g __AMMSTRING_UUID_CALJUL2UNX=$(( (2440587 - 2299160) ))
-	__AMMSTRING_UUID_TS1582=$(( (2440587 - 2299160) * 86400 ))
+	__AMMSTRING_UUID_TS1582=12219292800 # $(( (2440587 - 2299160) * 86400 ))
+
+	__AMMSTRING_CHARS_ALPHANUM='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+	__AMMSTRING_CHARS_SPECIAL=',.;:-_+/?*(){}[]|!#&'
+	__AMMSTRING_CHARS_ALL="${__AMMSTRING_CHARS_ALPHANUM}${__AMMSTRING_CHARS_SPECIAL}"
 
 }
 
@@ -1029,6 +1033,36 @@ function ammString::UrlDecode {
 	#printf '%b' "${url_encoded//%/\\x}"
 }
 
+# -----------------------------------------------------------------------------
+# Random
+# -----------------------------------------------------------------------------
+
+# @description  Generates a random number between min & max
+
+function ammString::RandomInt {
+	typeset min="${1:-0}"
+	typeset max="${2:-32767}"
+
+	if [[ $min -gt $max ]]; then
+		ammLog::Warning "min($min) > max($max)"
+		return 1
+	fi
+
+	echo $(( $RANDOM % ($max+1-$min) +$min ))
+}
+
+function ammString::RandomString {
+	typeset size="$1"
+	typeset alphabet="${2:-$__AMMSTRING_CHARS_ALPHANUM}"
+
+	typeset res=""
+	typeset -i i=0 posMax=${#alphabet}
+	for (( i=0; i<$size; i++ )); do
+		res+="${alphabet:$(ammString::RandomInt 0 $posMax):1}"
+	done
+
+	echo "$res"
+}
 
 # -----------------------------------------------------------------------------
 # UUID

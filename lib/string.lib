@@ -794,6 +794,47 @@ function ammString::FilterTuples {
 	done < "$file"
 }
 
+
+function ammString::LastLine {
+	typeset in="${1:-}"
+
+	# Recall itself with stdin
+	if [[ -n "$in" ]]; then
+		echo "$in" | $FUNCNAME
+		return $?
+	fi
+
+	if ammExec::Exists "tail"; then
+		tail -n 1
+	else
+		(
+			typeset line last=
+			while read line; do
+				last="$line"
+			done
+			echo "$last"
+		)
+	fi
+}
+
+function ammString::FirstLine {
+	typeset in="${1:-}"
+
+	if [[ -n "$in" ]]; then
+		echo "$in" | $FUNCNAME
+		return $?
+	fi
+
+	if ammExec::Exists "head"; then
+		head -n 1
+	else
+		typeset line
+		read line
+		echo "$line"
+	fi
+}
+
+
 # -----------------------------------------------------------------------------
 # Counting
 # -----------------------------------------------------------------------------

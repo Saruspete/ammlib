@@ -64,7 +64,7 @@ typeset -ga __AMMTABLE_CACHE_COLSIZE=()
 typeset -ga __AMMTABLE_CACHE_COLMAXSIZE=()
 
 function ammTable::_TermCols {
-	if [[ -n "$COLUMNS" ]]; then
+	if [[ -n "${COLUMNS:-}" ]]; then
 		echo "$COLUMNS"
 	# Tput from ncurses
 	elif type -P tput >/dev/null 2>&1; then

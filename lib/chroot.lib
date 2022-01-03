@@ -361,18 +361,18 @@ function ammChroot::SetKernel {
 	[[ ! -e "$chrootdir/bin/uname.bin" ]] && mv "$chrootdir/bin/uname" "$chrootdir/bin/uname.bin"
 
 	echo "$kver" > "$chrootdir/bin/uname.kver"
-	cat >"$chrootdir/bin/uname" <<-EOT
+	cat >"$chrootdir/bin/uname" <<-'EOT'
 	#!/bin/bash
 
 	typeset    UNAME_BIN="/bin/uname.bin"
-	typeset    REAL_KVER="\$(\$UNAME_BIN -r)"
-	typeset    FAKE_KVER="\$(cat \$0.kver)"
+	typeset    REAL_KVER="$($UNAME_BIN -r)"
+	typeset    FAKE_KVER="$(cat $0.kver)"
 
 	# Get the real output
-	OUTPUT="\$(\$UNAME_BIN \$@)"
+	OUTPUT="$($UNAME_BIN $@)"
 
 	# And replace the version by our fake
-	echo "\${OUTPUT/\$REAL_KVER/\$FAKE_KVER}"
+	echo "${OUTPUT/$REAL_KVER/$FAKE_KVER}"
 	EOT
 
 	chmod +x "$chrootdir/bin/uname"

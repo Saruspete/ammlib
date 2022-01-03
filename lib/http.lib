@@ -151,6 +151,7 @@ function ammHttp::_DoCurl {
 			             cwd="$val"
 			             curlopts+=("--remote-name") ;;
 			cookiejar=*) curlopts+=("--cookie-jar" "$val") ;;
+			cookieload=*)curlopts+=("--cookie" "$val") ;;
 
 			# curl specific options
 			parallel)    curlopts+=" -Z" ;;
@@ -219,6 +220,7 @@ function ammHttp::_DoWget {
 			dest=*)      wgetopts+=("--output-document" "$val") ;;
 			destdir=*)   wgetopts+=("--directory-prefix" "$val")  ;;
 			cookiejar=*) wgetopts+=("--load-cookies" "$val" "--save-cookies" "$val" "--keep-session-cookies") ;;
+			cookieload=*)curlopts+=("--load-cookies" "$val") ;;
 
 
 			# wget specific options

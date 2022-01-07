@@ -27,7 +27,7 @@ function ammChroot::_OSInit {
 	(set +u; [[ -n "${__AMMCHROOT_OS:-}" ]] ) && return 0
 
 	for sublib in $(ammLib::LocatePattern "chroot.*"); do
-		typeset sublibname="${sublib#*.}"; sublibname="${sublibname%.lib}"
+		typeset sublibname="${sublib%.lib}"; sublibname="${sublibname##*.}"
 		ammLog::Debug "Trying to load sublib $sublib"
 		if ammLib::Loadable "$sublib"; then
 			ammLib::Require "$sublib"

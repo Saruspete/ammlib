@@ -84,8 +84,6 @@ fi
 function ammPath::Canonicalize {
 	typeset path="$1"
 
-echo "$path" >> /tmp/rofl
-
 	# Path exists, just call the most efficient binary then fallback
 	if [[ -e "$path" ]]; then
 		if type -t "realpath" >/dev/null; then

@@ -31,7 +31,7 @@ function ammProcess::ExeGet {
 	# Try to read the symlink exe (not always possible
 	typeset exe=""
 	if [[ -r "$base/exe" ]] && [[ -n "$(readlink -f "$base/exe")" ]]; then
-		exe="$(readlink -f "$base/exe")"
+		exe="$(ammPath::Canonicalize "$base/exe")"
 
 	# Read maps
 	elif [[ -r "$base/maps" ]]; then
@@ -103,9 +103,186 @@ function ammProcess::PidExists {
 	return 1
 }
 
+# @description  Get process scheduling details
+# @output 
+function ammProcess::StatsSched {
+	typeset pid="$1"
 
-function ammProcess::LastRun {
-	:
+	# Uptime is 2 nums: <secs since boot> <secs spent in idle>
+	typeset uptime="$(< /proc/uptime)"
+	# Get the time in ms
+	uptime="${uptime% *}"
+	uptime="${uptime//./}0"
+
+	typeset -i lastrun
+	typeset key _sep val _junk
+	while read key _sep val _junk; do
+		# Skip unwanted lines
+		[[ -n "$_junk" ]] || [[ "$_sep" != ":" ]] && continue
+
+		# output defined in kernel/sched/debug.c :: proc_sched_show_task()
+		case "$key" in
+			# Time of last-run, in milisecs since system startup. We don't really care about us or ns, as the quantum
+			# of scheduling time is 1ms (HZ=1000). So having a value in units of 1ms is good enough
+			se.exec_start)
+				typeset    runtime="${val%.*}"
+				lastrun=$(( $uptime - $runtime ))
+				;;
+			# Core of CFS: virtual runtime in ns
+			se.vruntime)
+				;;
+			policy)
+				;;
+			prio)
+				;;
+			# delta in ns between 2 calls to cpu_clock of the task current cpu.
+			# Calls to sched_clock a monotonic cpu clock, initialized at init and updated with sched_clock_register()
+			# default is from jiffies. Timer is sched_clock.c::sched_clock_timer
+			clock-delta)
+				;;
+
+			# More defined if schedstat_enabled():
+			# sum_{sleep,block}_runtime, {wait,sleep,block}_{start,max} slice_max, {wait,iowait}_{sum,count}
+			# nr_migration_cold nr_failed_migrations nr_failed_migrations{affine,running,hot}
+			# nr_wakups nr_wakeups_{sync,migrate,local,remote,affine,affine_attemps,pasive,idle}
+			# avg_atom avg_per_cpu
+		esac
+	done < /proc/$pid/sched
+
+	[[ $lastrun -lt 0 ]] && lastrun=0
+
+
+	echo "$lastrun"
+}
+
+# sched flags defined in linux/sched.h :: PF_* (per-process flags)
+typeset -rgA __AMMPROCESS_PROCSTAT_SCHEDFLAGS=(
+	      [1]="Im-Virtual-CPU"         [4]="State-Shutting-Down"
+	      [2]="Im-IDLE-Thread"        [64]="State-Forked-Not-Exec"
+	     [16]="Im-IO-Worker"         [512]="State-Dumped-Core"
+	     [32]="Im-Workqueue-Worker" [1024]="State-Killed-By-Signal"
+	 [131072]="Im-kswapd"           [2048]="State-Allocating-Memory"
+	[2097152]="Im-kthread"         [65536]="State-Frozen-For-Suspend"
+
+	[128]="MCE-Process"
+	[256]="Super-User-Privileges"
+	[4096]="RLIMIT-nproc-exceeded"
+	[8192]="FPU-Initialized"
+	[16384]="ASync-Schedule"
+
+	[32768]="Freezer-Not-Freezable"  [262144]="Inherit-GFP_NOFS"
+	[134217728]="Freezer-Skip"       [524288]="Inherit-GFP_NOIO"
+	[268435456]="Freezer-Caller"   [67108864]="Inherit-Cleared-GFP_MOVABLE"
+
+	[1048576]="Throttle-Write-Against-BDI"
+	[4194304]="Randomize-VMem-Addresses"
+	[8388608]="Allowed-Swap-Use"
+	[16777216]="Disallowed-CPU-Affinity"
+	[33554432]="Status-Early-Kill-MCE"
+)
+
+# Fields provided by /proc/$pid/stat
+# doc in Documentation/filesystems/proc.rst
+# Registered at fs/proc/base.c, generated from fs/proc/array.c :: do_task_stat
+typeset -rgA AMMPROCESS_PROCSTAT_FIELDS=(
+	# Process ID, Name, State
+	[pid]=0   [ppid]=3  [pgid]=4  [sid]=5
+	[name]=1  [state]=2 [ttyNr]=6 [ttyPgrp]=7
+	# Faults counters
+	[faultMinor]=9  [faultMinorChild]=10 [faultMajor]=11 [faultMajorChild]=12
+	# CPU Time for task, its children, in user & system
+	[runTimeUser]=13 [runTimeSystem]=14 [runTimeUserChild]=15 [runTimeSystemChild]=16 [runTimeIowait]=41
+	# Start time (in jiffies)
+	[startTime]=21
+	[schedFlags]=8 [schedCpu]=38
+	[schedPriority]=17 [schedNice]=18 [schedPrioRt]=39 [schedPolicy]=40
+	[nThreads]=19
+	# Memory usage: virtual, resident, and maximum (from RLimit)
+	[memVirt]=22 [memRes]=23 [memResLimit]=24
+	# Registers values
+	[regEsp]=28 [regEip]=29
+	# Number of signals
+	[sigPending]=30 [sigBlocked]=31 [sigIgnored]=32 [sigCaught]=33 [sigExit]=37
+	[guestTimeJiffies]=42
+	[childGuestTimeJiffies]=43
+	# Addresses for Code, Data, Stack Brk, Cmd & Env
+	[addrCodeStart]=25 [addrCodeEnd]=26 [addrStackStart]=27
+	[addrDataStart]=44 [addrDataEnd]=45 [addrBrkStart]=46
+	[addrCmdStart]=47  [addrCmdEnd]=48  [addrEnvStart]=49  [addrEnvEnd]=50
+	[exitCode]=51
+)
+
+# @description  Get process statistics available in $AMMPROCESS_PROCSTAT_FIELDS
+function ammProcess::StatsRun {
+	typeset pid="$1" ; shift
+
+	# Skip invalid values
+	[[ -z "$pid" ]] || ! [[ -r "/proc/$pid/stat" ]] && return 1
+
+	typeset -a procStat
+	readarray -d " " procStat < /proc/$pid/stat
+
+	typeset field
+	# remove parenthesis from process name
+	field="${AMMPROCESS_PROCSTAT_FIELDS[name]}"
+	procStat[$field]=${procStat[$field]//[()]/}
+	# Remove extra spaces on each element
+	procStat=("${procStat[@]// /}")
+
+	# transform scheduling flags
+
+
+	for field in "$@"; do
+		if ! [[ -n "${AMMPROCESS_PROCSTAT_FIELDS[$field]}" ]]; then
+			ammLog::Warning "Invalid field '$field' for pid '$pid'"
+			continue
+		fi
+
+		typeset fieldId="${AMMPROCESS_PROCSTAT_FIELDS[$field]}"
+		typeset value="${procStat[$fieldId]}"
+
+		# Additionnal parsing for some fields
+		case "$field" in
+			schedFlags)
+				typeset flagVal flagStr
+				for flagVal in "${!__AMMPROCESS_PROCSTAT_SCHEDFLAGS[@]}"; do
+					if [[ "$(( $value & $flagVal ))" != 0 ]]; then
+						flagStr+="${flagStr:+,}${__AMMPROCESS_PROCSTAT_SCHEDFLAGS[$flagVal]}"
+					fi
+				done
+				value+="($flagStr)"
+				;;
+		esac
+
+		echo -n "$value "
+	done
+	echo
+}
+
+
+function ammProcess::StatsMemoryMap {
+	typeset pid="$1"
+
+	[[ -r "/proc/$pid/smaps" ]] || return 1
+
+	typeset key val
+	while read key val; do
+
+		case "$key" in
+			Size:)
+				;;
+			Rss:)
+				;;
+			Swap:)
+				;;
+			SwapPss:)
+				;;
+			Locked:)
+				;;
+			VmFlags:)
+				;;
+		esac
+	done < "/proc/$pid/smaps"
 }
 
 # -----------------------------------------------------------------------------

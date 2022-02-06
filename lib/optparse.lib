@@ -811,6 +811,10 @@ function ammOptparse::GetAll {
 	ammEnv::VarExport _AMMOPTPARSE_VALUE|cut -d'=' -f2-
 }
 
+function ammOptparse::GetAllOpts {
+	echo "${!_AMMOPTPARSE_VALUE[@]}"
+}
+
 
 # @description Get unparsed options. To be used as 'eval set -- $(ammOptparse::GetUnparsedOpts)'
 # @noarg

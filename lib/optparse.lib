@@ -264,7 +264,7 @@ function ammOptparse::AddOptGroupDesc {
 # @description  Add an option to the listing
 # @arg $1  (string) Options to handle, separated by '|'
 # @arg $2  (string) Description for the help
-# @arg $3  (string) Default value. Can be made from another option as "%{optname}"
+# @arg $3  (string) Default value. Can refer to another option as "%{optname}"
 # @arg $4  (string) Validation function
 function ammOptparse::AddOpt {
 	typeset options="$1"
@@ -390,7 +390,7 @@ function ammOptparse::AddOpt {
 }
 
 # @description Add one or more words that will infer on the parsing
-# @arg $1  (string) action for the words. Can be 'skip', 'break', 'continue' or a function name
+# @arg $1  (string) action for the words. Can be 'break', 'continue' or a function name
 # @arg $@  (string) words to handle
 function ammOptparse::AddActionWord {
 	typeset action="$1"; shift
@@ -443,7 +443,8 @@ function ammOptparse::RequireOrAsk {
 
 
 # @description  Parse the options, optionnally only those matching the prefix $1
-# @arg $@  (string) Prefix
+# @arg $@  (string) If starting with "--" can be multiple from "--no-unknown" "--no-help" "--skip=X".
+#                   If not, will only parse options options starting with provided string.
 function ammOptparse::Parse {
 
 	typeset -i r=0

@@ -55,7 +55,7 @@ for i in "${!arr[@]}"; do echo -n "$i='${arr[$i]}'  "; done
 echo ")"
 
 echo "Remaining unparsed elements:"
-eval set $(ammOptparse::GetUnparsedOpts)
+eval set -- $(ammOptparse::GetUnparsedOpts)
 for i in "$@"; do
 	echo "- '$i'"
 done

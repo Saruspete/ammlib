@@ -39,6 +39,7 @@ typeset -gA  _AMMOPTPARSE_OPTLONG
 typeset -gA  _AMMOPTPARSE_OPTSHORT
 # Raw options
 typeset -gA  _AMMOPTPARSE_OPTALL
+typeset -gA  _AMMOPTPARSE_OPTCNT
 # Special words
 typeset -gA  _AMMOPTPARSE_WORDS
 typeset -gA  _AMMOPTPARSE_WORDS_ACTIVE
@@ -378,6 +379,7 @@ function ammOptparse::AddOpt {
 	_AMMOPTPARSE_REGISTRANTS[$id]="$registrant"
 	_AMMOPTPARSE_OPTALL[$id]="$options"
 	_AMMOPTPARSE_VALUE[$id]="$default"
+	_AMMOPTPARSE_OPTCNT[$id]=0
 	_AMMOPTPARSE_DESCRIPTION[$id]="$description"
 	_AMMOPTPARSE_VALIDATOR[$id]="$validation"
 
@@ -618,8 +620,16 @@ function ammOptparse::Parse {
 					fi
 					;;
 
+				# Array
 				@)
 					if (set +u; [[ -n "${__AMMLIB_CALLOPTS[$optid+1]}" ]] ); then
+
+						# Check if that's the first option (to remove default value)
+						if [[ "${_AMMOPTPARSE_OPTCNT[$id]}" == "0" ]]; then
+							_AMMOPTPARSE_VALUE[$id]=""
+						fi
+						_AMMOPTPARSE_OPTCNT[$id]+=1
+
 						# Append previously set
 						if (set +u; [[ -n "${_AMMOPTPARSE_VALUE[$id]}" ]] ); then
 							val="${_AMMOPTPARSE_VALUE[$id]}"

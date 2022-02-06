@@ -570,6 +570,38 @@ function ammString::DecToHex {
 	ammString::BaseConvert 10 16 $1
 }
 
+function ammString::StrToBin {
+
+	if ammExec::Exists perl; then
+		perl -lpe '$_=unpack"B*"'
+	#elif ammExec::Exists xxd; then
+		#xxd -b
+	else
+		ammLog::Error "Cannot find suitable tool (perl, xxd)"
+		return 1
+	fi
+}
+
+
+# @description  Transforms a char string into a raw binary stream
+# @arg 
+function ammString::AsciiToStream {
+	typeset str="${1:-}"
+
+	# Call itself with stdin
+	if [[ -n "$str" ]]; then
+		echo -n "$str" | $FUNCNAME
+		return $?
+	fi
+
+	if ammExec::Exists xxd; then
+		xxd -revert -plain
+	elif ammExec::Exists perl; then
+		perl -pe '$_=~s/\s+//mxsg; $_=pack("H*",$_)'
+	fi
+}
+
+
 function ammString::IPv4ToHex {
 	typeset ipv4str="$1"
 	typeset separator="${2:-}"

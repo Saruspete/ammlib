@@ -108,6 +108,7 @@ function ammHttp::_DoCurl {
 	# Options parsing
 	typeset -i ret=0
 	typeset -a curlopts=()
+	typeset -A tmpdata
 	typeset opt= cwd=
 	for opt in $(ammHttp::_OptParse ${opts:-}); do
 		typeset val="${opt#*=}"
@@ -153,6 +154,10 @@ function ammHttp::_DoCurl {
 			cookiejar=*) curlopts+=("--cookie-jar" "$val") ;;
 			cookieload=*)curlopts+=("--cookie" "$val") ;;
 
+			# Set as tmp to gather under --user
+			auth-user=*) tmpdata[auth-user]="$val" ;;
+			auth-pass=*) tmpdata[auth-pass]="$val" ;;
+
 			# curl specific options
 			parallel)    curlopts+=" -Z" ;;
 			*)
@@ -161,6 +166,12 @@ function ammHttp::_DoCurl {
 				;;
 		esac
 	done
+
+	# Process transcient data
+	if (set +u; [[ -n "${tmpdata[auth-user]}" ]] ); then
+		curlopts+=("--user" "${tmpdata[auth-user]}:${tmpdata[auth-pass]}")
+	fi
+
 
 	if [[ $ret -gt 0 ]]; then
 		ammLog::Error "Cannot execute curl with unhandled parameters"
@@ -191,6 +202,8 @@ function ammHttp::_DoWget {
 	for opt in $(ammHttp::_OptParse ${opts:-}); do
 		typeset val="${opt#*=}"
 		case $opt in
+			# HEAD
+			head)        wgetopts+=("--spider") ;;
 			# POST
 			post-form=*) wgetopts+=("--post-data" "$val") ;;
 			# wget can't post binary data (multipart), we must convert it beforehand
@@ -220,8 +233,11 @@ function ammHttp::_DoWget {
 			dest=*)      wgetopts+=("--output-document" "$val") ;;
 			destdir=*)   wgetopts+=("--directory-prefix" "$val")  ;;
 			cookiejar=*) wgetopts+=("--load-cookies" "$val" "--save-cookies" "$val" "--keep-session-cookies") ;;
-			cookieload=*)curlopts+=("--load-cookies" "$val") ;;
+			cookieload=*)wgetopts+=("--load-cookies" "$val") ;;
 
+			# auth
+			auth-user=*) wgetopts+=("--user" "$val") ;;
+			auth-pass=*) wgetopts+=("--password" "$val") ;;
 
 			# wget specific options
 			recursive)   wgetopts+=("--recursive" "--no-parent" "--execute" "robots=off" "--wait" "0.1") ;;

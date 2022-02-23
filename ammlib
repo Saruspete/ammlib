@@ -1203,6 +1203,7 @@ function ammLog::CallingStack {
 function ammLog::Stackdump {
 	typeset -i skip=${1:-1}
 	typeset -i cnt=${2:-255}
+	typeset    fullPath=${3:-}
 
 	# Required for BASH_ARGV
 	typeset    extdbg="$(shopt extdebug)"
@@ -1217,7 +1218,9 @@ function ammLog::Stackdump {
 		fi
 		[[ $i -ge $(($skip + $cnt)) ]] && break
 
-		echo -n "${BASH_SOURCE[$i]##*/}:${BASH_LINENO[$(($i-1))]} ${FUNCNAME[$i]}() "
+		typeset file="${BASH_SOURCE[$i]}"
+		[[ -n "$fullPath" ]] || file="${file##*/}"
+		echo -n "${file}:${BASH_LINENO[$(($i-1))]} ${FUNCNAME[$i]}() "
 		if [[ "$extdbg" == "on" ]]; then
 			j=$(($argoff + ${BASH_ARGC[$i]:-0} -1))
 			while [[ $j -ge $argoff ]]; do

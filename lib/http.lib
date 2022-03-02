@@ -107,7 +107,8 @@ function ammHttp::_DoCurl {
 
 	# Options parsing
 	typeset -i ret=0
-	typeset -a curlopts=()
+	# Fail silently (do not show custom 5xx or 4xx error body message)
+	typeset -a curlopts=("--fail")
 	typeset -A tmpdata
 	typeset opt= cwd=
 	for opt in $(ammHttp::_OptParse ${opts:-}); do
@@ -179,11 +180,11 @@ function ammHttp::_DoCurl {
 	fi
 
 	# Do the query for every url provided
-	ammLog::Debug "Calling curl as: curl --request '$request' ${curlopts[@]} -f --connect-timeout 10 '$@'"
+	ammLog::Debug "Calling curl as: curl --request '$request' ${curlopts[@]} --connect-timeout 10 '$@'"
 	(
 		# cwd is required for destdir
 		[[ -n "$cwd" ]] && cd "$cwd"
-		\curl --request "$request" "${curlopts[@]}" -f --connect-timeout 10 "$@" 2>/dev/null
+		\curl --request "$request" "${curlopts[@]}" --connect-timeout 10 "$@" 2>/dev/null
 	)
 	ret+=$?
 	ammLog::Debug "Return curl: $ret"

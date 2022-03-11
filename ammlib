@@ -60,18 +60,26 @@ fi
 # Interactive and other calling methods specifics
 #
 
-# Check if we are started by a valid stdin
-typeset -g  __AMMLIB_TTY="$(tty)"
-typeset -g  __AMMLIB_INTERACTIVE=true
-if [[ -z "$__AMMLIB_TTY" ]] || ! [[ -e $__AMMLIB_TTY ]]; then
-	__AMMLIB_TTY=""
-	__AMMLIB_INTERACTIVE=false
+# Check if stdin is a terminal (ie, for user input)
+typeset -g  __AMMLIB_TTY=""
+typeset -g  __AMMLIB_INTERACTIVE=false
+if [[ -t 0 ]]; then
+	__AMMLIB_INTERACTIVE=true
+	__AMMLIB_TTY="$(tty 2>/dev/null)"
+	# That shouldn't be possible...
+	if ! [[ -e "$__AMMLIB_TTY" ]]; then
+		__AMMLIB_TTY=""
+		__AMMLIB_INTERACTIVE=false
+	fi
 fi
+
+# Check if stdout is a terminal (ie, colorize output)
 typeset -g  __AMMLIB_STDOUTPIPED=false
 if ! [[ -t 1 ]]; then
 	__AMMLIB_STDOUTPIPED=true
 fi
 
+# Add dark shadow to PS4
 if $__AMMLIB_INTERACTIVE; then
 	PS4="\033[2m$PS4\033[0m"
 fi

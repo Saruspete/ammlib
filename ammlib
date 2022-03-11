@@ -18,7 +18,7 @@ set -u
 export LC_ALL=C
 
 # If no debug override has been done yet
-if [[ -n "$PS4" ]] && [[ "$PS4" == "+ " ]]; then
+if [[ -z "${PS4:-}" ]] || [[ "$PS4" == "+ " ]]; then
 	PS4=' (${BASH_SOURCE##*/}:$LINENO ${FUNCNAME[0]:-main})  '
 fi
 
@@ -30,7 +30,7 @@ if [[ -z "${PATH:-}" ]]; then
 fi
 if [[ -z "${HOME:-}" ]]; then
 	HOME="$(getent passwd $(id -u))"
-	HOME="${HOME%%:*}"
+	HOME="${HOME%:*}"
 	export HOME="${HOME##*:}"
 fi
 
@@ -39,10 +39,10 @@ fi
 #
 
 # Check if we are using bash, else try to load the wrapper
-if [[ -z "$BASH" ]] || [[ "$(cat /proc/$$/comm)" != "bash" ]]; then
+#if [[ -z "$BASH" ]] || [[ "$(cat /proc/$$/comm)" != "bash" ]]; then
 	# TODO Try to find a valid wrapper
-	:
-fi
+#	:
+#fi
 
 # Minimal bash version
 if [[ "${BASH_VERSINFO[0]:-}${BASH_VERSINFO[1]:-0}" -lt 42 ]]; then

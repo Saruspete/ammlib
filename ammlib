@@ -845,7 +845,8 @@ typeset -gA __AMMLOG_TERMCODES=(
 	[bglightblack]=100 [bglightred]=101 [bglightgreen]=102 [bglightyellow]=103 [bglightblue]=104 [bglightmagenta]=105 [bglightcyan]=106 [bglightwhite]=107 [bglightdefault]=109
 )
 
-typeset -gi __AMMLOG_VERBOSITY=2
+typeset -ga __AMMLOG_LOGLEVELS=(ERROR WARNING NOTICE INFO DEBUG TRACE)
+typeset -gi __AMMLOG_VERBOSITY=3
 typeset -gi __AMMLOG_DEPTH=0
 
 # @description  Colorize the text with values in __AMMLOG_TERMCODES
@@ -877,6 +878,10 @@ function ammLog::Date {
 	date '+%y-%m-%d'
 }
 
+function ammLog::DateTime {
+	date '+%y-%m-%d %H:%M:%S%:::z'
+}
+
 # @description  Checks if AMMLIB_DEBUG variable is set and needs to do some job
 function ammLog::_DbgIsEnabled {
 	# Early tests
@@ -903,6 +908,15 @@ typeset -g __AMMLOG_FDDBG=99
 typeset -g __AMMLOG_LOGFILE=""
 typeset -g __AMMLOG_LOGTERM=""
 typeset -g __AMMLOG_SILENT="0"
+# Output stdout logs in prefixed format
+typeset -g __AMMLOG_EXTOUT="true"
+# Output stdout logs in color
+typeset -g __AMMLOG_COLOUT="false"
+typeset -g __AMMLOG_COLRST="$(ammLog::Color reset)"
+
+if ! $__AMMLIB_STDOUTPIPED; then
+	__AMMLOG_COLOUT="true"
+fi
 
 # If stdout is piped, forward logs to stderr to avoid messing
 if $__AMMLIB_STDOUTPIPED || [[ -n "${AMMLIB_LOGTOSTDERR:-}" ]]; then
@@ -920,35 +934,58 @@ typeset -ga __AMMLOG_STEPNAME
 # @stdout  (string) Resulting log
 function ammLog::_Log {
 	# Remove tracing if enabled to limit spam
-	typeset redbg=""
-	[[ "${-//x/}" != "$-" ]] && { set +x; redbg="set -x"; }
+	typeset reDbg=""
+	[[ "${-//x/}" != "$-" ]] && { set +x; reDbg="set -x"; }
 
-	typeset tag="$1"
-	typeset fmt="$2"
-	typeset pfx="$3"
-	shift 3
+	typeset level="$1"
+	typeset tag="$2"
+	typeset color="$3"
+	typeset prefix="$4"
+	shift 4
 
-	typeset color="$(ammLog::Color $fmt)"
-	typeset colorrst="$(ammLog::Color reset)"
-	typeset date="$(ammLog::Time)"
+	typeset levelStr="${__AMMLOG_LOGLEVELS[$level]}"
+
+	typeset colorStart= colorEnd=
+	typeset prefixOut="[$tag]"
+	typeset prefixLog="[$(ammLog::DateTime)][$tag]"
+
+	# Extended format for logging to stdout
+	if $__AMMLOG_EXTOUT; then
+		prefixOut="[$(ammLog::Time)][$tag]"
+	
+	# No extended logging requested
+	else
+		# For standard info logging, avoid clobbering output
+		[[ "$levelStr" == "INFO" ]] && prefixOut=""
+	fi
+
+	# Add color if interactive (not piped to a file or null)
+	if $__AMMLOG_COLOUT; then
+		colorStart="$(ammLog::Color $color)"
+		colorEnd="$__AMMLOG_COLRST"
+	fi
+
+	# Padding for steps
 	typeset pad="$(ammLog::_StepPad)"
 
 	# Read stdin
 	if [[ "$@" = "-" ]]; then
-		typeset line
 		# Add the reverse color for stdin logging
-		color+="$(ammLog::Color "reverse")"
+		[[ -n "$colorStart" ]] && colorStart+="$(ammLog::Color "reverse")"
+
+		typeset line
 		while read line; do
-			# Silent mode doesn't write any log
+			# Silent mode doesn't display any log
 			if [[ "$__AMMLOG_SILENT" == "0" ]]; then
-				echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $pfx$line${colorrst}"
+				echo >&$__AMMLOG_FDSTD -e "${prefixOut}${pad} ${colorStart}${prefix}${line}${colorEnd}"
 			# Special case: only error
-			elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
-				echo >&$__AMMLOG_FDERR "[$date][$tag][$$]$pad $line"
+			elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ $level -le 0 ]]; then
+				echo >&$__AMMLOG_FDERR "${prefixOut}${pad} $line"
 			fi
 
+			# Log to file if set
 			if [[ -n "${__AMMLOG_LOGFILE:-}" ]] && [[ -w "$__AMMLOG_LOGFILE" ]]; then
-				echo >>"$__AMMLOG_LOGFILE"  "[$date][$tag][$$]$pad $pfx$line"
+				echo >>"$__AMMLOG_LOGFILE"  "${prefixLog}${pad} ${prefix}${line}"
 			fi
 		done
 
@@ -956,19 +993,19 @@ function ammLog::_Log {
 	else
 		# Silent mode doesn't display any log
 		if [[ "$__AMMLOG_SILENT" == "0" ]]; then
-			echo >&$__AMMLOG_FDSTD -e "${color}[$date][$tag][$$]$pad $pfx$@${colorrst}"
+			echo >&$__AMMLOG_FDSTD -e "${prefixOut}${pad} ${colorStart}${prefix}$@${colorEnd}"
 		# Special case: only error
-		elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ "$tag" == "ERR" ]]; then
-			echo >&$__AMMLOG_FDERR "[$date][$tag][$$]$pad $pfx$@"
+		elif [[ "$__AMMLOG_SILENT" == "2" ]] && [[ $level -le 0 ]]; then
+			echo >&$__AMMLOG_FDERR "${prefixOut}${pad} ${prefix}$@"
 		fi
 
 		if [[ -n "${__AMMLOG_LOGFILE:-}" ]] && [[ -w "$__AMMLOG_LOGFILE" ]]; then
-			echo >>"$__AMMLOG_LOGFILE"  "[$date][$tag][$$]$pad $pfx$@"
+			echo >>"$__AMMLOG_LOGFILE"  "${prefixLog}${pad} ${prefix}$@"
 		fi
 	fi
 
 	# Restart tracing if was enabled
-	$redbg
+	$reDbg
 }
 
 
@@ -984,7 +1021,16 @@ function ammLog::_Write {
 # @description  Log a fatal error and terminate script
 # @arg $@  Log text for fatal error. If "-", text is read from stdin
 function ammLog::Die {
-	ammLog::_Log "DIE" "bold red reverse" "" "$@"
+	ammLog::_Log "0" "DIE" "bold red" "" "$@"
+	exit 255
+}
+
+# @description  Log a fatal error, add stacktrace and terminate
+# @arg $@  Error text to log. If "-", text is read from stdin
+function ammLog::Fatal {
+	ammLog::_Log 0 "FATAL" "bold white bgred" "" "$@"
+	# Add calltrace (inverse due to reverse keyword added by "-" reading)
+	ammLog::Stackdump 2 | ammLog::_Log 0 "FATAL" "bold bgwhite red" "  Callstack: " "-"
 	exit 255
 }
 
@@ -992,23 +1038,24 @@ function ammLog::Die {
 # @arg $@  Error text to log. If "-", text is read from stdin
 function ammLog::Error {
 	# TODO: add calling path
-	[[ $__AMMLOG_VERBOSITY -ge 0  ]] && ammLog::_Log "ERR" "bold red" "" "$@"
+	[[ $__AMMLOG_VERBOSITY -ge 0  ]] && ammLog::_Log 0 "ERR" "bold red" "" "$@"
 }
 
 # @description  Log a warning
 # @arg $@  warning text to log. If "-", text is read from stdin
 function ammLog::Warning {
-	[[ $__AMMLOG_VERBOSITY -ge 1 ]] && ammLog::_Log "WRN" "bold yellow" "" "$@"
+	[[ $__AMMLOG_VERBOSITY -ge 1 ]] && ammLog::_Log 1 "WRN" "bold yellow" "" "$@"
+}
+
+
+function ammLog::Notice {
+	[[ $__AMMLOG_VERBOSITY -ge 2 ]] && ammLog::_Log 2 "INF" "bold green" "" "$@"
 }
 
 # @description  Log an information
 # @arg $@  Info text to log. If "-", text is read from stdin
 function ammLog::Info {
-	[[ $__AMMLOG_VERBOSITY -ge 2  ]] && ammLog::_Log "INF" "bold green" "" "$@"
-}
-
-function ammLog::Notice {
-	[[ $__AMMLOG_VERBOSITY -ge 3 ]] && ammLog::_Log "INF" "bold green" "" "$@"
+	[[ $__AMMLOG_VERBOSITY -ge 3 ]] && ammLog::_Log 3 "INF" "bold green" "" "$@"
 }
 
 # @description  Log a debug info
@@ -1026,7 +1073,7 @@ function ammLog::Debug {
 		# Get the caller
 		typeset callerdbg="${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]} ${FUNCNAME[1]:-main}"
 
-		ammLog::_Log "DBG" "bold blue" "[$callerdbg] " "$@"
+		ammLog::_Log 4 "DBG" "bold blue" "[$callerdbg] " "$@"
 
 	# Else, we must consume stdin or bash will fail (and add to stack nonetheless)
 	else
@@ -1042,6 +1089,7 @@ function ammLog::Debug {
 	# Restart tracing if was enabled
 	$redbg
 }
+
 
 # Legacy helpers
 function ammLog::Err { ammLog::Error "$@"; }
@@ -1093,7 +1141,7 @@ function ammLog::_StepPad {
 
 	typeset i
 	for (( i=0; i < $step; i++ )); do
-		echo -n "  "
+		echo -n "   "
 	done
 }
 
@@ -1128,8 +1176,8 @@ function ammLog::Step {
 	typeset cols="${COLUMNS:-$(tput cols)}"
 	[[ -z "$cols" ]] && cols="100"
 
-	# Remove 2 + 23 chars to accomodate the ammLib::Log header
-	typeset -i size="$(( $cols - ${#name} - 26 ))"
+	# Remove chars to accomodate the ammLib::Log header
+	typeset -i size="$(( $cols - ${#name} - 18 ))"
 	[[ $size -lt 0 ]] && size=20
 
 	typeset -i i=0
@@ -1147,7 +1195,7 @@ function ammLog::Step {
 function ammLog::StepBegin {
 	typeset name="$1"
 
-	typeset txt=">> $name"
+	typeset txt="-> $name"
 
 	__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]="$name"
 	__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]="$(date +%s)"
@@ -1166,7 +1214,7 @@ function ammLog::StepEnd {
 
 	if [[ $__AMMLOG_STEPDEPTH -le 0 ]]; then
 		ammLog::Error "Cannot call ammLog::StepEnd while no step in progress. Callstack:"
-		ammLog::Stackdump | ammLog::Error "-"
+		ammLog::StackLog "Error"
 		return 1
 	fi
 
@@ -1174,8 +1222,8 @@ function ammLog::StepEnd {
 
 	#typeset txt="$(ammLog::_StepPrefix $__AMMLOG_STEPDEPTH"
 	typeset -i time="$(($(date +%s) - ${__AMMLOG_STEPTIME[$__AMMLOG_STEPDEPTH]} ))"
-	typeset txt="<< ${__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]}. Took:${time}s"
-	[[ -n "$ret" ]] && txt+=" Ret:'$ret'"
+	typeset txt="<- ${__AMMLOG_STEPNAME[$__AMMLOG_STEPDEPTH]}. Took:${time}s"
+	[[ -n "$ret" ]] && txt+=" Ret:$ret"
 	[[ -n "$msg" ]] && txt+=" Msg:'$msg'"
 
 	if [[ -z "$ret" ]]; then
@@ -1239,6 +1287,15 @@ function ammLog::Stackdump {
 		fi
 		echo
 		argoff+=${BASH_ARGC[$i]:-0}
+	done
+}
+
+function ammLog::StackLog {
+	typeset funcLogger="$1"
+
+	typeset line
+	ammLog::Stackdump 2 255 1| while read line; do
+		ammLog::$funcLogger "  $line"
 	done
 }
 

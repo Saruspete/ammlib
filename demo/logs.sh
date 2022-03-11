@@ -35,4 +35,5 @@ ammLog::StepEnd
 ammLog::StepEnd   0 "Finally all done"
 ammLog::StepEnd
 
-ammLog::Die "And now we die..."
+#ammLog::Die "And now we die..."
+ammLog::Fatal "And now we die..."

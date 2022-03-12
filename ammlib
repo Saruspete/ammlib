@@ -613,15 +613,6 @@ function ammLib::Loadable {
 			# Display the lib file before the test to have its path in error messages
 			echo "$libfile"
 
-			# check for features starting from bash 4.2 (typeset -g)
-			if [[ "${BASH_VERSINFO[0]:-0}" -eq "4" ]] && [[ "${BASH_VERSINFO[1]:-0}" -lt 2 ]]; then
-				if grep -P '(typeset|declare) -[a-zA-Z]*g[a-zA-Z]* ' $libfile >/dev/null 2>&1; then
-					ammLog::Debug "Library '$libfile' needs bash >= 4.2"
-					r+=1
-					continue
-				fi
-			fi
-
 			# Code 98 = fail during the load (parsing error ?)
 			metatext="$(ammLog::Silence onlyerr; . $libfile || exit 98; if \type ${metapref}Check >/dev/null 2>&1; then ${metapref}Check >/dev/null; exit $?; else exit 0; fi;)"
 
@@ -1038,7 +1029,6 @@ function ammLog::Fatal {
 # @description  Log an error
 # @arg $@  Error text to log. If "-", text is read from stdin
 function ammLog::Error {
-	# TODO: add calling path
 	[[ $__AMMLOG_VERBOSITY -ge 0  ]] && ammLog::_Log 0 "ERR" "bold red" "" "$@"
 }
 

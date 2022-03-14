@@ -866,6 +866,41 @@ function ammString::FirstLine {
 	fi
 }
 
+# @description  Select a count or percentage in a selection
+function ammString::SelectCount {
+	typeset count="$1"
+	shift;
+
+	typeset total="$#"
+	# Parsing non-int parameters
+	if ! ammString::IsInteger "$count"; then
+		case "$count" in
+			*%)
+				typeset pct="${count%\%}"
+				count="$(( $total * $pct / 100 ))"
+				;;
+			*)
+				ammLog::Warning "Unmanaged count format: $count"
+				ammLog::StackLog "Warning"
+				return 1
+				;;
+		esac
+	fi
+
+	# check boundaries
+	if [[ "$count" -gt "$total" ]]; then
+		ammLog::Warning "Requesting more numbers than available elements. Ceiling value. count=$count total=$total"
+		count=$total
+	fi
+
+	typeset -i i=0
+	for (( i=0; i<$count; i++ )); do
+		echo -n $1" "
+		shift
+	done | ammString::Trim
+
+	return 0
+}
 
 # -----------------------------------------------------------------------------
 # Counting

@@ -897,7 +897,7 @@ function ammString::SelectCount {
 	for (( i=0; i<$count; i++ )); do
 		echo -n $1" "
 		shift
-	done | ammString::Trim
+	done | ammString::Trim "-"
 
 	return 0
 }

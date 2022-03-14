@@ -285,8 +285,8 @@ function ammString::Trim {
 
 	
 	if [[ "$1" == "-" ]]; then
-		while read line; do
-			ammString::_Trim "$line" "$trimchars"
+		while read str; do
+			ammString::_Trim "$str" "$trimchars"
 		done
 	else
 		ammString::_Trim "$str" "$trimchars"

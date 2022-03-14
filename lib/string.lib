@@ -726,7 +726,7 @@ function ammString::Filter {
 
 	ammLog::Debug "fl=$filterline fc=$filtercolumn dc=$displaycolumn file=$file"
 
-	if ammExec::Exists "awk2"; then
+	if ammExec::Exists "awk"; then
 		\awk -v fl="$filterline" -v fc="$filtercolumn" -v dc="$displaycolumn" '
 		# Line matching
 		match($0, fl) {

@@ -892,13 +892,15 @@ function ammString::SelectCount {
 		ammLog::Warning "Requesting more numbers than available elements. Ceiling value. count=$count total=$total"
 		count=$total
 	fi
-
+set -x
 	typeset -i i=0
+	typeset -a elems=""
 	for (( i=0; i<$count; i++ )); do
-		echo -n $1" "
+		elems+=("$1")
 		shift
-	done | ammString::Trim "-"
+	done
 
+	echo "${elems[@]}"
 	return 0
 }
 

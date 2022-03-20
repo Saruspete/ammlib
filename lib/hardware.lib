@@ -397,57 +397,58 @@ function ammHardware::SystemSummary {
 
 function ammHardware::NumaSummary {
 
-	typeset -a numanodes cpucount cpuids cpumodels cpuucodes memsize
-	typeset -A tmp
-	typeset numapath key val currnode
+	typeset -a numanodes numacpus numacount numasmt cpuids memsize
+	typeset    numapath key val cpumodel cpuucode
+	typeset -i cpuid currnode
 
 #set -x
 	#
 	# Parse /proc/cpuinfo
 	#
+	ammLog::Debug "Listing CPUs from /proc/cpuinfo"
 	while IFS=: read key val; do
-		[[ -z "$key" ]] && continue
-
-		key="$(ammString::Trim "$key")"
-		val="$(ammString::Trim "$val")"
+		# Empty line will be the end of first block
+		[[ -z "$key" ]] && break
 
 		case $key in
-			processor)     tmp[cpuid]="$val" ;;
-			model\ name)   tmp[model]="$val" ;;
-			microcode)     tmp[ucode]="$val" ;;
-
-			physical\ id)
-				typeset numaid="$val"
-				currnode="$numaid"
-				# Flush previously stored tmp
-				( set +u; [[ -z "${cpumodels[$numaid]}" ]] ) && cpumodels[$numaid]="${tmp[model]}"
-				( set +u; [[ -z "${cpuucodes[$numaid]}" ]] ) && cpuucodes[$numaid]="${tmp[ucode]}"
-				#cpuids[$numaid]+="${tmp[cpuid]},"
-				tmp=()
-				;;
-
-			core\ id) cpucores[$currnode]+="$val," ;;
+			model\ name*)   cpumodel="${val# }" ;;
+			microcode*)     cpuucode="${val# }" ;;
 		esac
 	done < /proc/cpuinfo
 
 	#
 	# Discover numa nodes from /sys
 	#
+	ammLog::Debug "Listing NUMA nodes from /sys"
 	for numapath in /sys/devices/system/node/node[0-9]*; do
 		typeset numaid="${numapath##*node}"
 		typeset cpulist="$(< $numapath/cpulist)"
 		typeset meminfo="$(< $numapath/meminfo)"
 
 		numanodes+=("$numaid")
+		# As we don't know yet, set 0
+		numasmt[$numaid]=0
+
 		# CPU listing
 		typeset cpupath
 		typeset -i cpucnt=0
+		# Numbering will be lexicographic instead of numeric
 		for cpupath in $numapath/cpu[0-9]*; do
-			typeset cpuid="${cpupath##*cpu}"
-			cpuids[$numaid]+="$cpuid,"
+			typeset -i cpuid="${cpupath##*cpu}"
+			if [[ "$cpucnt" == 0 ]]; then
+				typeset threadPath="$cpupath/topology/thread_siblings_list"
+				if [[ -r "$threadPath" ]]; then
+					typeset threadIds="$(<"$threadPath")"
+					threadIds="${threadIds//[^,]/}"
+					# Number of threads is 1  + the number of separators
+					numasmt[$numaid]="$((1 + ${#threadIds}))"
+				fi
+			fi
+			numacpus[$numaid]+="$cpuid,"
 			cpucnt+=1
 		done
-		cpucount[$numaid]=$cpucnt
+		numacount[$numaid]=$cpucnt
+		
 
 		# 
 		memsize[$numaid]="$(echo "$meminfo" | awk '$3 == "MemTotal:" { print $4; }')"
@@ -458,7 +459,7 @@ function ammHardware::NumaSummary {
 	#
 	typeset numaid=0
 	for numaid in ${numanodes[@]}; do
-		echo "numanode=$numaid cpucount=\"${cpucount[$numaid]}\" cpuids=\"${cpuids[$numaid]%,}\" cpumodel=\"${cpumodels[$numaid]}\" cpuucode=\"${cpuucodes[$numaid]}\" memsize=\"${memsize[$numaid]}\""
+		echo "numanode=$numaid cpucount=\"${numacount[$numaid]}\" cpuids=\"${numacpus[$numaid]%,}\" cpumodel=\"$cpumodel\" cpuucode=\"$cpuucode\" cpusmt=\"${numasmt[$numaid]}\" memsize=\"${memsize[$numaid]}\""
 	done
 }
 

@@ -148,6 +148,7 @@ function ammHttp::_DoCurl {
 			# Local modifiers
 			silent)      curlopts+=("--silent" "--show-error") ;;
 			dest=*)      curlopts+=("--output" "$val" "--create-dirs") ;;
+			verbose)     curlopts+=("--verbose") ;;
 			# Have to implement it with shell, as --output-dir is not always available
 			destdir=*)   ! [[ -d "$val" ]] && mkdir -p "$val"
 			             cwd="$val"
@@ -348,6 +349,8 @@ function ammHttp::Fetch {
 	ammHttp::Get "$src" "$opts ${dstOpt}=$dst"
 	r=$?
 
+	ammLog::Trace "ammHttp::Get returned $r"
+
 	# Do the caching if requested and fetch success
 	if [[ $r == 0 ]] && [[ -n "${AMMHTTP_FETCH_CACHE:-}" ]]; then
 		typeset cachePath="$AMMHTTP_FETCH_CACHE/$cacheName"
@@ -356,6 +359,7 @@ function ammHttp::Fetch {
 		cp "$dst" "$cachePath"
 	fi
 
+	ammLog::Debug "return r=$r"
 	return $r
 }
 
@@ -363,8 +367,10 @@ function ammHttp::FetchSmart {
 	typeset src="$1"
 	typeset dst="${2:-$__AMMLIB_DATATMP/${src##*/}}"
 	typeset opt="${3:-}"
-	typeset ret=0
 
+	typeset -i ret=0
+
+	ammLog::Debug "Trying to fetch smart src='$src' dst='$dst' opt='$opt'"
 
 	# git: URL ends with .git  or start as git://
 	if [[ $src =~ ^git:// ]] || [[ $src =~ .+\.git$ ]]; then
@@ -412,6 +418,7 @@ function ammHttp::FetchSmart {
 	fi
 
 	echo "$dst"
+	ammLog::Debug "Finished fetch. ret=$ret"
 	return $ret
 }
 

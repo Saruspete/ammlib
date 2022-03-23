@@ -93,7 +93,7 @@ function ammOptparse::_OptToId {
 		echo "$id"
 		return 0
 	else
-		ammLog::Warning "Unregistered option '$opt'"
+		ammLog::Debug "Unregistered option '$opt'"
 		return 1
 	fi
 }

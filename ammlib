@@ -1955,6 +1955,10 @@ function ammExec::SudoIsAble {
 					done
 					;;
 
+				# Not implemented here, but don't show parsing error
+				RunAsGroups:*)
+					;;
+
 				Options:*)
 					;;
 

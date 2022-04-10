@@ -129,7 +129,8 @@ function ammChrootCentos::InitFromTemplate {
 	# Generate the URL or use the ones set in configuration
 	typeset -a urls
 	case $version in
-		8|8.*)
+		# Stream
+		8)
 			typeset release=""
 			typeset maj="${version:0:1}"
 
@@ -158,7 +159,7 @@ function ammChrootCentos::InitFromTemplate {
 			urls+=("${url}.x86_64.tar.xz")
 			;;
 
-		6|7|7.*|6.*)
+		6|7|7.*|6.*|8.*)
 			typeset release="" url=""
 			typeset maj="${version:0:1}"
 

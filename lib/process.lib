@@ -286,6 +286,20 @@ function ammProcess::StatsMemoryMap {
 }
 
 # -----------------------------------------------------------------------------
+# Process data extraction
+# -----------------------------------------------------------------------------
+
+# @description  List files in use by the process
+function ammProcess::FileList {
+	:
+}
+
+function ammProcess::MemExtract {
+	typeset pid="$1"
+	typeset files=""
+}
+
+# -----------------------------------------------------------------------------
 # Custom naming execution
 # -----------------------------------------------------------------------------
 
@@ -335,11 +349,33 @@ function ammProcess::Timeout {
 	elif ammExec::Exists perl; then
 		perl -e "alarm $time; exec @ARGV" "$@"
 		ret=$?
+	elif ammExec::Exists sleep; then
+		(
+			"$@" &
+			typeset pidRun=$!
+			( # Killer
+				sleep "$time"
+				if [[ -d "/proc/$pidRun" ]]; then
+					ammLog::Debug "Process '$pidRun' still present after '$time' sec. Killing"
+					kill -SIGKILL $pidRun >/dev/null 2>&1
+				fi
+			) &
+			typeset pidKill=$!
+			wait -f $pidRun >/dev/null 2>&1
+			ret=$?
+			if [[ -d "/proc/$pidKill" ]]; then
+				ammLog::Trace "Killing remaining timeout process '$pidKill'"
+				kill -SIGKILL $pidKill >/dev/null 2>&1
+			fi
+			exit $ret
+		)
+		ret=$?
 	else
 		ammLog::Error "Unable to find a suitable timeout function"
 		return 1
 	fi
 
+	ammLog::Debug "Timeout return:'$ret'"
 	return $ret
 }
 

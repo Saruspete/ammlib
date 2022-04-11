@@ -329,8 +329,8 @@ function ammHttp::Fetch {
 	# Check if cache is available
 	if [[ -n "${AMMHTTP_FETCH_CACHE:-}" ]]; then
 		typeset cachePath="$AMMHTTP_FETCH_CACHE/$cacheName"
-		ammLog::Debug "Checking if cache is present under '$cachePath'"
 		if [[ -s "$cachePath" ]]; then
+			ammLog::Debug "Found cache file '$cachePath'. Using it"
 			if [[ "$dst" == "-" ]]; then
 				cat "$cachePath"
 				return $?
@@ -339,6 +339,7 @@ function ammHttp::Fetch {
 				return $?
 			fi
 		fi
+		ammLog::Debug "No cache file '$cachePath'"
 	fi
 
 	# if dest is a directory or ends with /, change option accordingly

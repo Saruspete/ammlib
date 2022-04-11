@@ -21,13 +21,20 @@ ammTable::Display
 
 typeset -i i=1
 while [[ $i -lt 20 ]]; do
-	ammTable::AddRow "$i" "Name $RANDOM" "Lorem ipsum" "Useless desc"
+	ammTable::AddRow "$i" "Name $RANDOM" "Lorem ipsum" "This row will be shown when ammTable::Display is called"
 	i+=1
 done
 
-ammTable::Display "direct"
+sleep 1
+ammTable::Display
+
+# Now, rows will be printed immediately
+ammTable::SetDisplayMode "direct"
+
 while [[ $i -lt 40 ]]; do
-	ammTable::AddRow "$i" "Name $RANDOM" "mouarf" "haha"
+	ammTable::AddRow "$i" "Name $RANDOM" "Dolor sit amet" "This row is shown immediately"
 	sleep .1
 	i+=1
 done
+
+

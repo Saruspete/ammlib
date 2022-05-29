@@ -821,6 +821,7 @@ function ammLog::_ColorJoin {
 	echo "$*"
 }
 
+# These codes are ANSI/VT100. If not the correct term, use "tput" to get the correct one. Using fixed table for speed
 typeset -gA __AMMLOG_TERMCODES=(
 	# Set
 	[reset]=0 [bold]=1 [dim]=2 [underline]=4 [blink]=5 [reverse]=7 [hidden]=8
@@ -843,7 +844,7 @@ typeset -gi __AMMLOG_DEPTH=0
 # @description  Colorize the text with values in __AMMLOG_TERMCODES
 # @$ color codes to be printed
 function ammLog::Color {
-	typeset -r esc="\033["
+	typeset -r esc="\e[" # CSI  =  ESC+"["  =  \e or \x1b or \033 + "["
 	typeset -a codes=()
 
 	# TODO: Handle truecolor. See https://gist.github.com/XVilka/8346728
@@ -853,6 +854,33 @@ function ammLog::Color {
 	done
 
 	echo -ne "${esc}$(ammLog::_ColorJoin ";" ${codes[@]+"${codes[@]}"})m"
+}
+
+# @
+function ammLog::TrueColorAvailable {
+
+	typeset -i r=1
+	# Can only work if a tty is connected
+	if [[ -n "$__AMMLIB_TTY" ]]; then
+		# use Xterm-Control-Sequences for that
+		typeset sttyOld="$(stty -g)" cfg=
+		# config read: min 0 char & 0.1s timeout
+		stty raw -echo min 0 time 1
+		# We use OSC (Operating System Command) Xterm-Control-Sequence to query the current background color
+		# Format: "OSC Ps ; Pt BEL"  or  "OSC Ps ; Pt ST" (preferred)
+		#         OSC = Escape, BEL = \a, ST = \\, Ps = parameter, Pt = value
+		# When Pt = "?", query the font or color in Ps
+		# Ps = 11;?  => query text background. If reply "11;rgb:0000/0000/0000" it's truecolor
+		echo -e '\e]11;?\a'
+		read -rs cfg < $__AMMLIB_TTY
+		if [[ "${cfg//rgb/}" != "$cfg" ]]; then
+			ammLog::Debug "RGB found in terminal reply"
+			r=0
+		fi
+		stty -raw echo $sttyOld
+	fi
+
+	return $r
 }
 
 # @description  Returns the Time for the logs

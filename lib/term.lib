@@ -1,0 +1,167 @@
+# vim: ft=sh ts=4
+
+if ! [[ "${FUNCNAME[1]}" = ammLib::Load* ]]; then
+	echo >&2 "You must not source this library ($BASH_SOURCE): Use function ammLib::Load"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# AMM Lib meta stubs
+# -----------------------------------------------------------------------------
+
+#function ammTerm::MetaCheck {
+#	ammExec::Require awk
+#}
+#function ammTerm::MetaInit {
+#}
+
+# -----------------------------------------------------------------------------
+# Some description for your lib
+# -----------------------------------------------------------------------------
+
+typeset -g AMMTERM_KEY_BEL=$'\a' # Bell (Ctrl-G)
+typeset -g AMMTERM_KEY_BS=$'\b' # Backspace (Ctrl-H)
+typeset -g AMMTERM_KEY_CR= # Carriage Return (Ctrl-M)
+typeset -g AMMTERM_KEY_ENQ= # Return Term Status (Ctrl-E)
+typeset -g AMMTERM_KEY_FF= # Form Feed or NewPage(NP). FF is same a LF  (Ctrl-L)
+typeset -g AMMTERM_KEY_LF= # LineFeed or NewLine (NL). (Ctrl-J)
+typeset -g AMMTERM_KEY_SI= # Switch to Standard Char Set.
+typeset -g AMMTERM_KEY_SO= # Switch to Alternate Char Set.
+typeset -g AMMTERM_KEY_SP=" " # Space
+typeset -g AMMTERM_KEY_TAB=$'\t' # Horizontal Tab HTS (Ctrl-I)
+typeset -g AMMTERM_KEY_VT= # Vertical Tab VT (Ctrl-K). same as LF
+
+typeset -g AMMTERM_CTRL_ST="\\" # \x9c
+typeset -g AMMTERM_CTRL_DCS="P" # Device Control String: \x90
+typeset -g AMMTERM_CTRL_SOS="X" # Start Of String: \x98
+typeset -g AMMTERM_CTRL_CSI="[" # Control Sequence Introducer: \x9b
+typeset -g AMMTERM_CTRL_OSC="]" # Operating System Command: \x9d
+#typeset -g AMMTERM_CTRL_PM="^"  # Privacy Message: \x9e
+#typeset -g AMMTERM_CTRL_APC="_" # Application Program Command: \x9f
+typeset -gA AMMTERM_CTRL=([ESC]="" [CSI]="[" [OSC]="]")
+
+function ammTerm::_Send {
+	typeset ctrlType="$1"
+	typeset data="$2"
+
+	# Can only work if a tty is connected
+	if [[ -n "$__AMMLIB_TTY" ]]; then
+		echo -ne "\e${AMMTERM_CTRL[$ctrlType]}${data}"
+	fi
+}
+
+# @
+function ammTerm::_Query {
+	typeset ctrlType="$1"
+	typeset data="$2"
+	typeset replySkip="${3:-0}"
+	typeset replyTrim="${4:-}"
+
+	typeset -i r=1
+	# Can only work if a tty is connected
+	if [[ -n "$__AMMLIB_TTY" ]]; then
+		# use Xterm-Control-Sequences for that
+		typeset sttyOld="$(stty -g)" cfg=
+		# config read: min 0 char & 0.1s timeout
+		stty raw -echo min 0 time 1
+		# "OSC Ps ; Pt BEL"  or  "OSC Ps ; Pt ST" (preferred)
+		# With: OSC = Escape, BEL = \a, ST = \\, Ps = parameter, Pt = value
+		# When Pt = "?", query the font or color in Ps
+		echo -ne "\e${AMMTERM_CTRL[$ctrlType]}${data}"
+		read -rs cfg < $__AMMLIB_TTY
+		# Clean the reply
+		cfg="${cfg:4}"
+		#cfg="${cfg:$replySkip}"
+		stty -raw echo $sttyOld
+		echo "$cfg"
+	fi
+
+	return $r
+}
+
+#
+# Getter/Setter of XTerm Control Sequences
+# See: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands
+#
+# For icon (prop 0 & 1) see :
+#  https://unix.stackexchange.com/questions/234136/in-xterm-what-is-icon-name
+#  https://tronche.com/gui/x/icccm/sec-4.html#WM_NAME
+
+
+function ammTerm::TitleSet {
+	typeset title="${1:-}"
+	# "2" for VT100, "l" for shelltool/CDE dtterm
+	ammTerm::_Send "OSC" "2;${title}\a"
+}
+
+function ammTerm::XPropSet {
+	typeset property="$1"
+	typeset value="$2"
+	ammTerm::_Send "OSC" "3;${property}=${value}\a"
+}
+function ammTerm::XPropUnset {
+	typeset property="$1"
+	ammTerm::_Send "OSC" "3;${property}\a"
+}
+function ammTerm::ColorChange {
+	typeset colorCode="$1"
+	typeset colorSpec="$2"
+	# ColorSpec must be a value accepted by XParseColor: #FFAA33 or rgb:0000/0000/0000
+
+	# 4 = standard ANSI colors 0-7 + 8-15 + remaining 88 or 256-colors (depend on supported colors)
+	if [[ $colorCode -le 15 ]]; then
+		ammTerm::_Send "OSC" "4;${colorCode};${colorSpec}\a"
+	# 5 = special color: any color with code higher than the max allowed by 4
+	else
+		ammTerm::_Send "OSC" "5;${colorCode};${colorSpec}\a"
+	fi
+}
+
+function ammTerm::ColorReset {
+	typeset colorCode="$1"
+	if [[ $colorCode -le 15 ]]; then
+		ammTerm::_Send "OSC" "104;${colorCode}\a"
+	else
+		ammTerm::_Send "OSC"  "105;${colorCode}\a"
+	fi
+}
+
+function ammTerm::CursorSave    { ammTerm::_Send "ESC" "7"; }
+function ammTerm::CursorRestore { ammTerm::_Send "ESC" "8"; }
+function ammTerm::Reset         { ammTerm::_Send "ESC" "c"; }
+
+
+
+function ammTerm::WindowPositionSet {
+	typeset x="$1" y="$2"
+	ammTerm::_Send "CSI" "3;${x};${y}t"
+}
+function ammTerm::WindowPositionGet {
+	ammTerm::_Query "CSI" "13t"
+}
+
+function ammTerm::WindowSizeSet {
+	typeset w="$1" h="$2"
+	ammTerm::_Send "CSI" "4;${w};${h}t"
+}
+function ammTerm::WindowSizeGet {
+	ammTerm::_Query "CSI" "14;2t"
+}
+
+function ammTerm::WindowTextareaSet {
+	typeset w="$1" h="$2"
+	ammTerm::_Send "CSI" "8;${w};${h}t"
+}
+
+
+function ammTerm::WindowToFront { ammTerm::_Send "CSI" "5t"; }
+function ammTerm::WindowToBack  { ammTerm::_Send "CSI" "6t"; }
+function ammTerm::WindowMaximizeUndo { ammTerm::_Send "CSI" "9;0t"; }
+function ammTerm::WindowMaximize     { ammTerm::_Send "CSI" "9;1t"; }
+function ammTerm::WindowMaximizeVert { ammTerm::_Send "CSI" "9;2t"; }
+function ammTerm::WindowMaximizeHori { ammTerm::_Send "CSI" "9;3t"; }
+function ammTerm::WindowFullscreenUndo   { ammTerm::_Send "CSI" "10;0t"; }
+function ammTerm::WindowFullscreen       { ammTerm::_Send "CSI" "10;1t"; }
+function ammTerm::WindowFullscreenToggle { ammTerm::_Send "CSI" "10;2t"; }
+function ammTerm::ScreenSizeGet { ammTerm::_Query "CSI" "15t"; }
+

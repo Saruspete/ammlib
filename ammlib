@@ -842,18 +842,52 @@ typeset -gi __AMMLOG_VERBOSITY=3
 typeset -gi __AMMLOG_DEPTH=0
 
 # @description  Colorize the text with values in __AMMLOG_TERMCODES
-# @$ color codes to be printed
+# @$ color codes to be printed. Can be a text/format (in $__AMMLOG_TERMCODES), a rgb value (rgb:000:123:255), an hex value (hex:019aef)
 function ammLog::Color {
 	typeset -r esc="\e[" # CSI  =  ESC+"["  =  \e or \x1b or \033 + "["
 	typeset -a codes=()
 
-	# TODO: Handle truecolor. See https://gist.github.com/XVilka/8346728
+	# Color is handled by xterm "CSI Pm m  Character Attributes (SGR)"
 	while [[ -n "${1-}" ]]; do
-		[[ -n "${__AMMLOG_TERMCODES[$1]-}" ]] && codes[${#codes[@]}+1]="${__AMMLOG_TERMCODES[$1]}"
-		shift
+		# legacy 8 color
+		if [[ -n "${__AMMLOG_TERMCODES[$1]-}" ]]; then
+			codes[${#codes[@]}+1]="${__AMMLOG_TERMCODES[$1]}"
+			shift
+			continue
+		# Any non-standard color or modifier: rgb:123:456:789  hex:09ABEF
+		else
+			typeset pfx="${1%%:*}" colorCode="${1#*:}"
+			if [[ "$pfx" != "$1" ]]; then
+				typeset colorType=5 colorTarget=38
+				# If we have an hex or rgb color, check format
+
+				# Set color to truecolor
+				case $pfx in
+					rgb|rgbfg) colorType=2 ;;
+					rgbbg)     colorType=2 ; colorTarget=48 ;;
+					hex|hexfg) colorType=2 ;                  colorCode="$(ammLog::ColorHexToRgb "$colorCode")" ;;
+					hexbg)     colorType=2 ; colorTarget=48 ; colorCode="$(ammLog::ColorHexToRgb "$colorCode")" ;;
+					*)
+						ammLog::Warning "Invalid prefix '$pfx' in '$1' (called in $FUNCNAME)"
+						;;
+				esac
+
+				codes[${#codes[@]}+1]="${colorTarget}:${colorType}::${colorCode}"
+			# No prefix, assume direct color code
+			else
+				:
+			fi
+			shift
+		fi
 	done
 
 	echo -ne "${esc}$(ammLog::_ColorJoin ";" ${codes[@]+"${codes[@]}"})m"
+}
+
+function ammLog::ColorHexToRgb {
+	typeset hex="${1#\#}"
+	typeset rgb="$((16#${hex:0:2})):$((16#${hex:2:2})):$((16#${hex:4:2}))"
+	echo "$rgb"
 }
 
 # @

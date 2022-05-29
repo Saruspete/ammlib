@@ -824,9 +824,9 @@ function ammLog::_ColorJoin {
 # These codes are ANSI/VT100. If not the correct term, use "tput" to get the correct one. Using fixed table for speed
 typeset -gA __AMMLOG_TERMCODES=(
 	# Set
-	[reset]=0 [bold]=1 [dim]=2 [underline]=4 [blink]=5 [reverse]=7 [hidden]=8
+	[reset]=0 [bold]=1 [dim]=2 [italic]=3 [underline]=4 [underlinedouble]=21 [blink]=5 [reverse]=7 [hidden]=8 [strikethrough]=9
 	# Reset
-	[resetbold]=21 [resetdim]=22 [resetunderline]=24 [resetblink]=25 [resetreverse]=27 [resethidden]=28
+	[resetdim]=22 [resetitalic]=23 [resetunderline]=24 [resetblink]=25 [resetreverse]=27 [resethidden]=28 [resetstrikethrough]=29
 	# Foreground Colors
 	[black]=30 [red]=31 [green]=32 [yellow]=33 [blue]=34 [magenta]=35 [cyan]=36 [white]=37 [default]=39
 	# Background Colors

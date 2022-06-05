@@ -172,8 +172,8 @@ function ammIso::Extract {
 		return $?
 	fi
 
-	if ammExec::Exists "xoriso"; then
-		ammLog::Info "$logmsg xoriso"
+	if ammExec::Exists "xorriso"; then
+		ammLog::Info "$logmsg xorriso"
 		\xorriso -osirrox on -indev "$iso" -extract / "$dstdir"
 		return $?
 	fi

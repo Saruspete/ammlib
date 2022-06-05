@@ -31,14 +31,7 @@ typeset -g AMMTERM_KEY_SP=" " # Space
 typeset -g AMMTERM_KEY_TAB=$'\t' # Horizontal Tab HTS (Ctrl-I)
 typeset -g AMMTERM_KEY_VT= # Vertical Tab VT (Ctrl-K). same as LF
 
-typeset -g AMMTERM_CTRL_ST="\\" # \x9c
-typeset -g AMMTERM_CTRL_DCS="P" # Device Control String: \x90
-typeset -g AMMTERM_CTRL_SOS="X" # Start Of String: \x98
-typeset -g AMMTERM_CTRL_CSI="[" # Control Sequence Introducer: \x9b
-typeset -g AMMTERM_CTRL_OSC="]" # Operating System Command: \x9d
-#typeset -g AMMTERM_CTRL_PM="^"  # Privacy Message: \x9e
-#typeset -g AMMTERM_CTRL_APC="_" # Application Program Command: \x9f
-typeset -gA AMMTERM_CTRL=([ESC]="" [CSI]="[" [OSC]="]")
+typeset -gA AMMTERM_CTRL=([ESC]="" [CSI]="[" [OSC]="]" [SOS]="X" [DCS]="P" [APC]="_" [PM]="*")
 
 function ammTerm::_Send {
 	typeset ctrlType="$1"

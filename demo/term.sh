@@ -35,21 +35,27 @@ done
 
 
 ammLog::EchoSeparator "True colors"
-typeset -i red= green= blue=
-while [[ $red -lt 255 ]]; do
-	while [[ $green -lt 255 ]]; do
-		while [[ $blue -lt 255 ]]; do
-			ammLog::Color "rgbbg:$red:$green:$blue"
-			echo -n "  "
-			blue+=10
+
+if ammLog::TrueColorAvailable; then
+	typeset -i red=0
+	while [[ $red -lt 255 ]]; do
+		typeset -i green=0
+		while [[ $green -lt 255 ]]; do
+			typeset -i blue=0
+			while [[ $blue -lt 255 ]]; do
+				ammLog::Color "rgbbg:$red:$green:$blue"
+				echo -n "  "
+				blue+=10
+			done
+			green+=10
+			ammLog::Color reset
+			echo
 		done
-		green+=10
-		blue=0
-		ammLog::Color reset
+		red+=10
 		echo
 	done
-	red+=10
-	green=0
-	echo
-done
+
+else
+	echo "Not supported by your terminal"
+fi
 

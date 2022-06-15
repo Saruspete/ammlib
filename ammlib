@@ -791,15 +791,15 @@ function ammLib::Compact {
 # @description List modules currently available
 # @noargs
 function ammLib::ListModules {
+	typeset filter="${1:-}"
 
 	typeset libpath lib
-	for libpath in $(ammLib::LocatePattern); do
+	for libpath in $(ammLib::LocatePattern "$filter"); do
 		[[ -s "$libpath" ]] || continue
 		typeset lib=${libpath##*/}
 		lib=${lib%.lib}
 
-		echo
-		echo "====== $lib ($libpath)"
+		echo "$lib"
 	done
 }
 

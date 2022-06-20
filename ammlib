@@ -230,25 +230,10 @@ function ammLib::TmpPathGet {
 # Hooks and events
 # -----------------------------------------------------------------------------
 
-typeset -gA __AMMLIB_HOOKLIST
+typeset -g __AMMLIB_HOOK_SEP="§§"
+typeset -gA __AMMLIB_HOOK_LIST=() __AMMLIB_HOOK_INPROGRESS=()
 # This module will register dynamic arrays based on name + prefix __AMMHOOK_
 
-# @description  Will generate a variable ID from a given name
-function ammLib::HookNameToVarname {
-	typeset -u name="$1"
-
-	# Remove any non-alphanum char
-	name="${name//[^a-zA-Z0-9]/}"
-	echo "__AMMLIB_HOOK_$name"
-}
-
-function ammLib::HookExists {
-	typeset name="$1"
-
-	typeset id="$(ammLib::HookNameToVarname "$name")"
-	# Got to use eval, typeset -n is from bash 4.3
-	eval "(set +u; [[ -n \${${id}} ]] )"
-}
 
 # @description  Register a callback to a hook
 # @arg $1  (string) Name of the hook to register
@@ -256,33 +241,18 @@ function ammLib::HookExists {
 function ammLib::HookRegister {
 	typeset name="$1"; shift
 
-	typeset varname="$(ammLib::HookNameToVarname "$name")"
 	# Create the hook first if not existing
-	if ! ammLib::HookExists $name; then
-		ammLog::Debug "Registering cb '$@' to new hook '$name'"
-		eval "$varname=('$@')"
-		__AMMLIB_HOOKLIST["$varname"]="$name"
+	if ! [[ -n "${__AMMLIB_HOOK_LIST[$name]:-}" ]]; then
+		ammLog::Debug "Registering cb '$*' to new hook '$name'"
+		__AMMLIB_HOOK_LIST["$name"]="$*"
 	else
-		ammLog::Debug "Registering cb '$@' to existing hook '$name'"
-		eval "$varname+=('$@')"
-		__AMMLIB_HOOKLIST["$varname"]+=" $name"
+		ammLog::Debug "Registering cb '$*' to existing hook '$name'"
+		__AMMLIB_HOOK_LIST["$name"]+="${__AMMLIB_HOOK_SEP}$*"
 	fi
 }
 
 function ammLib::HookList {
-	echo "${!__AMMLIB_HOOKLIST[@]}"
-}
-
-# @description  List registered callbacks for an even
-# @arg $1  (string) name of the hook to list callbacks
-function ammLib::HookListCallbacks {
-	typeset name="$1"
-
-	typeset varname="$(ammLib::HookNameToVarname "$name")"
-	typeset callback callbackid
-	for callbackid in $(eval 'echo ${!'$varname'[@]}'); do
-		eval echo '${'${varname}'['${callbackid}']};'
-	done
+	echo "${!__AMMLIB_HOOK_LIST[@]}"
 }
 
 # @description  Trigger a hook
@@ -291,17 +261,41 @@ function ammLib::HookListCallbacks {
 function ammLib::HookTrigger {
 	typeset name="$1"; shift
 
-	ammLog::Debug "Triggering callbacks for '$name'"
+	# Check if we already are within a Hook trigger
+	if set +u && [[ -n "${__AMMLIB_HOOK_INPROGRESS[$name]}" ]]; then
+		set -u
+		ammLog::Debug "The hook for '$name' is already in progress. Skipping"
+		return
+	fi
+	set -u
 
-	typeset callback args
-	while read callback args; do
-		if ! ammEnv::IsFunc "$callback"; then
-			ammLog::Warning "Callback '$callback' is not a function. Skipping it"
+	# Avoid logs for unneeded evals (most of the time, there's no hook)
+	[[ -z "${__AMMLIB_HOOK_LIST[$name]:-}" ]] && return 0
+
+	# Process callbacks
+	ammLog::Debug "Triggering callbacks for '$name'"
+	__AMMLIB_HOOK_INPROGRESS[$name]="${SECONDS:-$(date +%s)}"
+
+	# Extract the callback + its args from the string
+	typeset -i callbackPos=0
+	while [[ $callbackPos -lt "${#__AMMLIB_HOOK_LIST[$name]}" ]]; do
+		typeset callbackStr="${__AMMLIB_HOOK_LIST[$name]: $callbackPos}"
+		typeset callback="${callbackStr%%${__AMMLIB_HOOK_SEP}*}"
+		callbackPos+=$(( ${#callback} + ${#__AMMLIB_HOOK_SEP} ))
+
+		if ! ammEnv::IsFunc "${callback%% *}"; then
+			ammLog::Warning "Callback '${callback%% *}' is not a function. Skipping it"
 			continue
 		fi
-		ammLog::Debug "Calling callback '$callback $args' with '$@'"
-		$callback $args "$@"
-	done < <(ammLib::HookListCallbacks "$name")
+
+		# Execute the callback
+		ammLog::Trace "Calling callback '$callback' with '$@'"
+		$callback "$@"
+
+	done
+
+	unset __AMMLIB_HOOK_INPROGRESS[$name]
+
 }
 
 # -----------------------------------------------------------------------------
@@ -727,7 +721,7 @@ function ammLib::Load {
 			if [[ -n "$libfile" ]] && [[ -s "$libfile" ]]; then
 				ammLog::Error "Unable to load lib '$libname' due to failed init (enable debug with AMMLIB_DEBUG=Lib for full detail)"
 			else
-				ammLog::Debug "Unable to locate library '$libname' in search path '$__AMMLIB_SEARCHPATH'"
+				ammLog::Debug "Unable to locate library '$libname' in search path: ${AMMLIB_SEARCHPATH_EXTRA:-} $__AMMLIB_SEARCHPATH ${AMMLIB_SEARCHPATH_EXTRA:-}"
 			fi
 
 			r=r+1

@@ -148,7 +148,7 @@ if ammLog::TrueColorAvailable; then
 	typeset -i red=0
 
 	echo "Colorbox"
-	typeset colMax="$COLUMNS" lineMax=10
+	typeset colMax="${COLUMNS:-$(tput cols)}" lineMax=10
 	for line in $(seq $lineMax); do
 		for colId in $(seq $colMax); do
 			# Compute HLS (Hue Lightness Saturation)

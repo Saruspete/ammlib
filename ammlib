@@ -2217,15 +2217,17 @@ function ammExec::IsExecutable {
 }
 
 
+# -----------------------------------------------------------------------------
 # Deprecated functions
-function ammEnv::PathDecompose { ammLog::Deprecated "ammPath::Decompose"; }
-function ammEnv::PathIsSecure { ammLog::Deprecated "ammPath::IsSecure"; }
-function ammEnv::PathIsWritable { ammLog::Deprecated "ammPath::IsWritable"; }
-function _ammLib::TrapInit { ammLog::Deprecated ammLib::_TrapInit "$@"; }
-function _ammLib::TrapHandler { ammLog::Deprecated ammLib::_TrapHandler "$@"; }
-function _ammEnv::Add { ammLog::Deprecated ammEnv::_Add "$@"; }
-function _ammPath::RecurseFolders {  ammLog::Deprecated ammPath::_RecurseFolders "$@"; }
-function _ammPath::CallbackCopy {    ammLog::Deprecated ammPath::_CallbackCopy "$@"; }
-function _ammPath::CallbackHardlink { ammLog::Deprecated ammPath::_CallbackHardlink "$@"; }
-function _ammPath::CallbackSymlink { ammLog::Deprecated ammPath::_CallbackSymlink "$@"; }
+# -----------------------------------------------------------------------------
+function ammEnv::PathDecompose {      ammLog::Deprecated "ammPath::Decompose"   "$@"; }
+function ammEnv::PathIsSecure {       ammLog::Deprecated "ammPath::IsSecure"    "$@"; }
+function ammEnv::PathIsWritable {     ammLog::Deprecated "ammPath::IsWritable"  "$@"; }
+function _ammLib::TrapInit {          ammLog::Deprecated "ammLib::_TrapInit"    "$@"; }
+function _ammLib::TrapHandler {       ammLog::Deprecated "ammLib::_TrapHandler" "$@"; }
+function _ammEnv::Add {               ammLog::Deprecated "ammEnv::_Add"         "$@"; }
+function _ammPath::RecurseFolders {   ammLog::Deprecated "ammPath::_RecurseFolders"   "$@"; }
+function _ammPath::CallbackCopy {     ammLog::Deprecated "ammPath::_CallbackCopy"     "$@"; }
+function _ammPath::CallbackHardlink { ammLog::Deprecated "ammPath::_CallbackHardlink" "$@"; }
+function _ammPath::CallbackSymlink {  ammLog::Deprecated "ammPath::_CallbackSymlink"  "$@"; }
 

@@ -1907,6 +1907,10 @@ function ammPath::CopyStructureSymlinks {
 # Execution helpers
 # -----------------------------------------------------------------------------
 
+typeset -gA __AMMEXEC_IGNORE_BINPATH=()
+
+
+
 function ammExec::Logged {
 	# TODO: Log the exec, return code and output of the command
 	set -x
@@ -2158,10 +2162,17 @@ function ammExec::Exists {
 	for bin in "$@"; do
 		typeset binfound="" p
 		for p in ${PATH//:/ }; do
-			[[ -x "$p/$bin" ]] && {
+			if [[ -x "$p/$bin" ]]; then
 				binfound="$p/$bin"
-				break
-			}
+				# Check if we want to ignore this binary
+				typeset binfoundabs="$(ammPath::Canonicalize "$binfound")"
+				if ( set +u; [[ -n "${__AMMEXEC_IGNORE_BINPATH[$binfoundabs]}" ]] ); then
+					ammLog::Debug "Ignoring binary '$binfound' (abs: $binfoundabs)"
+					binfound=""
+				else
+					break
+				fi
+			fi
 		done
 
 		# If binary was not found in $PATH, stop here

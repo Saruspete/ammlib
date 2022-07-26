@@ -346,6 +346,7 @@ function ammOptparse::AddOpt {
 						!)
 							# TODO: Check for existing option collision
 							_AMMOPTPARSE_OPTLONG["no$var"]="$id"
+							_AMMOPTPARSE_OPTLONG["no-$var"]="$id"
 							_AMMOPTPARSE_VALTYPE[$id]='!'
 							;;
 						*)
@@ -650,6 +651,9 @@ function ammOptparse::Parse {
 					# Check if the option without "no" is registered to the same ID
 					if [[ "${var:0:2}" == "no" ]] && ( set +u; [[ "${_AMMOPTPARSE_OPTLONG[${var:2}]}" == "$id" ]] ); then
 						ammLog::Trace "Option '$var' is the negation of '${var:2}' for ID '$id'"
+						val="false"
+					elif [[ "${var:0:3}" == "no-" ]] && ( set +u; [[ "${_AMMOPTPARSE_OPTLONG[${var:3}]}" == "$id" ]] ); then
+						ammLog::Trace "Option '$var' is the negation of '${var:3}' for ID '$id'"
 						val="false"
 					else
 						ammLog::Trace "Option '$var' set to true for ID '$id'"

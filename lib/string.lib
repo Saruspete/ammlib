@@ -583,7 +583,7 @@ function ammString::BaseConvert {
 		echo $number
 
 #	# (<=64) => 10
-	elif [[ $basedst == 10 ]] && [[ $basesrc -le $__AMMLIB_INTMAX ]]; then
+	elif [[ $basedst == 10 ]] && [[ $basesrc -le $__AMMLIB_ARCHSIZE ]]; then
 		# Bit of uglyness to avoid vim parsing error (due to the #)
 		echo $(( $basesrc#$number \
 		))

@@ -131,6 +131,7 @@ function ammPath::Canonicalize {
 
 # @description  Path where ammlib is
 typeset -g  __AMMLIB_REALPATH="$(ammPath::Canonicalize ${BASH_SOURCE[0]} 2>/dev/null)"
+typeset -g  __AMMLIB_ARCHSIZE="$(getconf LONG_BIT)"
 
 
 # @description  Options passed to the script ($@)

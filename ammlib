@@ -302,11 +302,13 @@ function ammLib::HookTrigger {
 # -----------------------------------------------------------------------------
 # Exit code and trap management
 # -----------------------------------------------------------------------------
-typeset -gA __AMMLIB_SIGNALS
-typeset -gA __AMMLIB_TRAP_CALLBACKS
-typeset -gA __AMMLIB_TRAP_REGISTERED
+typeset -gA __AMMLIB_SIGNALS=()
+typeset -gA __AMMLIB_TRAP_CALLBACKS=()
+typeset -gA __AMMLIB_TRAP_REGISTERED=()
 typeset -gi __AMMLIB_TRAP_WAITMAX=30
 typeset -g  __AMMLIB_TRAP_WAITSTEP=1
+typeset -gi __AMMLIB_TRAP_EXIT_CNT=0
+typeset -gi __AMMLIB_TRAP_EXIT_MAX=5
 
 
 # @description  Initialize and registers the signal handling trap
@@ -390,6 +392,7 @@ ammLib::TrapRegister "ammLib::TrapClean" EXITALL
 # ABRT: Call of abort(), usually by libc for ptmalloc errors
 # TSTP: Stopped (Ctrl + Z)
 
+
 # @description  (private) TRAP handler to clean
 # @arg $1  Name of the signal
 function ammLib::_TrapHandler {
@@ -403,18 +406,20 @@ function ammLib::_TrapHandler {
 		# Standard shutdown
 		EXIT)
 			sigtype="EXITOK"
+			trap "" EXIT
+			__AMMLIB_TRAP_EXIT_CNT+=1
 
 			# Wait for unfinished jobs
-			if [[ -n "$(jobs)" ]] && [[ $__AMMLIB_TRAP_WAITMAX -gt 0 ]]; then
+			if [[ -n "$(jobs -r)" ]] && [[ $__AMMLIB_TRAP_WAITMAX -gt 0 ]]; then
 				ammLog::Info "Waiting unfinished jobs in background for $__AMMLIB_TRAP_WAITMAX checks every $__AMMLIB_TRAP_WAITSTEP sec"
 				typeset num pid state cmd
 				typeset -i waitjob=0
 				while [[ $waitjob -lt $__AMMLIB_TRAP_WAITMAX ]]; do
 					typeset -i jobcnt=0
-					ammLog::Debug "== Check $waitjob $(ammLog::Time)"
+					ammLog::Debug "Check $waitjob $(ammLog::Time)"
 					while read num pid state cmd; do
 						[[ "$pid" == "$$" ]] && continue
-						ammLog::Info "PID:$pid State:$state Command:$cmd"
+						ammLog::Info "Test:$waitjob PID:$pid State:$state Command:$cmd"
 						jobcnt+=1
 					done < <(jobs -lr)
 					[[ $jobcnt -eq 0 ]] && break
@@ -432,7 +437,19 @@ function ammLib::_TrapHandler {
 		# Manual stop
 		INT|HUP|TERM|QUIT)
 			sigtype="EXITERR"
-			ammLog::Warning "Caught graceful interruption $signame. Cleaning"
+			if [[ $__AMMLIB_TRAP_EXIT_CNT -eq 0 ]]; then
+				ammLog::Warning "Caught graceful interruption $signame. Cleaning"
+			else
+				typeset -i rem="$(( $__AMMLIB_TRAP_EXIT_MAX - $__AMMLIB_TRAP_EXIT_CNT ))"
+				if [[ $rem -gt 0 ]]; then
+					ammLog::Warning "Exit in progress. Press Ctrl+C $rem more times to exit forcefully"
+					__AMMLIB_TRAP_EXIT_CNT+=1
+					return
+				else
+					ammLog::Warning "Exiting forcefully after $__AMMLIB_TRAP_EXIT_MAX signals"
+					exit $retcode
+				fi
+			fi
 			retaction="exit"
 			;;
 

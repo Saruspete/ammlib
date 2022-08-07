@@ -582,9 +582,11 @@ function ammString::BaseConvert {
 	if [[ "$basesrc" == "$basedst" ]]; then
 		echo $number
 
-#	# (<=64) => 10 # commented as fuck up the vim parsing
-#	elif [[ $basedst == 10 ]] && [[ $basesrc -le 64 ]]; then
-#		echo $(( $basesrc#$number ))
+#	# (<=64) => 10
+	elif [[ $basedst == 10 ]] && [[ $basesrc -le $__AMMLIB_INTMAX ]]; then
+		# Bit of uglyness to avoid vim parsing error (due to the #)
+		echo $(( $basesrc#$number \
+		))
 	# 16 => 10: pure bash
 	elif [[ $basesrc -le 16 ]]; then
 		# Beware to order of obase/ibase !

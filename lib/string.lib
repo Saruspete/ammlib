@@ -248,6 +248,41 @@ function ammString::Type {
 	fi
 }
 
+
+function ammString::IPv4IsInRange {
+	typeset ipv4="$1"
+	typeset ipLower="$2"
+	typeset ipUpper="$3"
+
+	if ! ammString::IsIPv4 "$ipv4"; then
+		ammLog::Error "Invalid IPv4 '$ipv4' provided to $FUNCNAME"
+		return 1
+	fi
+	if ! ammString::IsIPv4 "$ipLower"; then
+		ammLog::Error "Invalid lower IPv4 '$ipLower' provided to $FUNCNAME"
+		return 1
+	fi
+	if ! ammString::IsIPv4 "$ipUpper"; then
+		ammLog::Error "Invalid IPv4 '$ipUpper' provided to $FUNCNAME"
+		return 1
+	fi
+
+	typeset -a ipParts=(${ipv4//./ }) lowParts=(${ipLower//./ }) upParts=(${ipUpper//./ })
+	typeset -i i=0
+	for (( i=0; i<4; i++ )); do
+		if [[ ${ipParts[$i]} -lt ${lowParts[$i]} ]] || [[ ${ipParts[$i]} -gt ${upParts[$i]} ]]; then
+			return 1
+		fi
+	done
+	return 0
+}
+
+function ammString::IPv4IsMulticast {
+	typeset ipv4="$1"
+	ammString::IPv4IsInRange "$ipv4" "224.0.0.0" "239.255.255.255"
+}
+
+
 # -----------------------------------------------------------------------------
 # String modifiers
 # -----------------------------------------------------------------------------

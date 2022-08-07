@@ -630,6 +630,29 @@ function ammString::DecToHex {
 	ammString::BaseConvert 10 16 $1
 }
 
+# @description  Apply the provided AND mask
+# @arg (string) $1 The value to work on
+# @arg (string) $2 The AND mask to apply on the value
+function ammString::BitfieldAnd {
+	typeset val="$(ammString::StrToDec "$1")"
+	typeset mask="$(ammString::StrToDec "$2")"
+	typeset outbase="${3:-10}"
+
+	ammString::BaseConvert "10" "$outbase" "$(( $val & $mask ))"
+}
+
+# @description  Apply the provided OR mask
+# @arg (string) $1 The value to work on
+# @arg (string) $2 The OR mask to apply on the value
+function ammString::BitfieldOr {
+	typeset val="$(ammString::StrToDec "$1")"
+	typeset mask="$(ammString::StrToDec "$2")"
+	typeset outbase="${3:-10}"
+
+	ammString::BaseConvert "10" "$outbase" "$(( $val | $mask ))"
+}
+
+
 function ammString::StrToBin {
 
 	if ammExec::Exists perl; then

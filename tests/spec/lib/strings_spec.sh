@@ -174,6 +174,51 @@ Describe "string.lib:"
 				The output should eq "$2"
 			End
 		End
+
+		Describe "ammString::IPv4IsInRange"
+			It "returns failure if arg is not a valid IPv4"
+				When call ammString::IPv4IsInRange "this is a string" "10.0.0.1" "10.255.255.255"
+				The fd 98 should include "Invalid IPv4"
+				The status should be failure
+			End
+			It "returns failure if arg is not a valid IPv4"
+				When call ammString::IPv4IsInRange "10.255.255.256" "10.0.0.1" "10.255.255.255"
+				The fd 98 should include "Invalid IPv4"
+				The status should be failure
+			End
+			It "returns success if IP is in provided range"
+				When call ammString::IPv4IsInRange "10.20.30.40" "10.0.0.1" "10.255.255.255"
+				The status should be success
+			End
+			It "returns failure if IP is not in provided range"
+				When call ammString::IPv4IsInRange "20.20.30.40" "10.0.0.1" "10.255.255.255"
+				The status should be failure
+			End
+		End
+
+		Describe "ammString::IPv4IsMulticast"
+			It "returns failure if arg is not a multicast address"
+				When call ammString::IPv4IsMulticast "8.8.8.8"
+				The status should be failure
+			End
+			It "returns failure if arg is not a multicast address"
+				When call ammString::IPv4IsMulticast "223.255.255.255"
+				The status should be failure
+			End
+			It "returns failure if arg is not a multicast address"
+				When call ammString::IPv4IsMulticast "240.0.0.0"
+				The status should be failure
+			End
+			It "returns success if arg is a multicast address"
+				When call ammString::IPv4IsMulticast "224.0.0.0"
+				The status should be success
+			End
+			It "returns success if arg is a multicast address"
+				When call ammString::IPv4IsMulticast "239.255.255.255"
+				The status should be success
+			End
+		End
+
 	End
 
 	Describe "string modifiers:"
@@ -243,6 +288,45 @@ Describe "string.lib:"
 		Describe "ammString::HexToIPv4"
 		End
 
+		Describe "ammString::IPv4QuadToInt"
+		End
+
+		Describe "ammString::IPv4ToInt"
+		End
+
+		Describe "ammString::IntToIPv4"
+		End
+
+		Describe "ammString::IPv4MaskToPrefix"
+		End
+
+		Describe "ammString::IPv6Canonicalize"
+			It "fails when provided an invalid IPv6"
+				When call ammString::IPv6Canonicalize "0:1:2:3::4:5:6:7"
+				The fd 98 should include "Invalid IPv6"
+				The status should be failure
+			End
+
+			It "expands prefix :: form"
+				When call ammString::IPv6Canonicalize "::F"
+				The output should eq "0:0:0:0:0:0:0:f"
+				The status should be success
+			End
+			It "expands suffix :: form"
+				When call ammString::IPv6Canonicalize "F::"
+				The output should eq "f:0:0:0:0:0:0:0"
+				The status should be success
+			End
+			It "expands central :: form"
+				When call ammString::IPv6Canonicalize "DEAD:BEEF::B15:B00B"
+				The output should eq "dead:beef:0:0:0:0:b15:b00b"
+				The status should be success
+			End
+		End
+
+		Describe "ammString::IPv6ToHex"
+		End
+ARCHSIZE
 		Describe "ammString::IntegerMin"
 		End
 

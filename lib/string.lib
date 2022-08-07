@@ -743,6 +743,73 @@ function ammString::IPv4MaskToPrefix {
 	echo $pfx
 }
 
+#
+# IPv6
+#
+
+# @description  Canonicalize (get the expanded form) of provided IP
+# @arg string $1 IPv6 to expand
+function ammString::IPv6Canonicalize {
+	typeset -l ip="$1"
+
+	if ! ammString::IsIPv6 "$ip"; then
+		ammLog::Error "Invalid IPv6 '$ip' provided to $FUNCNAME"
+		return 1
+	fi
+
+	typeset -a hex=(0 0 0 0  0 0 0 0) ipParts=(${ip//:/ }) ipPartsAfterJoker=() ipPartsBeforeJoker=()
+	typeset ipHasJoker=false
+
+	# If we have :: in address
+	if [[ "${ip//::/}" != "$ip" ]]; then
+		typeset strBeforeJoker="${ip%::*}"
+		typeset strAfterJoker="${ip#*::}"
+		ipPartsBeforeJoker=(${strBeforeJoker//:/ })
+		ipPartsAfterJoker=(${strAfterJoker//:/ })
+		ipHasJoker=true
+	fi
+
+	typeset ipPart=
+	typeset -i i=0 j=0
+	for (( i=0; i<8; i++ )); do
+
+		# When we are at :: position, jump to remaining parts
+		if $ipHasJoker && [[ $i -eq ${#ipPartsBeforeJoker[@]} ]]; then
+			# Skip to fill the last
+			i=$((8 - ${#ipPartsAfterJoker[@]} -1 ))
+			continue
+		fi
+
+		# Replace the final part with provided one
+		hex[$i]="${ipParts[$j]}"
+		j+=1
+	done
+
+	ammString::Glue ':' "${hex[@]}"
+}
+
+function ammString::IPv6ToHex {
+	typeset ipv6str="$(ammString::IPv6Canonicalize "$1")"
+	typeset separator="${2:- }"
+
+	typeset ipHex=
+	typeset -a ipParts=( ${ipv6str//:/ } )
+	for part in ${ipParts[@]}; do
+		typeset partLen="${#part}"
+		case "$partLen" in
+			0) ipHex+="0000:"     ;;
+			1) ipHex+="000$part:" ;;
+			2) ipHex+="00$part:"  ;;
+			3) ipHex+="0$part:"   ;;
+			4) ipHex+="$part:"    ;;
+		esac
+	done
+
+	echo "${ipHex%:}"
+}
+
+
+
 
 function ammString::IntegerMin {
 

@@ -326,7 +326,6 @@ Describe "string.lib:"
 
 		Describe "ammString::IPv6ToHex"
 		End
-ARCHSIZE
 		Describe "ammString::IntegerMin"
 		End
 

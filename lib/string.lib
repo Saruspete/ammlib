@@ -666,7 +666,7 @@ function ammString::StrToBin {
 }
 
 
-# @description  Transforms a char string into a raw binary stream
+# @description  Transforms an hex char string into a raw binary stream
 # @arg 
 function ammString::AsciiToStream {
 	typeset str="${1:-}"
@@ -681,9 +681,14 @@ function ammString::AsciiToStream {
 		xxd -revert -plain
 	elif ammExec::Exists perl; then
 		perl -pe '$_=~s/\s+//mxsg; $_=pack("H*",$_)'
+	else
+		ammLog::Error "Cannot find xxd nor perl, cannot use $FUNCNAME"
 	fi
 }
 
+#
+# IPv4
+#
 
 function ammString::IPv4ToHex {
 	typeset ipv4str="$1"

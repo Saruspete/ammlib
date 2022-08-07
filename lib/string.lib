@@ -598,7 +598,30 @@ function ammString::BaseConvert {
 	fi
 }
 
+# @description Smart converted from octal, binary or hex to dec
+# @arg string  $1 The number to convert to dec
+function ammString::StrToDec {
+	typeset num="$1"
 
+	typeset base=10
+	# Explicit prefix
+	if [[ "${num:0:1}" == 0 ]]; then
+		typeset pfx="${num:1:1}"
+		case "$pfx" in
+			b) base=2;  num="${num#0b}" ;;
+			x) base=16; num="${num#0x}" ;;
+			[0-7]) base=8 ; num="${num#0}" ;;
+			*)
+				ammLog::Error "Unknown base '$pfx'. Using base 10"
+				;;
+		esac
+	# Hex chars
+	elif [[ "${num//[a-zA-F]/}" != "$num" ]]; then
+		base=16
+	fi
+
+	ammString::BaseConvert "$base" "10" "$num"
+}
 
 function ammString::HexToDec {
 	ammString::BaseConvert 16 10 $1

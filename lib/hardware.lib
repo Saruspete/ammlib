@@ -459,7 +459,7 @@ function ammHardware::NumaSummary {
 	#
 	typeset numaid=0
 	for numaid in ${numanodes[@]}; do
-		echo "numanode=$numaid cpucount=\"${numacount[$numaid]}\" cpuids=\"${numacpus[$numaid]%,}\" cpumodel=\"$cpumodel\" cpuucode=\"$cpuucode\" cpusmt=\"${numasmt[$numaid]}\" memsize=\"${memsize[$numaid]}\""
+		echo "numanode=$numaid cpucount=\"${numacount[$numaid]}\" cpuids=\"${numacpus[$numaid]%,}\" cpumodel=\"${cpumodel:-}\" cpuucode=\"${cpuucode:-}\" cpusmt=\"${numasmt[$numaid]}\" memsize=\"${memsize[$numaid]}\""
 	done
 }
 

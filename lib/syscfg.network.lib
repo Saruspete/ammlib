@@ -132,13 +132,13 @@ function ammSyscfgNetwork::CableInfo {
 				key="$(ammString::Trim "$key")"
 				val="$(ammString::Trim "$val")"
 				case "$key" in
-					BR,\ Nominal)  echo "module-speed='${val%MBd}'" ;;
+					BR,\ Nominal)  echo "module_speed='${val%MBd}'" ;;
 					Connector)
 						# Only take parsed value
-						echo "module-connector-raw='$val'"
+						echo "module_connector_raw='$val'"
 						val="${val#*(}"
 						val="${val%)*}"
-						echo "module-connector-str='$val'"
+						echo "module_connector_str='$val'"
 
 						if ammString::ContainsWord "$val" "Copper"; then
 							sfpmedium="Copper"
@@ -151,26 +151,27 @@ function ammSyscfgNetwork::CableInfo {
 						else
 							sfpactive="Active"
 						fi
-						if ammString::ContainsWord "$val" "Cable" && [[ -z "$sfpmedium" ]]; then
+						if ammString::ContainsWord "$val" "Cable" && [[ -z "${sfpmedium:-}" ]]; then
 							sfpmedium="Copper"
 						fi
 						;;
 
-					Length\ \($sfpmedium\))
+					Length\ \(${sfpmedium:-}\))
 						echo "length='$val'"
-						echo "length-$sfpmedium='$val'"
+						echo "length_$sfpmedium='$val'"
 						;;
 
 					Length\ *)
 						typeset typ="${key##*(}"
 						typ="${typ%)}"
-						echo "length-$typ='$val'"
+						typ="${typ//[^a-zA-Z0-9_]/_}"
+						echo "length_$typ='$val'"
 						;;
 
 					# For vendor-{Name,OUI,PN,SN,rev}
 					Vendor*)
 						typeset -l vendor="${key// /-}"
-						echo "$vendor='$val'"
+						echo "vendor='$val'"
 						;;
 
 					# Format fix for Ethtool 3.5 in Centos6

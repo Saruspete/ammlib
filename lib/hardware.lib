@@ -340,6 +340,13 @@ function ammHardware::PciDeviceRemove {
 }
 
 
+function ammHardware::_PciDeviceCtrl {
+	typeset deviceId="$1"
+	
+	# Get the PCI_CTRL address
+	typeset ctrlAddr="$(setpci -s $port)"
+}
+
 # -----------------------------------------------------------------------------
 # System / Core
 # -----------------------------------------------------------------------------
@@ -479,7 +486,7 @@ function ammHardware::MemoryDetail {
 		# Empty row + valid current: print line
 		if [[ -z "$key" ]] && [[ "$doProcess" == "1" ]]; then
 			if [[ -n "${data[size]:-}" ]] || [[ "$showEmpty" != "false" ]]; then
-				echo "slot=\"${data[locator]}\" size=\"${data[size]:-}\" form=\"${data[form]:-}\" rank=\"${data[rank]:-}\"  vendor=\"${data[vendor]:-}\" model=\"${data[model]:-}\" serial=\"${data[serial]:-}\"  "
+				echo "slot=\"${data[locator]}\" size=\"${data[size]:-}\" type=\"${data[type]}\" form=\"${data[form]:-}\" rank=\"${data[rank]:-}\"  vendor=\"${data[vendor]:-}\" model=\"${data[model]:-}\" serial=\"${data[serial]:-}\" speed=\"${data[speed]}\" speedmax=\"${data[speedmax]}\" "
 			fi
 			doProcess=0
 			data=()
@@ -505,7 +512,7 @@ function ammHardware::MemoryDetail {
 			Configured\ Memory\ Speed) data[speed]="$val" ;;
 			Manufacturer)  data[vendor]="$val" ;;
 			Serial\ Number)data[serial]="$val" ;;
-			Asset\ Tag) ;;
+			Asset\ Tag)    data[asset]="$val" ;;
 			Part\ Number)  data[model]="$val" ;;
 			Rank)          data[rank]="$val" ;;
 

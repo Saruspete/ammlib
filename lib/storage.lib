@@ -469,6 +469,7 @@ function ammStorage::GetModel {
 	[[ -z "$dev" ]] && return 1
 
 	typeset model="$(ammStorage::_GetFromSysBlock "$dev" "device/model")"
+	typeset vendor="$(ammStorage::_GetFromSysBlock "$dev" "device/vendor")"
 	# No direct model, fallback depending on type
 	if [[ -z "$model" ]]; then
 		typeset typ="$(ammStorage::GetType "$dev")"
@@ -483,14 +484,15 @@ function ammStorage::GetModel {
 			part)
 				typeset parent="$(ammStorage::ListParents "$dev")"
 				[[ -z "$parent" ]] && return 1
-				model="($(ammStorage::_GetFromSysBlock "$parent" "device/model"))"
+				model="$(ammStorage::_GetFromSysBlock "$parent" "device/model")"
+				vendor="$(ammStorage::_GetFromSysBlock "$parent" "device/vendor")"
 				;;
 			*)
 				return 1
 		esac
 	fi
 
-	echo "$model"
+	echo "$vendor $model"
 }
 
 function ammStorage::GetSerial {    ammStorage::_GetSysBlockGeneric "$1" "device/serial"; }

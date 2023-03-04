@@ -543,7 +543,8 @@ function ammHttp::GithubReleaseGetLatest {
 	typeset out="$(ammHttp::Get "$url")"
 	# curl will output the html with new location href
 	# wget will show the redirect url
-	typeset vers="$(echo "$out"| grep -Po 'releases/tag/.+[" ]' | cut -d/ -f 3 | tr -d '"')"
+	typeset vers="$(echo "$out"| grep -Po 'releases/tag/[a-zA-Z0-9_\.\-]+?[";& ]' | cut -d/ -f 3 | tr -d '"&;')"
+	vers="${vers%%$'\n'*}"
 
 	# If a version was tagged latest, use it and stop
 	if [[ -n "$vers" ]]; then

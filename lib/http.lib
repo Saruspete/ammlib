@@ -449,13 +449,13 @@ function ammHttp::GithubBranchGetLastCommit {
 
 	# Get the atom feed, and grep the related tag...
 	typeset url="https://github.com/$projectpath/commits/${branch}.atom"
-	typeset out="$(ammHttp::Get "$url" "-")"
+	typeset out="$(ammHttp::Get "$url")"
 
 	# Try again with "main" branch if default
 	if [[ "$out" == "Not Found" ]] && [[ -z "${2:-}" ]]; then
 		branch="main"
 		url="https://github.com/$projectpath/commits/${branch}.atom"
-		out="$(ammHttp::Get "$url" "-")"
+		out="$(ammHttp::Get "$url")"
 	fi
 
 	typeset commitid="${out#*<id>tag:github.com,2008:Grit::Commit/}"
@@ -472,7 +472,7 @@ function ammHttp::GithubCommitExists {
 	typeset commit="$2"
 
 	typeset url="https://github.com/$projectpath/commit/$commit"
-	[[ "$(ammHttp::Get "$url" "-" 2>/dev/null)" != "Not Found" ]]
+	[[ "$(ammHttp::Get "$url" 2>/dev/null)" != "Not Found" ]]
 }
 
 function ammHttp::GithubArchiveGetUrl {
@@ -506,7 +506,7 @@ function ammHttp::GithubReleaseList {
 			date="$(date -d "$date" +%s)"
 			echo "$tag $date $name"
 			cnt+=1
-		done < <(ammHttp::Get "$url" "-" | jq '.[] | "\(.tag_name) \(.prerelease) \(.published_at) \(.name)"')
+		done < <(ammHttp::Get "$url" | jq '.[] | "\(.tag_name) \(.prerelease) \(.published_at) \(.name)"')
 	# fallback to awk (more risky to output updates)
 	else
 		typeset tag prerelease date name
@@ -515,7 +515,7 @@ function ammHttp::GithubReleaseList {
 			date="$(date -d "$date" +%s)"
 			echo "$tag $date $name"
 			cnt+=1
-		done < <(ammHttp::Get "$url" "-" | awk '
+		done < <(ammHttp::Get "$url" | awk '
 			$1 == "\"tag_name\":"   { gsub(/[,"]/,"",$2); tag=$2; }
 			$1 == "\"prerelease\":" { gsub(/[,"]/,"",$2); prerelease=$2; }
 			$0 ~ /^    "name":/     { gsub(/[,"]/,"",$2); name=$2; }
@@ -540,7 +540,7 @@ function ammHttp::GithubReleaseGetLatest {
 
 	# Try with the simple http
 	typeset url="https://github.com/$projectpath/releases/$tag"
-	typeset out="$(ammHttp::Get "$url" "-" "nofollow")"
+	typeset out="$(ammHttp::Get "$url")"
 	# curl will output the html with new location href
 	# wget will show the redirect url
 	typeset vers="$(echo "$out"| grep -Po 'releases/tag/.+[" ]' | cut -d/ -f 3 | tr -d '"')"
@@ -555,7 +555,7 @@ function ammHttp::GithubReleaseGetLatest {
 
 	# Test from atom feed
 	url="https://github.com/$projectpath/releases.atom"
-	out="$(ammHttp::Get "$url" "-")"
+	out="$(ammHttp::Get "$url")"
 	typeset vers="${out#*<id>tag:github.com,2008:Repository/*/}"
 	if [[ "$vers" != "$out" ]]; then
 		vers="${vers%%</id*}"
@@ -565,7 +565,7 @@ function ammHttp::GithubReleaseGetLatest {
 
 	# Else, test with api
 	url="https://api.github.com/repos/$projectpath/releases"
-	out="$(ammHttp::Get "$url" "-")"
+	out="$(ammHttp::Get "$url")"
 	if ammExec::Exists jq; then
 		vers="$(echo "$out" | jq '.[0].tag_name')"
 		vers="${vers//\"/}"
@@ -586,7 +586,7 @@ function ammHttp::GithubReleaseGetAssets {
 	typeset assetfilter="${3:-}"
 
 	typeset url="https://api.github.com/repos/$projectpath/releases/tags/$tag"
-	typeset out="$(ammHttp::Get "$url" "-")"
+	typeset out="$(ammHttp::Get "$url")"
 	typeset urls=""
 
 	#
@@ -625,7 +625,7 @@ function ammHttp::CGitTagGet {
 		if [[ $line =~ /.+/tag/\?h=([-_\.0-9a-zA-Z]+)\'\> ]]; then
 			echo "${BASH_REMATCH[1]}"
 		fi
-	done < <(ammHttp::Get "$url" "-")
+	done < <(ammHttp::Get "$url")
 
 
 }

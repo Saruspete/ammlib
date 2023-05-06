@@ -79,6 +79,22 @@ function ammSyscfgNetwork::NicEnable {
 	ip link set "$iface" up
 }
 
+function ammSyscfgNetwork::NicType {
+	typeset iface="$1"
+
+	ammSyscfgNetwork::NicValidate "$iface" || return $?
+	# Try uevent
+	typeset ue="/sys/class/net/$iface/uevent"
+	if [[ -s "$ue" ]]; then
+		typeset t="$(source "$ue"; echo "${DEVTYPE:-}")"
+		if [[ -n "$t" ]]; then
+			echo "$t"
+			return
+		fi
+	fi
+	return 1
+}
+
 # @description Display information about a given NIC
 # @arg $1  Name of the NIC
 function ammSyscfgNetwork::NicInfo {

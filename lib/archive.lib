@@ -58,20 +58,20 @@ function ammArchive::LibList {
 # @arg $@  (string[])  Options to pass to the called function
 function ammArchive::_Proxy {
 	typeset op="$1"
-	typeset file="$2"
-	typeset fmt="${3:-}"
+	typeset fmt="${2:-}"
+	typeset file="${3:-}"
 	shift 3
 
 	# No format specified of discovery requested
 	if [[ -z "$fmt" ]] || [[ "$fmt" == "auto" ]]; then
-		if [[ -s "$file" ]]; then
+		if [[ -n "$file" ]]; then
 			fmt="$(ammArchive::FormatFromFile "$file")"
 			if [[ -z "$fmt" ]]; then
 				ammLog::Error "Unable to guess format of '$file' from current system available modules"
 				return 1
 			fi
 		else
-			ammLog::Error "Unable to guess format from empty file '$file'"
+			ammLog::Error "Unable to guess format from empty filename '$file'"
 			return 1
 		fi
 	fi
@@ -92,21 +92,23 @@ function ammArchive::_Proxy {
 # @arg $1  (path) Archive file to be checked for format
 # @arg $2  (path) Optional format hint or fallback
 function ammArchive::FormatFromFile {
-	typeset file="$1"
+	typeset -l file="$1"
 	typeset fmt="${2:-}"
 
 	typeset archfmt=""
 
 	# First by filename
-	case $file in
-		*.tar.gz|*.tgz)     archfmt="tar";;
-		*.tar.bz2|*.tbz2)   archfmt="tar";;
-		*.tar.xz|*.txz)     archfmt="tar";;
-		*.tar.lzma|*.tlzma) archfmt="tar";;
-		*.rpm)              archfmt="rpm";;
-		*.deb)              archfmt="deb";;
-		*.zip)              archfmt="zip";;
-		Dockerfile)         archfmt="docker";;
+	case "${file#*/}" in
+		*.tar.gz|*.tgz)     archfmt="tar" ;;
+		*.tar.bz2|*.tbz2)   archfmt="tar" ;;
+		*.tar.xz|*.txz)     archfmt="tar" ;;
+		*.tar.lzma|*.tlzma) archfmt="tar" ;;
+		*.cpio)             archfmt="cpio" ;;
+		*.rpm)              archfmt="rpm" ;;
+		*.deb)              archfmt="deb" ;;
+		*.zip)              archfmt="zip" ;;
+		*.iso)              archfmt="iso" ;;
+		*Dockerfile)        archfmt="docker" ;;
 	esac
 
 	# If format found, use it
@@ -125,6 +127,84 @@ function ammArchive::FormatFromFile {
 }
 
 
+function ammArchive::Compress {
+	typeset src="$1"
+	typeset dst="${2:-}"
+	typeset fmt="${3:-}"
+
+
+	# If no format is specified, guess it from filename
+	if [[ -z "$fmt" ]] && [[ -n "$dst" ]] && [[ "$dst" != "-" ]]; then
+		fmt="${dst##*.}"
+	fi
+
+	# Not format given nor guessed, cannot do anything here
+	if [[ -z "$fmt" ]]; then
+		ammLog::Debug "Compression format not provided and cannot be guessed"
+		return 0
+	fi
+
+	typeset -a compCmds=()
+	case "$fmt" in
+		*gz)     compCmds=("|gzip")  ;;
+		*bz2)    compCmds=("bzip2") ;;
+		*xz)     compCmds=("xz") ;;
+		*lzma)   compCmds=("lzma" "xz --format=lzma") ;;
+	esac
+
+	typeset cmd=""
+
+	# Search for a command that can handle this format
+	for cmd in "${compCmds[@]}"; do
+		# If the input is stream, needs a command that manages it
+		[[ "$cmd" == "-" ]] && [[ "${cmd:0:1}" != "|" ]] && continue
+
+		# Remove the optional stream indicator
+		cmd="${cmd#|}"
+
+		# If the binary is available, select it
+		ammExec::Exists "${cmd%% *}" && break
+	done
+
+	if [[ -z "$cmd" ]]; then
+		ammLog::Error "Cannot find a valid binary for format '$fmt' among '${compCmds[@]}'"
+		return 1
+	fi
+
+	
+}
+
+function ammArchive::Uncompress {
+	typeset src="$1"
+	typeset dst="$2"
+	typeset fmt="${3:-}"
+
+	# If no format is specified, guess it from filename
+	if [[ -z "$fmt" ]]; then
+		fmt="${src##*.}"
+	fi
+
+	typeset -a uncompCmds=()
+	case "$fmt" in
+		*gz)     uncompCmds=("|gzip -cd" "|gunzip -c" "gunzip")  ;;
+		*bz2)    uncompCmds=("bunzip2" "bzip2 -d") ;;
+		*xz)     uncompCmds=("|unxz" "|xz --decompress") ;;
+		*lzma)   uncompCmds=("|unlzma" "|xz --format=lzma") ;;
+	esac
+
+
+	typeset cmd=
+	for cmd in "${uncompCmds[@]}"; do
+
+		# If file is from stdin, 
+		if [[ "$file" == "-" ]]; then
+			:
+		fi
+
+	done
+
+}
+
 # -----------------------------------------------------------------------------
 # Basic operations: create / unpack
 # -----------------------------------------------------------------------------
@@ -139,7 +219,7 @@ function ammArchive::Unpack {
 	shift 2
 
 	# Call the real function
-	ammArchive::_Proxy "Unpack" "$file" "" "$dest" "$@"
+	ammArchive::_Proxy "Unpack" "auto" "$file" "$dest" "$@"
 }
 
 # @description  Create an archive
@@ -148,11 +228,11 @@ function ammArchive::Unpack {
 # @arg $@  (path) optional: select files relative to root folder to add
 function ammArchive::Pack {
 	typeset file="$1"
-	typeset src="$2"
+	typeset rootdir="$2"
 	shift 2
 
 	# Call the real function
-	ammArchive::_Proxy "Pack" "$file" "" "$src" "$@"
+	ammArchive::_Proxy "Pack" "auto" "$file" "$rootdir" "$@"
 }
 
 # @description  Add a file or folder to an archive
@@ -164,7 +244,7 @@ function ammArchive::Add {
 
 	typeset prefix=""
 
-	ammArchive::_Proxy "Pack" "$file" "" "$dest"
+	ammArchive::_Proxy "Pack" "auto" "$file" "$dest"
 
 }
 

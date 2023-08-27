@@ -17,6 +17,28 @@ function ammArchiveTar::MetaCheck {
 # Some description for your lib
 # -----------------------------------------------------------------------------
 
+function ammArchiveTar::_FormatToOpt {
+	typeset file="$1"
+
+	typeset opt=""
+
+	# Preprocessing if needed (could use -a)
+	case $file in
+		*tar.gz|*.tgz)   opt=" -z" ;;
+		*.tar.bz2|*.tbz) opt=" -j" ;;
+		*.tar.xz|*.txz)  opt=" -J" ;;
+		*.tar.lzma|*.tlzma) opt=" --lzma" ;;
+	esac
+
+	echo "$opt"
+}
+
+function ammArchiveTar::FormatHandled {
+	typeset file="$1"
+
+}
+
+
 # @description  Extract an archive file
 # @arg $1  
 function ammArchiveTar::Unpack {
@@ -25,38 +47,14 @@ function ammArchiveTar::Unpack {
 
 	typeset file="${src##*/}"
 	typeset path="${src%/*}"
-	typeset user="${RUN_USER:-$(user_owner "$MYSELF")}"
-	typeset usercurr="$(user_current)"
 	typeset -i ret=0
 
-	typeset PREP_BIN=""
-	typeset PREP_OPTS=""
-	typeset TAR_BIN="\\tar"
-	typeset TAR_OPTS=" -C $path "
+	typeset tarBin="\\tar"
+	typeset -a tarOpts=("-C" "$path")
 
-	# if we need to change the ownership
-	if [[ "$user" != "$usercurr" ]]; then
 
-		# tar as root can change its owner
-		if [[ "$usercurr" = "root" ]]; then
-			TAR_OPTS+=" --owner=$user "
-		# prefix tar with sudo to run as root
-		elif ammExec::Exists "sudo" >/dev/null; then
-			TAR_BIN="\\sudo -n \\tar"
-			TAR_OPTS+=" --owner=$user "
-		else
-			ammLog::Error "Cannot change the ownership from $usercurr to $user"
-			return 1
-		fi
-	fi
-
-	# Preprocessing if needed (could use -a)
-	case $file in
-		*tar.gz|*.tgz)   TAR_OPTS+=" -z" ;;
-		*.tar.bz2|*.tbz) TAR_OPTS+=" -j" ;;
-		*.tar.xz|*.txz)  TAR_OPTS+=" -J" ;;
-		*.tar.lzma|*.tlzma) TAR_OPTS+=" --lzma" ;;
-	esac
+	typeset preprocess="$(ammArchiveTar::_FormatToOpt "$file")"
+	[[ -n "$preprocess" ]] && tarOpts+=("$preprocess")
 
 	# Check if we should strip the first path or not
 	typeset strip=" --strip-components=1"
@@ -72,24 +70,23 @@ function ammArchiveTar::Unpack {
 		[[ "${line}" =~ ^\./ ]] && {
 			strip=" --strip-components=2"
 		}
-	done < <(\tar $TAR_OPTS -t -f "$src")
+	done < <(\tar "${tarOpts[@]}" -t -f "$src")
 
 	# Add the strip (if any left)
-	TAR_OPTS+=" $strip"
-
-	# Override the owner for the same user as the calling script
-	TAR_OPTS+=" --owner $user"
+	tarOpts+=("$strip")
 
 	# Unpack the tarball
-	ammLog::Info "Unpacking $file with tar opts: $TAR_OPTS"
+	ammLog::Info "Unpacking $file with tar opts: ${tarOpts[@]}"
 	set -o pipefail
-	\tar $TAR_OPTS -x -p -f "$src" 2>&1 | ammLog::Debug -
+	${tarBin} "${tarOpts[@]}" -x -p -f "$src" 2>&1 | ammLog::Debug -
+	set +o pipefail
 
 	ret=$?
-
 }
 
 
 function ammArchiveTar::Pack {
 	:
 }
+
+

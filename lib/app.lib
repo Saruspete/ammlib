@@ -44,6 +44,10 @@ function ammApp::MetaInit {
 # @description  Initialize application vars
 function ammApp::Init {
 
+	if [[ -n "${APP_NAME:-}" ]]; then
+		ammLog::Error "Already called $FUNCNAME. Called again at $(ammLog::Stackdump 2 1)"
+		return 1
+	fi
 
 	# Set my path according to these
 	typeset -gr APP_ROOT="$(realpath "${1:-$__AMMLIB_CALLPATH/..}")"

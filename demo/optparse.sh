@@ -50,7 +50,8 @@ ammOptparse::AddOpt "--fooenabled"  "This option is enabled"
 
 # Can also be simplified as:
 # ammOptparse::Parse --no-unknown || ammLog::Die "Parsing error. Please check previous errors. Use --help to for more details"
-if ! ammOptparse::Parse --no-unknown; then
+#if ! ammOptparse::Parse --no-unknown; then
+if ! ammOptparse::Parse ; then
 	ammLog::Error "Parsing error. Please check"
 	ammOptparse::Help
 	exit 1

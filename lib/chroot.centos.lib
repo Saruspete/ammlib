@@ -45,12 +45,14 @@ function ammChrootCentos::MetaInit {
 	__AMMCHROOTCENTOS_VERSIONS=(
 		[6.7]="1601" [6.8]="1605" [6.9]="1704" [6.10]="1808"
 		[7.0]="1406" [7.1]="1503" [7.2]="1511" [7.3]="1611" [7.4]="1708" [7.5]="1804" [7.6]="1810" [7.7]="1908" [7.8]="2003" [7.9]="2009"
-		[8.0]="8.0.1905" [8.1]="8.1.1911-20200113.3" [8.2]="8.2.2004-20200611.2" [8.3]="8.3.2011-20201204.2"
+		[8.0]="8.0.1905" [8.1]="8.1.1911-20200113.3" [8.2]="8.2.2004-20200611.2" [8.3]="8.3.2011-20201204.2" [8.4]="8.4.2105" [8.5]="8.5.2111"
+		[8-stream]="8-stream"
+		[9-stream]="9-stream"
 	)
 	__AMMCHROOTCENTOS_VERSIONS+=(
 		[6]=${__AMMCHROOTCENTOS_VERSIONS[6.10]}
 		[7]=${__AMMCHROOTCENTOS_VERSIONS[7.8]}
-		[8]=${__AMMCHROOTCENTOS_VERSIONS[8.3]}
+		[8]=${__AMMCHROOTCENTOS_VERSIONS[8.5]}
 	)
 
 	# Mirrorlist is only for latest version, else it's in the vault
@@ -70,7 +72,7 @@ function ammChrootCentos::MetaInit {
 	for v in ${!__AMMCHROOTCENTOS_VERSIONS[@]}; do
 		case "$v" in
 			6*|7*)  AMMCHROOTCENTOS_REPO_LIST[$v]="os updates extras centosplus" ;;
-			8*)     AMMCHROOTCENTOS_REPO_LIST[$v]="BaseOS AppStream" ;;
+			8*|9*)     AMMCHROOTCENTOS_REPO_LIST[$v]="BaseOS AppStream" ;;
 		esac
 	done
 

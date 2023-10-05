@@ -486,7 +486,7 @@ function ammHardware::MemoryDetail {
 		# Empty row + valid current: print line
 		if [[ -z "$key" ]] && [[ "$doProcess" == "1" ]]; then
 			if [[ -n "${data[size]:-}" ]] || [[ "$showEmpty" != "false" ]]; then
-				echo "slot=\"${data[locator]}\" size=\"${data[size]:-}\" type=\"${data[type]}\" form=\"${data[form]:-}\" rank=\"${data[rank]:-}\"  vendor=\"${data[vendor]:-}\" model=\"${data[model]:-}\" serial=\"${data[serial]:-}\" speed=\"${data[speed]}\" speedmax=\"${data[speedmax]}\" "
+				echo "slot=\"${data[locator]}\" size=\"${data[size]:-}\" type=\"${data[type]}\" form=\"${data[form]:-}\" rank=\"${data[rank]:-}\"  vendor=\"${data[vendor]:-}\" model=\"${data[model]:-}\" serial=\"${data[serial]:-}\" speed=\"${data[speed]:-}\" speedmax=\"${data[speedmax]:-}\" "
 			fi
 			doProcess=0
 			data=()

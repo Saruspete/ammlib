@@ -173,10 +173,16 @@ function ammString::IsIPv4 {
 }
 
 function ammString::IsIPv6 {
-	typeset ip="${1:-}"
+	typeset -l ip="${1:-}"
 
 	# ::1
-	[[ $ip =~ ^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$ ]]
+	[[ $ip =~ ^([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}$ ]]
+}
+
+function ammString::IsIPv6Local {
+	typeset -l ip="${1:-}"
+	# Consider fc00/7 and / fe80 as local IPs
+	[[ -z "${ip##f[dc]*}" ]] || [[ -z "${ip##fe80*}" ]]
 }
 
 function ammString::IsIP {

@@ -99,7 +99,7 @@ function ammSyscfgNetwork::NicType {
 # @arg $1  Name of the NIC
 function ammSyscfgNetwork::NicInfo {
 	typeset iface="$1"
-	typeset fields="${2:-carrier duplex speed type master mac vendorid deviceid ipv4 driver}"
+	typeset fields="${2:-carrier duplex speed type upper lowers mac vendorid deviceid ipv4 driver}"
 
 	ammSyscfgNetwork::NicValidate "$iface" || return $?
 
@@ -116,7 +116,17 @@ function ammSyscfgNetwork::NicInfo {
 			ipv4)    echo "ipv4=\"$(ip address show dev $iface|ammString::Filter "-" "inet" "^inet$" "+1")\"" ;;
 			# More complex processing
 			type)    echo "type=$(awk -F= '$1=="DEVTYPE"{print $2}' $ifpath/uevent)" ;;
-			master)  echo "master=" ;;
+			upper|master)
+				typeset upperPath="$ifpath/upper_*"
+				typeset upper="$(compgen -G "$upperPath")"
+				upper="${upper##*upper_}"
+				echo "upper=$upper master=$upper"
+				;;
+			lowers)
+				typeset lowers="$(cd $ifpath; compgen -G "./lower_*")"
+				lowers="${lowers//.\/lower_/}"
+				echo "lowers='$lowers'"
+				;;
 			driver)
 				typeset driver="$(readlink -f "$ifpath/device/driver" 2>/dev/null)"
 				echo "driver=\"${driver##*/}\""
